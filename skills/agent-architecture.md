@@ -39,7 +39,7 @@ ROCCO is one voice. The 8 Masters are how that voice splits the workload. Sub-ag
 | 3 | **Meta Ads** | Facebook/Instagram ads | PARTIAL | Intelligence, Sales+Ops | Sales+Ops, Build, Content, Intelligence |
 | 4 | **TikTok Ads** | TikTok ads + short-form | PLANNED | Intelligence, Sales+Ops | Sales+Ops, Content, Intelligence |
 | 5 | **Marketing** | Strategy, positioning, frameworks, pricing, **outreach design (sequences, channels, hooks)** | PARTIAL | Content, Build, all Ads, Sales+Ops | Intelligence |
-| 6 | **Content** | Social, video, newsletter, voice | PLANNED | all Ads, Build | Marketing, Intelligence |
+| 6 | **Content** | Social, video, newsletter, voice, **autonomous content pipeline (draft→approve→schedule→post)**, **image + video gen orchestration** | LIVE | all Ads, Build | Marketing, Intelligence |
 | 7 | **Intelligence** | Research, recon, customer/competitor intel | PLANNED | Marketing, all Ads, Content | all Ads (perf data), Sales+Ops |
 | 8 | **Sales and Ops** | Sales execution (Tyler dials, discovery, close), GHL pipeline ops, lifecycle delivery, daily ops, vault hygiene | LIVE (sales) | Build, all Ads, Intelligence | Build, all Ads, **Marketing (designed sequences)** |
 
@@ -70,7 +70,7 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `copy-editing` → outputs `EditedCopy`
 - `site-architecture` → outputs `Sitemap`
 - `ui-ux-pro-max` → outputs `UISpec`
-- `image` → outputs `ImageAssets`
+- `image` → outputs `ImageAssets` *(shared with Content Master — Build owns site images, Content owns social/ad images)*
 - `schema-markup` → outputs `SchemaJSON` (technical SEO that lives on the page)
 - `gitnexus` → outputs `ImpactReport` (call BEFORE any code edit per CLAUDE.md)
 
@@ -228,8 +228,8 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 ---
 
 ### 6. CONTENT MASTER
-**Owns:** Social posts, threads, videos, newsletters, voice/tone documentation, repurposing. Both agency content (Brendan's LinkedIn/Twitter) and client content.
-**Status:** PLANNED — skills installed, no `skills/content.md` yet
+**Owns:** Social posts, threads, videos, newsletters, voice/tone documentation, repurposing, **autonomous content pipeline (draft→approve→schedule→post)**, **image + video gen orchestration**. Both agency content (Brendan's LinkedIn/X) and client content (50/50 weight).
+**Status:** LIVE — `skills/content.md` is the completed playbook (autonomous pipeline, brand voice system, 5-symptom perf reviewer, full image/video tool stack)
 **Callsign (optional):** Echo
 
 **Sub-agents:**
@@ -244,23 +244,28 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `de-ai-ify` → outputs `HumanizedCopy`
 - `linkedin-authority-builder` → outputs `LinkedInSystem`
 - `linkedin-profile-optimizer` → outputs `ProfileRewrite`
+- `image` → outputs `ImageAsset` *(shared with Build Master — Build owns site images, Content owns social/ad images)*
 
-**Playbook:** `skills/content.md` — TBD (priority #7 in build order)
+**Playbook:** `skills/content.md` — **LIVE** (autonomous pipeline, brand voice system, hook bank with 200+ examples, 5-symptom perf reviewer, full image/video tool stack with decision trees)
 
-**Tools / MCP:** Remotion, HeyGen, Higgsfield, Jitter, Motionsites, Brave Search
+**Tools / MCP:** Midjourney, Flux, DALL-E, Ideogram, Gemini Imagen, Canva, Figma, Veo, Runway, Kling, Pika, Higgsfield, Hyperframes, HeyGen, Synthesia, Remotion, Jitter, Motionsites, CapCut, Buffer, Hypefury, Typefully, Notion, Make.com, Brave Search
 
 **Routing triggers:**
 - "tweet" / "thread" / "LinkedIn post" / "Reels" / "TikTok video"
 - "newsletter" / "email content"
 - "what should I post" / "content ideas"
 - "make this sound human" / "remove AI tone"
-- "voice guide" / "ghostwriting"
+- "voice guide" / "ghostwriting" / "brand voice"
 - "repurpose this content"
+- "image generation" / "video generation"
+- "Midjourney" / "Flux" / "DALL-E" / "Ideogram" / "Veo" / "Runway" / "Higgsfield" / "Remotion"
+- "hook frameworks" / "approval workflow" / "posting schedule" / "content pillars"
+- "autonomous content" / "daily pipeline" / "approve queue"
 
-**Feeds →** all Ads (creative + scripts), Build (hero copy, page video assets)
-**Fed by ←** Marketing (strategy + positioning), Intelligence (pain points + trends)
+**Feeds →** all Ads (creative + scripts via Contracts C7/C8), Build (hero copy, page video assets)
+**Fed by ←** Marketing (strategy + positioning + voice rules), Intelligence (pain points + trends)
 
-**Default next move when called:** Pull voice guide if it exists. Pull Marketing positioning if it exists. Generate 3+ angles before drafting. Never single-shot a post.
+**Default next move when called:** Load `skills/content.md`. If task is content generation → check brand voice file (§3) first. If task is performance question → run §10 reviewer. If task is image/video → use §6/§7 tool decision tree. Never single-shot a post.
 
 ---
 
@@ -746,7 +751,7 @@ Order to write the per-Master playbooks. Driven by **revenue impact + foundation
 | 3 | All Ads (Google + Meta + TikTok) | `skills/ads.md` LIVE. Shared playbook for all 3 Ads Masters: CPL framework, learning phase rules, performance reviewer, per-niche strategy, budget tiers. SonoView protected sub-playbook included. TikTok still deferred for execution; doc covers it for completeness. | `skills/ads.md` ✅ |
 | 4 | Build | Primary deliverable for clients. Without sites, ads have nowhere to send traffic. | `skills/build.md` |
 | 5 | Intelligence | Research backbone every other Master leans on. Building this 5th unlocks better outputs everywhere. | `skills/intelligence.md` |
-| 6 | Content | Agency growth (Brendan's LinkedIn/Twitter) + client content. Important but not on critical path. | `skills/content.md` |
+| 6 | Content | `skills/content.md` LIVE. Autonomous content pipeline (draft→approve→schedule→post), brand voice system, hook bank, full image+video tool stack, 5-symptom perf reviewer. Agency + client content (50/50). | `skills/content.md` ✅ |
 
 This is the order for **per-Master playbooks**. The architecture file (this doc) ships in one pass with all 8 Masters defined.
 
