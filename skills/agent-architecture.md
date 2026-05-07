@@ -38,10 +38,10 @@ ROCCO is one voice. The 8 Masters are how that voice splits the workload. Sub-ag
 | 2 | **Google Ads** | Google Ads campaigns + tracking | PARTIAL | Intelligence, Sales+Ops | Sales+Ops, Build, Marketing, Intelligence |
 | 3 | **Meta Ads** | Facebook/Instagram ads | PLANNED | Intelligence, Sales+Ops | Sales+Ops, Build, Content, Intelligence |
 | 4 | **TikTok Ads** | TikTok ads + short-form | PLANNED | Intelligence, Sales+Ops | Sales+Ops, Content, Intelligence |
-| 5 | **Marketing** | Strategy, positioning, frameworks, pricing | PLANNED | Content, Build, all Ads, Sales+Ops | Intelligence |
+| 5 | **Marketing** | Strategy, positioning, frameworks, pricing, **outreach design (sequences, channels, hooks)** | PARTIAL | Content, Build, all Ads, Sales+Ops | Intelligence |
 | 6 | **Content** | Social, video, newsletter, voice | PLANNED | all Ads, Build | Marketing, Intelligence |
 | 7 | **Intelligence** | Research, recon, customer/competitor intel | PLANNED | Marketing, all Ads, Content | all Ads (perf data), Sales+Ops |
-| 8 | **Sales and Ops** | Cold outreach, CRM, lifecycle, daily ops | LIVE (sales) | Build, all Ads, Intelligence | Build, all Ads |
+| 8 | **Sales and Ops** | Sales execution (Tyler dials, discovery, close), GHL pipeline ops, lifecycle delivery, daily ops, vault hygiene | LIVE (sales) | Build, all Ads, Intelligence | Build, all Ads, **Marketing (designed sequences)** |
 
 LIVE = playbook exists, contracts work today
 PARTIAL = skills work, playbook stub
@@ -177,8 +177,8 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 ---
 
 ### 5. MARKETING MASTER
-**Owns:** Strategy, positioning, ICP, pricing, messaging frameworks, organic SEO direction, launches, case studies, testimonials. The brain that decides WHAT we say and HOW we differentiate.
-**Status:** PLANNED — skills installed, no `skills/marketing.md` yet
+**Owns:** Strategy, positioning, ICP, pricing, messaging frameworks, organic SEO direction, launches, case studies, testimonials, **outreach design (cold email sequences, channel mix, niche selection, Review Scraper SOP, FB groups strategy)**. The brain that decides WHAT we say, HOW we differentiate, and WHICH channel + sequence to deploy.
+**Status:** PARTIAL — `skills/marketing.md` LIVE; sub-domains still expanding
 **Callsign (optional):** Compass
 
 **Sub-agents:**
@@ -199,10 +199,13 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `seo-audit` → outputs `SEOAudit` (organic strategy)
 - `ai-seo` → outputs `AIVisibilityPlan`
 - `programmatic-seo` → outputs `pSEOPlan`
+- `cold-email` → outputs `EmailSequence` *(shared with Sales+Ops — Marketing OWNS sequence design, Sales+Ops OWNS execution)*
+- `cold-outreach-sequence` → outputs `LinkedInSequence` *(shared with Sales+Ops — same split)*
+- `email-sequence` → outputs `LifecycleSequence` *(shared with Sales+Ops — Marketing designs lifecycle flows, Sales+Ops executes via GHL automations)*
 
-**Playbook:** `skills/marketing.md` — TBD (priority #6 in build order)
+**Playbook:** `skills/marketing.md` — **LIVE** (11 niches, Vegas markets, channel mix, cold sequences, Review Scraper SOP, FB groups, GHL marketing view, positioning matrix, Council LCM examples)
 
-**Tools / MCP:** Brave Search, NotebookLM (fact-check), positioning frameworks, Council LCM (CLAUDE.md)
+**Tools / MCP:** Brave Search, NotebookLM (fact-check), Apollo.io (lead lists), Apify (Review Scraper), Google Sheets, GHL (custom fields + import), positioning frameworks, Council LCM (CLAUDE.md)
 
 **Routing triggers:**
 - "positioning" / "ICP" / "value prop" / "messaging"
@@ -210,12 +213,17 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - "launch" / "go-to-market" / "GTM"
 - "SEO" / "ranking" / "keywords" (organic, not page-level — for page-level go to Build)
 - "case study" / "testimonial" / "social proof"
+- "cold email design" / "outreach sequence" / "channel mix" / "what channel should I use"
+- "11 niches" / "niche selection" / "expand to a new niche"
+- "Vegas markets" / "Vegas zip codes" / "neighborhood targeting"
+- "Review Scraper" / "review audit" / "personalization hook"
+- "Facebook groups" / "FB group strategy"
 - Anything triggering Council LCM (strategy / pricing / clients / growth / money)
 
-**Feeds →** Content (strategy → calendar), Build (positioning → site brief), all Ads (angle → creative), Sales+Ops (positioning → cold script)
+**Feeds →** Content (strategy → calendar), Build (positioning → site brief), all Ads (angle → creative), **Sales+Ops (positioning → cold script, designed sequences → execution)**
 **Fed by ←** Intelligence (research → positioning input)
 
-**Default next move when called:** Run Council LCM (5 lenses). Output positioning doc OR pricing decision OR launch plan — never abstract advice.
+**Default next move when called:** Load `skills/marketing.md`. If task is strategic → run Council LCM (5 lenses). If task is sequence design → produce sequence + handoff to Sales+Ops via Contract C13. Never produce abstract advice — output the doc, the sequence, or the decision.
 
 ---
 
@@ -288,16 +296,13 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 ---
 
 ### 8. SALES AND OPS MASTER
-**Owns:** Cold outreach (Tyler's dials), discovery, proposals, closes, GHL pipeline, lifecycle email, churn prevention, referrals, daily ops, internal vault hygiene.
-**Status:** LIVE — `skills/sales.md` is the only completed playbook. Lifecycle + ops still PARTIAL.
+**Owns:** Sales **execution** — Tyler's dials, discovery calls, proposals, closes. GHL pipeline operations + automations. Lifecycle delivery (sending the sequences Marketing designed). Daily ops + internal vault hygiene.
+**Status:** LIVE — `skills/sales.md` is the completed execution playbook. Lifecycle + ops sub-playbooks still PARTIAL.
 **Callsign (optional):** Closer
 
 **Sub-agents:**
-- `cold-email` → outputs `EmailSequence`
-- `cold-outreach-sequence` → outputs `LinkedInSequence`
 - `sales-enablement` → outputs `SalesAsset` (deck, one-pager, objection doc)
 - `meeting-prep` → outputs `MeetingBrief`
-- `email-sequence` → outputs `LifecycleSequence`
 - `lead-magnets` → outputs `LeadMagnetSpec`
 - `churn-prevention` → outputs `ChurnPlan`
 - `revops` → outputs `RevOpsPlan`
@@ -307,6 +312,9 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `daily-briefing-builder` → outputs `MorningBrief`
 - `vault-cleanup-auditor` → outputs `VaultReport`
 - `go-mode` → orchestrator for autonomous goal execution
+- `cold-email` *(shared — see Marketing for design; Sales+Ops sends)*
+- `cold-outreach-sequence` *(shared — see Marketing for design; Sales+Ops sends)*
+- `email-sequence` *(shared — see Marketing for design; Sales+Ops executes via GHL)*
 
 **Playbook:** `skills/sales.md` — LIVE. Lifecycle + ops sub-playbooks TBD.
 
@@ -314,16 +322,16 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 
 **Routing triggers:**
 - "cold call" / "Tyler" / "dial" / "discovery call" / "proposal" / "close"
-- "GHL" / "pipeline" / "lead status"
-- "follow-up email" / "lifecycle" / "drip"
-- "churn" / "cancel" / "save offer"
+- "GHL" / "pipeline" / "lead status" / "GHL automations"
+- "send the sequence" / "execute the sequence" / "run the email"
+- "churn" / "cancel" / "save offer" *(execution; Marketing designs)*
 - "plan my day" / "what should I do today"
 - ANY revenue-generating task → priority #1 per CLAUDE.md
 
-**Feeds →** Build (closed deal → site brief), all Ads (closed deal → kickoff brief), Intelligence (call notes → ICP refinement)
-**Fed by ←** Build (site delivered → onboarding email), all Ads (perf data → client report)
+**Feeds →** Build (closed deal → site brief), all Ads (closed deal → kickoff brief), Intelligence (call notes → ICP refinement), **Marketing (call notes + dial outcomes → sequence iteration)**
+**Fed by ←** Build (site delivered → onboarding email), all Ads (perf data → client report), **Marketing (designed sequences for execution via Contract C13)**
 
-**Default next move when called:** Check GHL pipeline state first. Reference `skills/sales.md` for any sales-flow question. Cold calls are #1 priority — interrupt other work if a sales blocker shows up.
+**Default next move when called:** Check GHL pipeline state first. Reference `skills/sales.md` for any execution question; reference `skills/marketing.md` for any sequence/strategy question. Cold calls are #1 priority — interrupt other work if a sales blocker shows up.
 
 ---
 
@@ -622,7 +630,7 @@ When work crosses Masters, the handoff is a structured JSON object. ROCCO produc
   "client": "Valdes Agency (internal)",
   "task_id": "cold-script-pool-vegas-v3",
   "timestamp": "ISO",
-  "status": "PLANNED",
+  "status": "LIVE",
   "payload": {
     "icp_segment": "5-20 employee pool service companies, Vegas",
     "core_message": "string (one-liner)",
@@ -633,7 +641,7 @@ When work crosses Masters, the handoff is a structured JSON object. ROCCO produc
       { "objection": "string", "response": "string" }
     ]
   },
-  "next_action": "Sales+Ops updates Tyler's call script + email templates"
+  "next_action": "Sales+Ops updates Tyler's call script + email templates per skills/marketing.md §10 positioning matrix"
 }
 ```
 
@@ -690,6 +698,43 @@ When work crosses Masters, the handoff is a structured JSON object. ROCCO produc
 
 ---
 
+#### C13 — `Marketing → Sales+Ops` :: cold-sequence-deploy (LIVE)
+
+Marketing designs a cold email + LinkedIn sequence (per `skills/marketing.md` §6). Sales+Ops executes (Tyler dials replies + GHL automations send the touches). This contract is the handoff.
+
+```json
+{
+  "from": "marketing.cold-email",
+  "to": "sales-ops.dial",
+  "client": "Valdes Agency (internal)",
+  "task_id": "cold-batch-pool-vegas-2026-05",
+  "timestamp": "2026-05-07T14:00:00-07:00",
+  "status": "LIVE",
+  "payload": {
+    "niche": "pool-service",
+    "geo_target": ["Las Vegas NV", "Henderson NV", "Summerlin NV", "Enterprise NV"],
+    "batch_size": 50,
+    "review_scraper_run_id": "apify-run-{{id}}",
+    "sequence_version": "pool-5touch-v1 (skills/marketing.md §6)",
+    "merge_fields_required": [
+      "owner_first_name",
+      "business_name",
+      "rating",
+      "review_count",
+      "negative_theme",
+      "response_gap"
+    ],
+    "ghl_tag": "cold-pool-2026-05",
+    "engaged_handoff_trigger": "replied | clicked | opened-3plus",
+    "tyler_call_window": "Tue-Thu 8-10am or 2-4pm",
+    "expected_reply_rate_baseline": 0.05
+  },
+  "next_action": "Sales+Ops triggers sequence in GHL; Tyler watches inbox daily; engaged contacts dialed within 2 hours of signal; outcomes feed back to Marketing for v2 iteration"
+}
+```
+
+---
+
 ## §6 — BUILD ORDER
 
 Order to write the per-Master playbooks. Driven by **revenue impact + foundational dependency**.
@@ -697,11 +742,11 @@ Order to write the per-Master playbooks. Driven by **revenue impact + foundation
 | # | Master | Why this order | Playbook to write |
 |---|---|---|---|
 | 1 | Sales and Ops | `sales.md` is LIVE. Finish lifecycle (email-sequence, churn) + ops integration. Cold calls are #1 priority (CLAUDE.md). | `skills/sales.md` ✅ + extend with lifecycle |
-| 2 | Build | Primary deliverable for clients. Without sites, ads have nowhere to send traffic. | `skills/build.md` |
-| 3 | Google Ads | Primary paid service for pool clients. CPL framework already drafted. | `skills/google-ads.md` |
-| 4 | Intelligence | Research backbone every other Master leans on. Building this 4th unlocks better outputs everywhere. | `skills/intelligence.md` |
-| 5 | Meta Ads | Second paid service offered. | `skills/meta-ads.md` |
-| 6 | Marketing | Strategy frameworks. Council LCM lives here. Useful at any time but doesn't unblock revenue today. | `skills/marketing.md` |
+| 2 | Marketing | `skills/marketing.md` LIVE. Owns niche selection, channel mix, cold sequence design, Review Scraper SOP — direct upstream of sales execution. | `skills/marketing.md` ✅ |
+| 3 | Build | Primary deliverable for clients. Without sites, ads have nowhere to send traffic. | `skills/build.md` |
+| 4 | Google Ads | Primary paid service for pool clients. CPL framework already drafted. | `skills/google-ads.md` |
+| 5 | Intelligence | Research backbone every other Master leans on. Building this 5th unlocks better outputs everywhere. | `skills/intelligence.md` |
+| 6 | Meta Ads | Second paid service offered. | `skills/meta-ads.md` |
 | 7 | Content | Agency growth (Brendan's LinkedIn/Twitter) + client content. Important but not on critical path. | `skills/content.md` |
 | 8 | TikTok Ads | Pool companies aren't TikTok-first. Defer until first non-pool client or until tested for pools. | `skills/tiktok-ads.md` |
 
