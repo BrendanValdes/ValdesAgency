@@ -36,7 +36,7 @@ ROCCO is one voice. The 8 Masters are how that voice splits the workload. Sub-ag
 |---|---|---|---|---|---|
 | 1 | **Build** | Sites, landing pages, CRO, copy, code | PARTIAL | Google Ads, Meta Ads, Sales+Ops | Marketing, Content, Sales+Ops |
 | 2 | **Google Ads** | Google Ads campaigns + tracking | PARTIAL | Intelligence, Sales+Ops | Sales+Ops, Build, Marketing, Intelligence |
-| 3 | **Meta Ads** | Facebook/Instagram ads | PLANNED | Intelligence, Sales+Ops | Sales+Ops, Build, Content, Intelligence |
+| 3 | **Meta Ads** | Facebook/Instagram ads | PARTIAL | Intelligence, Sales+Ops | Sales+Ops, Build, Content, Intelligence |
 | 4 | **TikTok Ads** | TikTok ads + short-form | PLANNED | Intelligence, Sales+Ops | Sales+Ops, Content, Intelligence |
 | 5 | **Marketing** | Strategy, positioning, frameworks, pricing, **outreach design (sequences, channels, hooks)** | PARTIAL | Content, Build, all Ads, Sales+Ops | Intelligence |
 | 6 | **Content** | Social, video, newsletter, voice | PLANNED | all Ads, Build | Marketing, Intelligence |
@@ -104,7 +104,7 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `ab-test-setup` → outputs `ExperimentSpec`
 - `analytics-tracking` → outputs `TrackingPlan` (GA4, GTM, conversion events)
 
-**Playbook:** `skills/google-ads.md` — TBD (priority #3 in build order)
+**Playbook:** `skills/ads.md` — **LIVE** *(shared with Meta + TikTok Ads Masters — see `skills/ads.md` §4 for Google-specific sections, §7 for performance reviewer)*
 
 **Tools / MCP:** Google Ads API, Google Tag Manager, GA4, PostHog (event mirror)
 
@@ -118,13 +118,13 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 **Feeds →** Intelligence (weekly perf data → next-cycle insights), Sales+Ops (CPL/booking data for client report)
 **Fed by ←** Sales+Ops (closed deal → kickoff brief, budget, geo, services), Build (LP live → tracking can fire), Marketing (positioning → ad angle), Intelligence (audience research → targeting)
 
-**Default next move when called:** Pull current account state. Check learning phase status. Reference CLAUDE.md SonoView CPL targets ($20–35 GOOD, $35–55 OK, $55+ FIX). Diagnose before suggesting changes. Never block geo terms.
+**Default next move when called:** Load `skills/ads.md`. Pull current account state. Check learning phase status (`skills/ads.md` §3). Run §7 performance reviewer if CPL is in OK or FIX band. Reference SonoView verbatim playbook in §4 + §8. Never block geo terms.
 
 ---
 
 ### 3. META ADS MASTER
 **Owns:** Facebook + Instagram ads — campaign structure, creative testing, audiences, tracking, optimization.
-**Status:** PLANNED — skills installed, not yet active for any client
+**Status:** PARTIAL — `skills/ads.md` §5 ships full Meta playbook; no live clients yet
 **Callsign (optional):** Mirror
 
 **Sub-agents:**
@@ -132,7 +132,7 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `ad-creative` (Meta variants — image, carousel, video) → outputs `AdCreativeSet`
 - `ab-test-setup` → outputs `ExperimentSpec`
 
-**Playbook:** `skills/meta-ads.md` — TBD (priority #5 in build order)
+**Playbook:** `skills/ads.md` — **LIVE** *(shared with Google + TikTok Ads Masters — see `skills/ads.md` §5 for Meta-specific sections, §7 for performance reviewer)*
 
 **Tools / MCP:** Meta Business Suite, Meta Ads API, Pixel + CAPI
 
@@ -145,13 +145,13 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 **Feeds →** Intelligence (perf data), Sales+Ops (lead/conversion data for report)
 **Fed by ←** Sales+Ops (kickoff brief), Build (LP), Content (video/static creative), Intelligence (audience insights)
 
-**Default next move when called:** Confirm Pixel + CAPI fire correctly. Set up creative test (3+ angles minimum). Do not optimize before signal.
+**Default next move when called:** Load `skills/ads.md` §5. Confirm Pixel + CAPI fire correctly. Set up creative test (3+ angles minimum). Do not optimize before signal — check §3 learning phase rules.
 
 ---
 
 ### 4. TIKTOK ADS MASTER
 **Owns:** TikTok paid + organic short-form for ad context. Last priority because pool companies aren't TikTok-first.
-**Status:** PLANNED — defer until first non-pool client or until Brendan tests TikTok for pools
+**Status:** PLANNED — `skills/ads.md` §6 documents the playbook; execution deferred until first non-pool client (likely Carpet Cleaning or House Cleaning per `skills/ads.md` §6)
 **Callsign (optional):** Spark
 
 **Sub-agents:**
@@ -160,7 +160,7 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 - `video` (short-form scripts + production) → outputs `VideoAsset`
 - `ab-test-setup` → outputs `ExperimentSpec`
 
-**Playbook:** `skills/tiktok-ads.md` — TBD (priority #8 in build order)
+**Playbook:** `skills/ads.md` — **PLANNED (shared, deferred)** *(shared with Google + Meta Ads Masters — see `skills/ads.md` §6 for TikTok-specific sections; execution deferred until niche fit confirmed)*
 
 **Tools / MCP:** TikTok Ads Manager, TikTok Pixel, Remotion (animated cuts), Higgsfield (image-to-video)
 
@@ -172,7 +172,7 @@ PLANNED = skills installed, no playbook yet, contracts documented but not battle
 **Feeds →** Intelligence (perf data), Sales+Ops (leads)
 **Fed by ←** Content (raw creative + script), Sales+Ops (kickoff), Intelligence (trend signals via reddit-insights / last30days)
 
-**Default next move when called:** Validate the offer is TikTok-native (problem-aware + visual). If not, route back to Marketing for angle work first.
+**Default next move when called:** Load `skills/ads.md` §6. Validate the offer is TikTok-native (problem-aware + visual). Use Spark Ads when client has organic handle. If niche doesn't fit (most of our 8 niches don't), route back to Marketing for channel reconsideration.
 
 ---
 
@@ -743,12 +743,10 @@ Order to write the per-Master playbooks. Driven by **revenue impact + foundation
 |---|---|---|---|
 | 1 | Sales and Ops | `sales.md` is LIVE. Finish lifecycle (email-sequence, churn) + ops integration. Cold calls are #1 priority (CLAUDE.md). | `skills/sales.md` ✅ + extend with lifecycle |
 | 2 | Marketing | `skills/marketing.md` LIVE. Owns niche selection, channel mix, cold sequence design, Review Scraper SOP — direct upstream of sales execution. | `skills/marketing.md` ✅ |
-| 3 | Build | Primary deliverable for clients. Without sites, ads have nowhere to send traffic. | `skills/build.md` |
-| 4 | Google Ads | Primary paid service for pool clients. CPL framework already drafted. | `skills/google-ads.md` |
+| 3 | All Ads (Google + Meta + TikTok) | `skills/ads.md` LIVE. Shared playbook for all 3 Ads Masters: CPL framework, learning phase rules, performance reviewer, per-niche strategy, budget tiers. SonoView protected sub-playbook included. TikTok still deferred for execution; doc covers it for completeness. | `skills/ads.md` ✅ |
+| 4 | Build | Primary deliverable for clients. Without sites, ads have nowhere to send traffic. | `skills/build.md` |
 | 5 | Intelligence | Research backbone every other Master leans on. Building this 5th unlocks better outputs everywhere. | `skills/intelligence.md` |
-| 6 | Meta Ads | Second paid service offered. | `skills/meta-ads.md` |
-| 7 | Content | Agency growth (Brendan's LinkedIn/Twitter) + client content. Important but not on critical path. | `skills/content.md` |
-| 8 | TikTok Ads | Pool companies aren't TikTok-first. Defer until first non-pool client or until tested for pools. | `skills/tiktok-ads.md` |
+| 6 | Content | Agency growth (Brendan's LinkedIn/Twitter) + client content. Important but not on critical path. | `skills/content.md` |
 
 This is the order for **per-Master playbooks**. The architecture file (this doc) ships in one pass with all 8 Masters defined.
 
