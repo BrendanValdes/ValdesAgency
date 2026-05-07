@@ -105,7 +105,9 @@ skills/sales.md          → Cold calling, discovery, proposals, closing, GHL pi
                            USE WHEN: Tyler's dials, objection handling, follow-ups,
                            discovery prep, proposal drafts, close-call coaching
 
-[future] skills/website.md   → Lovable workflow, design brief, components, hero video, delivery
+skills/website.md        → Lovable workflow, design brief, components, hero video, delivery
+                           USE WHEN: kickoff brief, Lovable prompts, component upgrades,
+                           QA pre-launch, domain/DNS, delivery package, SEO+schema setup
 [future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
 [future] skills/content.md   → Content pillars, hooks, platform timing
