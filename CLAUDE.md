@@ -69,6 +69,13 @@ FULL TOOL STACK
 | Motionsites.ai | High-end animated site templates |
 | ReactBits | 135+ animated components (reactbits.dev) |
 | Framer Motion | React animation engine |
+| Three.js | Foundational 3D library — base layer for any web 3D (see skills/website.md STAGE 8) |
+| React Three Fiber (R3F) | React renderer for Three.js — recommended 3D default for Lovable builds |
+| GSAP + ScrollTrigger | Scroll-pinned timelines, horizontal scroll, complex reveals (NEVER mix with Framer Motion in same component tree) |
+| Spline | Visual 3D editor for designer-led scenes — embed via @splinetool/react-spline |
+| Lenis | Smooth scroll (~7KB) — replaces Locomotive Scroll for new builds; disable on iOS |
+| Rive | State-machine vector animation — interactive logos, multi-state illustrations |
+| Lottie | After Effects → JSON animation — brand logo loops, designer handoff |
 | Rotato | Device mockups for client delivery |
 | IterationX | Client feedback pinned to live sites |
 | designspells.co | Design inspiration before any brief |

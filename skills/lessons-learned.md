@@ -43,6 +43,7 @@ Sorted most-recent first. Status legend: **LIVE** = rule actively enforced | **R
 
 | ID | Date | Category | Lesson (one-line) | Cost | Status |
 |---|---|---|---|---|---|
+| L-018 | 2026-05-08 | Process | Banned tools deserve a controlled-use doc, not a flat "AVOID" list | ~3 wks premium-tier positioning loss | RESOLVED |
 | L-017 | 2026-05-08 | Tools | Skip Smithery CLI — direct npm or git clone instead | ~1.5 hrs failed installs | LIVE |
 | L-016 | 2026-05-08 | Tools | Skip "generic language killer" repo — private/dead | ~30 min | RESOLVED |
 | L-015 | 2026-05-08 | Tools | Skip banana-claude repo — broken; use Flux via Replicate + Higgsfield | ~2 hrs | RESOLVED |
@@ -141,6 +142,13 @@ Each entry follows the same shape: **What happened** (2 sentences max) → **Why
 **Why it cost us:** Friction at startup kills momentum. The first 10 minutes after a restart should be productive, not "why is claude not found."
 **The rule going forward:** Every Codespace restart runs a startup checklist: (1) reinstall Claude Code, (2) verify MCP servers connected, (3) verify GitNexus index fresh, (4) `git status` for uncommitted work from last session. Document the exact commands somewhere reachable.
 **Lives also at:** (no playbook section yet — candidate for future `skills/dev-environment.md`)
+
+#### L-018 — Banned tools deserve a controlled-use doc, not a flat "AVOID" list
+**Date:** 2026-05-08 | **Category:** Process | **Cost:** ~3 weeks of premium-tier positioning loss + missed pitch opportunities | **Status:** RESOLVED
+**What happened:** `skills/website.md` DESIGN STANDARDS shipped with "Heavy Three.js / particle on mobile (kills performance)" under Animations — AVOID. That flat ban locked the agency out of any premium-tier work involving 3D, scroll choreography, or advanced motion. The fix was a 500-line STAGE 8 documenting controlled-use rules for 8 motion tools — the ban was always a documentation gap, not a real engineering constraint.
+**Why it cost us:** Couldn't pitch 3D/animation capabilities to premium-tier prospects ($2.5k+ retainers, brand-led briefs) because our own playbook said no. Positioning loss compounds — every week without the menu is a week we don't pursue brand-led work.
+**The rule going forward:** When a tool/technique has real costs, document the controlled-use rules (when to use, when not, performance contract, fallback plan) — never ship a flat AVOID. AVOID is only for things with zero legitimate use case. Everything else gets a guardrail-based menu entry with a hard performance contract.
+**Lives also at:** `skills/website.md` STAGE 8 (the safe-use playbook for Three.js + 7 other motion tools that previously had no documented path)
 
 ---
 
@@ -257,4 +265,5 @@ When you make a mistake or reverse a decision, copy this block and fill it in. A
 - Don't waste time on banana-claude (broken) or generic-language-killer (dead) (L-015, L-016)
 - Don't skip Codespace startup checklist — Claude Code reinstalls every restart (L-013)
 - Don't go 30+ minutes uncommitted in Codespace — disconnects lose work (L-012)
+- Don't write flat "AVOID" rules for tools with legitimate use cases — write controlled-use rules with guardrails (L-018)
 - Don't re-debate decisions logged in §2 — read the entry first, then challenge with new evidence
