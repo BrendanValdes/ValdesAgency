@@ -108,6 +108,12 @@ skills/sales.md          → Cold calling, discovery, proposals, closing, GHL pi
 skills/website.md        → Lovable workflow, design brief, components, hero video, delivery
                            USE WHEN: kickoff brief, Lovable prompts, component upgrades,
                            QA pre-launch, domain/DNS, delivery package, SEO+schema setup
+
+skills/lessons-learned.md → Mistake ledger — every reversal, voice correction, killed
+                           assumption with the cost that earned it.
+                           USE WHEN: every session start (§4 cheat scan, mandatory).
+                           ALSO USE: before reversing any prior decision.
+
 [future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
 [future] skills/content.md   → Content pillars, hooks, platform timing
@@ -122,8 +128,8 @@ Three-rule routing:
 3. If a playbook is missing → flag it, do the work this session, suggest extracting it next session.
 
 MEMORY PROTOCOL
-Session start: Check MCP Knowledge Graph for client updates, recent decisions, active tasks.
-Session end: Save to MCP — key decisions made, client status changes, what was built, what's next.
+Session start: (1) Read `skills/lessons-learned.md` §4 anti-pattern cheat scan (60 seconds, mandatory). (2) Check MCP Knowledge Graph for client updates, recent decisions, active tasks.
+Session end: Save to MCP — key decisions made, client status changes, what was built, what's next. If a mistake or reversal happened this session, log it to `skills/lessons-learned.md` using the §3 template before closing.
 Brain dump: `/workspaces/ValdesAgency/memory/brain-dump.md` — running notes, ideas, things to do.
 
 TASK PRIORITY ORDER
