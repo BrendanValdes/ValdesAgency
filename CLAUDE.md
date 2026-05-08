@@ -101,6 +101,11 @@ THE PLAYBOOK INDEX
 Load these on demand. If the task touches the topic — READ THE FILE before answering.
 
 ```
+skills/agent-architecture.md → 8 Masters org chart, routing triggers, JSON contracts,
+                           cross-Master handoffs. THE orchestration layer.
+                           USE WHEN: any task — load FIRST to pick the right Master.
+                           ALSO USE: multi-Master tasks, sub-agent confusion.
+
 skills/sales.md          → Cold calling, discovery, proposals, closing, GHL pipeline
                            USE WHEN: Tyler's dials, objection handling, follow-ups,
                            discovery prep, proposal drafts, close-call coaching
@@ -109,14 +114,35 @@ skills/website.md        → Lovable workflow, design brief, components, hero vi
                            USE WHEN: kickoff brief, Lovable prompts, component upgrades,
                            QA pre-launch, domain/DNS, delivery package, SEO+schema setup
 
+skills/marketing.md      → 11 niches, Vegas geo, cold sequences, Review Scraper SOP,
+                           FB groups, GHL marketing view, positioning
+                           USE WHEN: niche evaluation, sequence design, hook writing,
+                           Review Scraper SOP, Council LCM strategy calls
+
+skills/ads.md            → Google + Meta + TikTok unified — CPL framework, learning
+                           phase rules, performance reviewer decision trees, per-niche strategy
+                           USE WHEN: campaign kickoff, CPL spike triage, learning phase
+                           checks, budget tier decisions, SonoView ads work
+
+skills/content.md        → Autonomous content pipeline (draft→approve→schedule→post),
+                           voice system, hook bank, image+video tool stack, perf reviewer
+                           USE WHEN: any LinkedIn/X/IG post, content calendar, voice
+                           drift check, image/video generation, hook brainstorming
+
+skills/sonoview.md       → SonoView client playbook (PROTECTED — existing client)
+                           USE WHEN: any SonoView decision — ads, content, copy, geo,
+                           verification layer. Never generalize into base templates.
+
+skills/trade-n-travel.md → Trade N Travel partner project (BUILDING — dual ICP)
+                           USE WHEN: TNT brand, site, content, affiliate setup,
+                           dual-ICP framing decisions
+
 skills/lessons-learned.md → Mistake ledger — every reversal, voice correction, killed
                            assumption with the cost that earned it.
                            USE WHEN: every session start (§4 cheat scan, mandatory).
                            ALSO USE: before reversing any prior decision.
 
-[future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
-[future] skills/content.md   → Content pillars, hooks, platform timing
 [future] skills/design.md    → Color palettes, typography, spacing, animation rules
 ```
 
