@@ -250,6 +250,505 @@ This is where $1,500/mo feels like $10k. Every delivery includes:
 
 ---
 
+## STAGE 8 — 3D & ADVANCED ANIMATION (OPTIONAL UPGRADES)
+
+This is an opt-in menu, not a default. The Lovable base build (STAGE 1) plus Framer Motion baseline (STAGE 2) plus ReactBits (STAGE 3) plus a Higgsfield hero video (STAGE 4) is enough for 90% of Valdes Agency sites — and it's what wins on lead-gen niches like pool service. Pick from this menu only when the brief or pricing tier earns it: editorial sites, brand-led builds, premium-tier retainers ($2.5k+), or anywhere motion is the actual differentiator. Every tool here has a hard mobile performance contract — see the rules at the end of this stage. If you can't meet the contract, ship static + Framer Motion baseline and tell the client honestly why.
+
+### When to ADD advanced animation (yes-list)
+- Premium pricing tier ($2.5k+ retainer or one-off $8k+ build)
+- Brand-led brief where motion *is* the deliverable (agency portfolio, editorial, designer-led)
+- Audience is desktop-heavy or has GPU budget (B2B SaaS, enterprise, design-conscious DTC)
+- Client supplies their own design system / motion direction
+- Direct competitive pressure — competitor has it and the client's brand can't read "behind"
+
+### When to SKIP and stay on baseline (no-list)
+- Pool, HVAC, garage, plumbing, pest, landscaping — any local-service lead-gen niche
+- Sub-$2k retainer, no premium tier yet
+- Mobile-first audience on low-end Android (most local-service customers)
+- Client's stated win is "more leads" — speed beats polish, every time
+- Current mobile LCP > 2.0s and you can't get it down with current scope
+
+---
+
+### THE 8 TOOLS — DECISION TREE
+
+```
+What are you trying to do?
+│
+├─ 3D hero object / product config / branded 3D logo
+│   ├─ Code-level control needed → Tool 1 + Tool 2 (Three.js + R3F)
+│   └─ Designer-led, no code control → Tool 4 (Spline)
+│
+├─ Scroll-pinned timeline / horizontal scroll / pinned hero
+│   └─ Tool 3 (GSAP ScrollTrigger)
+│
+├─ Smooth scroll + parallax aesthetic
+│   └─ Tool 6 (Lenis preferred — Locomotive Scroll only for legacy compat)
+│
+├─ Multi-page route transitions (rare on Lovable SPAs)
+│   └─ Tool 5 (Barba.js — but usually skip; AnimatePresence is enough)
+│
+├─ Interactive logo / state-driven illustration / hover-input states
+│   └─ Tool 7 (Rive)
+│
+└─ Brand logo loop / designer-handoff motion / simple decorative animation
+    └─ Tool 8 (Lottie)
+```
+
+Tools 1+2 are paired (you almost never use vanilla Three.js without React Three Fiber on a Lovable build). Tools 3 and 6 cannot live in the same component tree without a sync helper — see the isolation rule below.
+
+---
+
+### Tool 1 — Three.js (Foundation 3D Library)
+
+**What it is:** The foundational JavaScript 3D library. Imperative API, ships everything: scenes, cameras, lights, geometry, shaders.
+
+**When to use:** Almost never directly on a Lovable build. Use it via React Three Fiber (Tool 2) instead — the React-idiomatic wrapper.
+
+**When to use Three.js directly (rare escape hatch):**
+- Custom shader work that doesn't map cleanly to R3F
+- A scene that needs imperative animation loop control beyond `useFrame`
+- Migrating from a vanilla Three.js codebase
+
+**When NOT to use:** Default Lovable builds, lead-gen niches, mobile-first sites (see contract below).
+
+**Bundle cost:** ~85KB gzipped (core, tree-shaken). Plus your scene assets.
+
+**Performance contract:** Same as Tool 2 (R3F). See Tool 2 for the full guardrails — they apply equally.
+
+---
+
+### Tool 2 — React Three Fiber (R3F — Recommended 3D Default)
+
+**What it is:** React renderer for Three.js. Lets you compose 3D scenes with JSX — the React-idiomatic way to ship Three.js on a Lovable/React stack.
+
+**When to use:**
+- Hero 3D object on a brand-led page (rotating product, branded 3D logo, abstract shape)
+- Product configurator (interactive model the user manipulates)
+- Any 3D need on a Lovable build (you're already in React, R3F is the path)
+
+**When NOT to use:**
+- Lead-gen sites where LCP is the conversion lever
+- Mobile-first audiences on low-end Android without a static fallback path
+- Any scene over 5k polygons without LOD/instancing optimization
+
+**Lovable integration:**
+1. Open the Lovable project in GitHub Codespaces (STAGE 3 setup)
+2. `npm install three @react-three/fiber @react-three/drei`
+3. Wrap the 3D component in `<Canvas>` from R3F
+4. Lazy-load via `React.lazy` + `Suspense` so the ~120KB bundle doesn't block LCP
+5. Provide a static fallback `<img>` for `prefers-reduced-motion` and mobile breakpoints
+
+**Code skeleton:**
+
+```jsx
+// Hero3D.tsx — lazy-loaded R3F scene
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, useGLTF } from '@react-three/drei';
+import { useRef } from 'react';
+
+function Model() {
+  const ref = useRef();
+  const { scene } = useGLTF('/models/hero.glb');
+  useFrame((_, delta) => { ref.current.rotation.y += delta * 0.2; });
+  return <primitive ref={ref} object={scene} />;
+}
+
+export default function Hero3D() {
+  return (
+    <Canvas camera={{ position: [0, 0, 4], fov: 45 }} dpr={[1, 2]}>
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[5, 5, 5]} intensity={1} />
+      <Model />
+      <OrbitControls enableZoom={false} />
+    </Canvas>
+  );
+}
+```
+
+```jsx
+// Page.tsx — lazy + static fallback
+import { lazy, Suspense } from 'react';
+const Hero3D = lazy(() => import('./Hero3D'));
+
+const isMobile = window.matchMedia('(max-width: 767px)').matches;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion)').matches;
+const useStatic = isMobile || reducedMotion;
+
+return useStatic
+  ? <img src="/hero-static.webp" alt="" />
+  : <Suspense fallback={<img src="/hero-static.webp" alt="" />}><Hero3D /></Suspense>;
+```
+
+**Performance contract:**
+- Max 5k polygons total across the scene (use Draco compression on .glb)
+- Lazy-load via `React.lazy` + `Suspense` — never block LCP
+- Static `.webp` fallback ALWAYS provided (for `prefers-reduced-motion` and mobile)
+- Hide on mobile breakpoint (<768px) OR ship the static fallback there
+- Bundle cost: ~120KB gzipped (Three.js + R3F + drei tree-shaken). Audit with `vite build --mode analyze`
+- Test mobile LCP after adding. < 2.5s or revert.
+
+---
+
+### Tool 3 — GSAP ScrollTrigger (Scroll-Pinned Timeline Animation)
+
+**What it is:** GreenSock's scroll-driven animation engine. Pin elements, scrub timelines on scroll, build horizontal scroll sections, choreograph complex reveals.
+
+**When to use:**
+- Scroll-pinned hero (element stays in place while content animates around it)
+- Horizontal scroll sections (case studies, gallery walks)
+- Complex timeline reveals that go beyond Framer Motion's declarative `useScroll`/`useTransform`
+- Scroll-scrubbed video or canvas effect
+
+**When NOT to use:**
+- Simple stagger / fade-up — that's already in the Framer Motion baseline (STAGE 2). Don't reach for GSAP for this.
+- Any component that already uses Framer Motion (see isolation rule below)
+- Lead-gen sites where scroll choreography doesn't directly drive conversion
+
+**ISOLATION RULE (LOCKED):** Never mix GSAP and Framer Motion in the same component tree. They both manipulate transform values and will fight each other. Pick ONE per component. Mixing across different components on the same page is fine — just not inside the same subtree.
+
+**Lovable integration:**
+1. `npm install gsap @gsap/react`
+2. Register the ScrollTrigger plugin once at module level
+3. Use `useGSAP` hook for proper React lifecycle + cleanup
+4. ALWAYS kill ScrollTrigger instances on unmount
+
+**Code skeleton:**
+
+```jsx
+import { useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+
+gsap.registerPlugin(ScrollTrigger);
+
+export default function PinnedHero() {
+  const containerRef = useRef(null);
+
+  useGSAP(() => {
+    gsap.to('.hero-content', {
+      yPercent: -50,
+      scrollTrigger: {
+        trigger: containerRef.current,
+        start: 'top top',
+        end: '+=100%',
+        pin: true,
+        scrub: 1,
+      },
+    });
+  }, { scope: containerRef });
+
+  return (
+    <section ref={containerRef} className="h-screen">
+      <div className="hero-content">{/* ... */}</div>
+    </section>
+  );
+}
+```
+
+**Performance contract:**
+- Use `useGSAP` (not raw `useEffect`) — handles cleanup automatically
+- Below 768px: replace ScrollTrigger pins with IntersectionObserver fade-ups (pinning is expensive on mobile)
+- NEVER use `window.addEventListener('scroll')` — kills mobile (rule carries from `.claude/skills/skills/taste-skill`)
+- Bundle cost: ~40KB gzipped (GSAP core + ScrollTrigger plugin)
+- Test mobile LCP and scroll smoothness on a real low-end Android, not just DevTools
+
+---
+
+### Tool 4 — Spline (Visual 3D Editor)
+
+**What it is:** A browser-based visual 3D editor (think Figma for 3D). You build the scene with a UI, then embed via iframe or a runtime React component.
+
+**When to use:**
+- Designer-led 3D where the designer ships a Spline file, not a glTF
+- Rapid 3D prototyping when you don't have R3F skills handy
+- Brand-led page where the 3D is the differentiator and Spline's renderer quality is "good enough"
+
+**When NOT to use:**
+- Performance-critical pages — Spline's runtime is heavier than custom R3F
+- Mobile-first sites
+- Anything needing custom shaders (Spline can't ship them)
+- Sites where you need code-level control over the scene
+
+**Honest call:** Spline runtime is heavier than a custom R3F scene with the same visual content. Use Spline only when designer-handoff speed matters more than perf budget. For most agency builds, custom R3F is the better long-term choice.
+
+**Lovable integration:**
+1. Designer exports the scene from Spline (gives you a URL like `prod.spline.design/...`)
+2. `npm install @splinetool/react-spline`
+3. Drop in `<Spline scene="..." />` — lazy-load it
+
+**Code skeleton:**
+
+```jsx
+import { lazy, Suspense } from 'react';
+const Spline = lazy(() => import('@splinetool/react-spline'));
+
+export default function HeroSpline() {
+  return (
+    <Suspense fallback={<img src="/hero-static.webp" alt="" />}>
+      <Spline scene="https://prod.spline.design/YOUR_SCENE/scene.splinecode" />
+    </Suspense>
+  );
+}
+```
+
+**Performance contract:**
+- Lazy-load below the fold ONLY (never as the LCP element)
+- Hide on mobile if scene drops below 60fps (test on real device)
+- Max 1 Spline scene per page
+- Bundle cost: ~80KB runtime + scene file size (varies, often 200KB+)
+- Same static fallback rule as R3F: provide `.webp` for `prefers-reduced-motion` + mobile
+
+---
+
+### Tool 5 — Barba.js (Page Transitions)
+
+**HONEST CALL FIRST:** For 95% of Valdes Agency sites, skip Barba entirely. Lovable builds are React SPAs — Framer Motion's `<AnimatePresence>` handles route transitions natively, with no extra library. Barba is for retrofitting SPA-feel transitions onto multi-page (WordPress, Astro, static HTML) sites.
+
+**When to use:**
+- Editorial multi-page site (NOT a Lovable build) where you want SPA-feel transitions retroactively
+- Agency portfolio with stylized route transitions where the transition itself is the feature
+- WordPress/Astro/static-HTML migrations where converting to a real SPA isn't feasible
+
+**When NOT to use:**
+- Lovable SPAs (default — use AnimatePresence)
+- Lead-gen sites — page-load speed beats transition polish, every time
+- Anything where SEO requires server-rendered HTML and Barba's prefetching breaks crawling
+
+**Integration steps (only if you've decided yes):**
+1. `npm install @barba/core`
+2. Init Barba in your main JS entry
+3. Define a `data-barba-namespace` per page
+4. Hook `leave` and `enter` transitions
+
+**Code skeleton:**
+
+```js
+import barba from '@barba/core';
+
+barba.init({
+  transitions: [{
+    name: 'fade',
+    leave({ current }) {
+      return gsap.to(current.container, { opacity: 0, duration: 0.3 });
+    },
+    enter({ next }) {
+      return gsap.from(next.container, { opacity: 0, duration: 0.3 });
+    },
+  }],
+});
+```
+
+**Performance contract:**
+- Adds ~15KB gzipped to bundle
+- Pre-fetches linked pages by default — extra network cost (turn off if it hurts your CDN bill)
+- Disable on iOS Safari if transitions stutter
+- Confirm SEO bots still crawl pages independently (Barba's intercept can mask routes from crawlers)
+
+---
+
+### Tool 6 — Lenis (Smooth Scroll) + Locomotive Scroll (Legacy)
+
+**MODERN PICK — USE LENIS, NOT LOCOMOTIVE:** Lenis (~7KB) replaced Locomotive Scroll (~25KB) as the smooth-scroll standard in 2024-2025. Same buttery scroll feel, smaller bundle, better React integration, actively maintained, plays nice with GSAP ScrollTrigger via a sync helper.
+
+**When to use:**
+- Editorial sites where smooth scroll IS part of the brand aesthetic
+- Brand-led builds where the scroll feel itself is a quality signal
+- Designer specifically requested smooth scroll and you can meet the perf contract
+
+**When NOT to use:**
+- Lead-gen sites — most Valdes Agency work
+- iOS — smooth scroll fights iOS native momentum, feels broken
+- Anywhere `prefers-reduced-motion` is likely (accessibility-first audiences)
+
+**Lovable integration (Lenis):**
+1. `npm install @studio-freight/lenis` (or the new `lenis` package)
+2. Init in a top-level `useEffect` with a `requestAnimationFrame` loop
+3. Disable on iOS via UA check or feature detection
+4. Respect `prefers-reduced-motion` and disable
+
+**Code skeleton:**
+
+```jsx
+import { useEffect } from 'react';
+import Lenis from '@studio-freight/lenis';
+
+export function SmoothScroll() {
+  useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const reduced = window.matchMedia('(prefers-reduced-motion)').matches;
+    if (isIOS || reduced) return;
+
+    const lenis = new Lenis({ duration: 1.2, smoothWheel: true });
+    function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+    requestAnimationFrame(raf);
+
+    return () => lenis.destroy();
+  }, []);
+  return null;
+}
+```
+
+**Locomotive Scroll (legacy reference only):**
+Same use case, larger bundle, harder React integration. If you're maintaining an older site that already ships Locomotive, leave it. For new builds: Lenis.
+
+**Performance contract:**
+- DISABLE on iOS (smooth scroll fights native momentum, feels broken — every time)
+- DISABLE for `prefers-reduced-motion` users (accessibility hard rule)
+- Don't combine with GSAP ScrollTrigger pins without using the official Lenis-ScrollTrigger sync helper
+- Bundle cost: ~7KB (Lenis) or ~25KB (Locomotive)
+
+---
+
+### Tool 7 — Rive (State-Machine Vector Animation)
+
+**What it is:** A runtime animation tool with a state-machine model. You design states + transitions in the Rive editor, then trigger them at runtime via inputs (boolean, number, trigger). Lighter than Lottie for interactive work; heavier than Lottie for simple loops.
+
+**When to use:**
+- Interactive logo with hover/click/loaded states
+- State-driven illustration (e.g., a button that morphs between idle → hover → success)
+- Micro-interactions where Framer Motion can't reach (multi-state vector with internal logic)
+- Animations driven by user input, scroll position, or app state
+
+**When NOT to use:**
+- Simple loops (a logo that just plays once on load) — Lottie is lighter
+- Static graphics — plain SVG is enough
+- Complex 3D — wrong tool, use R3F
+
+**Lovable integration:**
+1. Designer ships a `.riv` file (export from Rive editor)
+2. `npm install @rive-app/react-canvas`
+3. Drop `.riv` into `/public`, use the `useRive` hook
+
+**Code skeleton:**
+
+```jsx
+import { useRive, Layout, Fit } from '@rive-app/react-canvas';
+
+export default function InteractiveLogo() {
+  const { RiveComponent, rive } = useRive({
+    src: '/logo.riv',
+    stateMachines: 'State Machine 1',
+    autoplay: true,
+    layout: new Layout({ fit: Fit.Contain }),
+  });
+
+  return (
+    <div onMouseEnter={() => rive?.play()} className="w-32 h-32">
+      <RiveComponent />
+    </div>
+  );
+}
+```
+
+**Performance contract:**
+- Lazy-load on intersection (use `IntersectionObserver` or React `lazy`)
+- Max 3 Rive instances per page
+- Total `.riv` budget < 200KB across the page
+- Bundle cost: ~50KB runtime (gzipped)
+- Test mobile — state-machine logic is light, but multiple canvases compound
+
+---
+
+### Tool 8 — Lottie (After Effects → JSON)
+
+**What it is:** Renders After Effects animations as JSON in the browser. Designer-handoff staple — designer animates in AE, exports via Bodymovin plugin, you ship the .json.
+
+**When to use:**
+- Brand logo loop (plays once on load, or on a slow loop)
+- Simple decorative animation (icons, success checkmarks, illustrative loops)
+- Designer-handoff workflow where the designer owns AE and ships .json files
+- Anywhere SVG is too static and Rive is overkill
+
+**When NOT to use:**
+- Interactive state-machine work — Rive wins
+- Complex 3D — wrong tool, use R3F
+- Animations that need runtime data binding beyond color/scale (Lottie is hard to drive dynamically)
+
+**Lovable integration:**
+1. Designer exports `.json` via Bodymovin (After Effects plugin)
+2. `npm install lottie-react`
+3. Drop `.json` into `/public`, use the `Lottie` component
+
+**Code skeleton:**
+
+```jsx
+import Lottie from 'lottie-react';
+import animationData from '/public/logo-loop.json';
+
+export default function LogoLoop() {
+  return <Lottie animationData={animationData} loop autoplay style={{ width: 160 }} />;
+}
+```
+
+**Performance contract:**
+- Optimize the JSON via lottiefiles.com optimizer or LottieLab before shipping
+- Max 100KB per `.json` file (un-optimized AE exports are often 500KB+ — never ship raw)
+- Lazy-load below the fold; don't make Lottie the LCP element
+- Use `renderer: 'canvas'` for >5 instances on a page; default `'svg'` is fine for <5
+- Bundle cost: ~50KB runtime + JSON file size
+
+---
+
+### LAYERING ORDER — How These Stack on Lovable
+
+The motion stack of any premium build, from foundation up:
+
+1. **Lovable base** (STAGE 1) — vanilla React + Tailwind, no motion
+2. **Framer Motion baseline** (STAGE 2) — stagger, fade-up 20px, parallax. Hard floor for every site.
+3. **Component libraries** (STAGE 2-3) — Magic UI (Shimmer, Border Beam, Number Ticker), 21st.dev, ReactBits (BlurText, TiltedCard, Aurora)
+4. **Hero video** (STAGE 4) — Higgsfield (image → cinematic camera push)
+5. **THIS STAGE — pick from the menu above**
+   - Pick ONE primary motion library per component
+   - Mixing libraries across DIFFERENT components on the same page is fine (R3F hero + GSAP scroll section + Lottie footer logo all coexist)
+   - **NEVER mix GSAP + Framer Motion in the same component tree** (locked isolation rule — they fight over transforms)
+   - **NEVER mix Lenis/Locomotive + GSAP ScrollTrigger pins without the official sync helper**
+
+---
+
+### MOBILE PERFORMANCE — HARD GATES
+
+Extends the existing DESIGN STANDARDS performance gates (LCP < 2.5s mobile, Mobile score 85+, hero image WebP < 200KB). These tool-specific guardrails are additive — they apply ON TOP of the base contract, not instead of it.
+
+| Tool | Bundle (gzip) | Mobile-safe? | Required guardrail |
+|---|---|---|---|
+| Three.js + R3F | ~120KB | Conditional | Static fallback + lazy-load + max 5k polys + hide <768px or fallback |
+| Spline | ~80KB + scene | Below-fold only | Hide if <60fps; max 1 scene per page |
+| GSAP + ScrollTrigger | ~40KB | Yes with IO fallback | IntersectionObserver replaces pins <768px |
+| Barba.js | ~15KB | Yes | Rarely needed — usually skip |
+| Locomotive Scroll | ~25KB | iOS: disable | Use Lenis instead for new builds |
+| Lenis | ~7KB | Yes | Disable on iOS + for `prefers-reduced-motion` |
+| Rive | ~50KB | Yes | Lazy-load + max 3 instances + total .riv budget < 200KB |
+| Lottie-Web | ~50KB + JSON | Yes | Optimize JSON, max 100KB/file, lazy below fold |
+
+**The hard rule:** **Test mobile LCP after every addition. Under 2.5s or revert.**
+
+---
+
+### COST DECISION GATE — When a client asks "can we add a 3D thing?"
+
+Run this 3-step gate before saying yes:
+
+1. **Pricing tier check.** Sub-$2k retainer or sub-$8k one-off? Default to no. Pitch a static premium graphic instead. Premium motion is a premium-tier feature.
+2. **LCP budget check.** Current mobile LCP > 2.0s? No room. Optimize the existing site first, then revisit.
+3. **Brief alignment.** Does the 3D/animation directly serve the conversion goal (or the brand goal on a brand-led brief)? Or is it eye candy?
+
+If all three pass → ship it via the menu above. If any fail → static + Framer Motion baseline only, and tell the client honestly why.
+
+---
+
+### CLIENT-FACING TALKING POINTS
+
+When scoping a build that includes 3D or advanced motion, set expectations upfront:
+
+- **"Premium motion adds 5-10 days to the build timeline."** Set scope and price accordingly.
+- **"We test mobile performance after every addition. If it slows the site, we remove it."** Sets the performance contract before the work, not after.
+- **"On lead-gen sites, the conversion winner is usually clean + fast, not flashy. We add motion where it earns the conversion, not for show."** This is the honest no-thanks line for clients on $1.5-2k retainers asking for premium polish.
+- **"Three.js / Spline / scroll choreography work best on desktop-heavy audiences. If most of your traffic is mobile lead-gen, we'll spend the budget on speed instead."** Reframes the conversation toward what actually moves their numbers.
+
+---
+
 ## DESIGN STANDARDS — NON-NEGOTIABLE
 
 ### Colors
@@ -291,7 +790,7 @@ This is where $1,500/mo feels like $10k. Every delivery includes:
 - Subtle parallax on hero background (0.5x scroll speed)
 
 ### Animations — AVOID
-- Heavy Three.js / particle on mobile (kills performance)
+- Heavy Three.js / particle without optimization (see STAGE 8 for safe-use rules + mobile fallbacks)
 - Looping animations that never stop (distracting + battery)
 - Anything delaying CTA visibility on load
 - Full-page loading screens (users bounce instantly)
