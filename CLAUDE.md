@@ -69,13 +69,6 @@ FULL TOOL STACK
 | Motionsites.ai | High-end animated site templates |
 | ReactBits | 135+ animated components (reactbits.dev) |
 | Framer Motion | React animation engine |
-| Three.js | Foundational 3D library — base layer for any web 3D (see skills/website.md STAGE 8) |
-| React Three Fiber (R3F) | React renderer for Three.js — recommended 3D default for Lovable builds |
-| GSAP + ScrollTrigger | Scroll-pinned timelines, horizontal scroll, complex reveals (NEVER mix with Framer Motion in same component tree) |
-| Spline | Visual 3D editor for designer-led scenes — embed via @splinetool/react-spline |
-| Lenis | Smooth scroll (~7KB) — replaces Locomotive Scroll for new builds; disable on iOS |
-| Rive | State-machine vector animation — interactive logos, multi-state illustrations |
-| Lottie | After Effects → JSON animation — brand logo loops, designer handoff |
 | Rotato | Device mockups for client delivery |
 | IterationX | Client feedback pinned to live sites |
 | designspells.co | Design inspiration before any brief |
@@ -108,49 +101,18 @@ THE PLAYBOOK INDEX
 Load these on demand. If the task touches the topic — READ THE FILE before answering.
 
 ```
-skills/agent-architecture.md → 8 Masters org chart, routing triggers, JSON contracts,
-                           cross-Master handoffs. THE orchestration layer.
-                           USE WHEN: any task — load FIRST to pick the right Master.
-                           ALSO USE: multi-Master tasks, sub-agent confusion.
-
 skills/sales.md          → Cold calling, discovery, proposals, closing, GHL pipeline
                            USE WHEN: Tyler's dials, objection handling, follow-ups,
                            discovery prep, proposal drafts, close-call coaching
 
-skills/website.md        → Lovable workflow, design brief, components, hero video, delivery
-                           USE WHEN: kickoff brief, Lovable prompts, component upgrades,
-                           QA pre-launch, domain/DNS, delivery package, SEO+schema setup
+skills/website-build.md  → Lovable workflow, design brief, components, hero video,
+                           niche playbooks (11 niches), design standards, delivery
+                           USE WHEN: starting a new client website, choosing colors/fonts,
+                           picking components, troubleshooting Lovable, prepping delivery
 
-skills/marketing.md      → 11 niches, Vegas geo, cold sequences, Review Scraper SOP,
-                           FB groups, GHL marketing view, positioning
-                           USE WHEN: niche evaluation, sequence design, hook writing,
-                           Review Scraper SOP, Council LCM strategy calls
-
-skills/ads.md            → Google + Meta + TikTok unified — CPL framework, learning
-                           phase rules, performance reviewer decision trees, per-niche strategy
-                           USE WHEN: campaign kickoff, CPL spike triage, learning phase
-                           checks, budget tier decisions, SonoView ads work
-
-skills/content.md        → Autonomous content pipeline (draft→approve→schedule→post),
-                           voice system, hook bank, image+video tool stack, perf reviewer
-                           USE WHEN: any LinkedIn/X/IG post, content calendar, voice
-                           drift check, image/video generation, hook brainstorming
-
-skills/sonoview.md       → SonoView client playbook (PROTECTED — existing client)
-                           USE WHEN: any SonoView decision — ads, content, copy, geo,
-                           verification layer. Never generalize into base templates.
-
-skills/trade-n-travel.md → Trade N Travel partner project (BUILDING — dual ICP)
-                           USE WHEN: TNT brand, site, content, affiliate setup,
-                           dual-ICP framing decisions
-
-skills/lessons-learned.md → Mistake ledger — every reversal, voice correction, killed
-                           assumption with the cost that earned it.
-                           USE WHEN: every session start (§4 cheat scan, mandatory).
-                           ALSO USE: before reversing any prior decision.
-
+[future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
-[future] skills/design.md    → Color palettes, typography, spacing, animation rules
+[future] skills/content.md   → Content pillars, hooks, platform timing
 ```
 
 Until `[future]` files exist, the previous full-fat content lives in git history at commit `f464362`. Run `git show f464362:CLAUDE.md` to grab a section in a pinch, then extract it into its own playbook.
@@ -161,8 +123,8 @@ Three-rule routing:
 3. If a playbook is missing → flag it, do the work this session, suggest extracting it next session.
 
 MEMORY PROTOCOL
-Session start: (1) Read `skills/lessons-learned.md` §4 anti-pattern cheat scan (60 seconds, mandatory). (2) Check MCP Knowledge Graph for client updates, recent decisions, active tasks.
-Session end: Save to MCP — key decisions made, client status changes, what was built, what's next. If a mistake or reversal happened this session, log it to `skills/lessons-learned.md` using the §3 template before closing.
+Session start: Check MCP Knowledge Graph for client updates, recent decisions, active tasks.
+Session end: Save to MCP — key decisions made, client status changes, what was built, what's next.
 Brain dump: `/workspaces/ValdesAgency/memory/brain-dump.md` — running notes, ideas, things to do.
 
 TASK PRIORITY ORDER
