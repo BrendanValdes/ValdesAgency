@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Desert Blue Pools — Vegas's most trusted residential pool service. Weekly maintenance, green-to-clean restoration, equipment repair. Free quotes in 2 hours.">
+  <title>Desert Blue Pools — Vegas's Most Trusted Pool Service</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --sunset-coral: #ff5005;
+      --sunset-amber: #ff8a3d;
+      --sunset-violet: #6d2c8a;
+      --ink: #0a1929;
+      --ink-soft: #122236;
+      --gold: #d4a157;
+      --gold-bright: #e8c074;
+      --pool-blue: #2a9df4;
+      --ivory: #f5f1e8;
+      --cream: #faf6f1;
+      --warm-white: #fffbf5;
+      --rule: rgba(212, 161, 87, 0.25);
+      --rule-ink: rgba(245, 241, 232, 0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: auto; }
+    html, body {
+      overflow-x: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    canvas#hero-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 0;
+      will-change: transform, opacity;
+    }
+
+    /* Loader */
+    #loader {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--ink);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    #loader .loader-mark {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.6rem; letter-spacing: 0.04em;
+      color: var(--gold); margin-bottom: 1.4rem;
+    }
+    #loader .loader-bar {
+      width: 200px; height: 1px;
+      background: rgba(212, 161, 87, 0.15);
+      overflow: hidden;
+    }
+    #loader .loader-fill {
+      height: 100%; width: 0;
+      background: linear-gradient(90deg, var(--sunset-coral), var(--gold));
+      animation: loadFill 1.4s ease-out forwards;
+    }
+    @keyframes loadFill { to { width: 100%; } }
+
+    /* Scroll container */
+    .scroll-container {
+      position: relative; z-index: 2;
+    }
+
+    /* Sticky mobile click-to-call */
+    .mobile-call {
+      position: fixed; bottom: 18px; right: 18px;
+      z-index: 50;
+      background: var(--gold);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif; font-weight: 700;
+      font-size: 0.95rem; letter-spacing: 0.02em;
+      padding: 14px 22px;
+      border-radius: 999px;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(10, 25, 41, 0.35);
+      display: none;
+      align-items: center; gap: 8px;
+      min-height: 56px;
+      transition: transform 0.2s ease;
+    }
+    .mobile-call:hover { transform: translateY(-2px); }
+    .mobile-call svg { width: 18px; height: 18px; }
+    @media (max-width: 767px) {
+      .mobile-call { display: inline-flex; }
+    }
+
+    /* Common */
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 6vw;
+    }
+    .eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      display: inline-block;
+    }
+    h1, h2, h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.015em;
+      line-height: 1.04;
+    }
+    p { line-height: 1.65; font-weight: 400; }
+
+    /* ─────────── HERO ─────────── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex; align-items: center;
+      padding: 11rem 0 6rem;
+      color: var(--ivory);
+    }
+    .hero-fallback {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 75% 25%, rgba(168, 230, 255, 0.35) 0%, transparent 55%),
+        linear-gradient(180deg, var(--pool-blue) 0%, #1a6a8a 55%, #06283d 100%);
+      z-index: -1;
+      opacity: 0;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 3;
+      max-width: 880px;
+    }
+    .hero .eyebrow {
+      color: var(--ivory);
+      opacity: 0.85;
+      margin-bottom: 1.8rem;
+      padding: 0.5em 1.1em;
+      border: 1px solid rgba(245, 241, 232, 0.3);
+      border-radius: 2px;
+    }
+    .hero h1 {
+      font-size: clamp(2.8rem, 6.5vw, 6rem);
+      margin-bottom: 1.6rem;
+      text-shadow: 0 2px 30px rgba(10, 25, 41, 0.3);
+    }
+    .hero h1 .italic-accent {
+      font-style: italic;
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      color: var(--gold-bright);
+    }
+    .hero-subhead {
+      font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+      max-width: 600px;
+      margin-bottom: 2.6rem;
+      color: rgba(245, 241, 232, 0.92);
+      font-weight: 400;
+      line-height: 1.55;
+      text-shadow: 0 1px 12px rgba(10, 25, 41, 0.4);
+    }
+    .hero-cta-row {
+      display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap;
+    }
+    .btn-primary {
+      position: relative;
+      display: inline-flex; align-items: center; gap: 0.65rem;
+      background: var(--gold);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+      padding: 1.1rem 2.1rem;
+      border-radius: 4px;
+      border: none;
+      text-decoration: none;
+      cursor: pointer;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(10, 25, 41, 0.18);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 32px rgba(10, 25, 41, 0.28);
+    }
+    .btn-primary::before {
+      content: ''; position: absolute; top: 0; left: -100%;
+      width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 251, 245, 0.4), transparent);
+      transform: skewX(-20deg);
+      animation: shimmer 3s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { left: -100%; }
+      50% { left: 200%; }
+    }
+    .btn-primary svg { width: 16px; height: 16px; }
+    .hero-phone {
+      font-family: 'DM Mono', monospace;
+      color: var(--ivory);
+      text-decoration: none;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      padding-bottom: 2px;
+      border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+      transition: border-color 0.2s ease;
+    }
+    .hero-phone:hover { border-bottom-color: var(--gold); }
+    .scroll-cue {
+      position: absolute;
+      bottom: 2.5rem; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(245, 241, 232, 0.6);
+      display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+      animation: scrollBounce 2.4s ease-in-out infinite;
+    }
+    .scroll-cue .line {
+      width: 1px; height: 36px;
+      background: linear-gradient(180deg, rgba(245, 241, 232, 0.6), transparent);
+    }
+    @keyframes scrollBounce {
+      0%, 100% { transform: translate(-50%, 0); opacity: 0.7; }
+      50% { transform: translate(-50%, 8px); opacity: 1; }
+    }
+
+    /* ─────────── TRUST STRIP ─────────── */
+    .trust {
+      background: var(--ink);
+      color: var(--ivory);
+      padding: 3.6rem 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+    }
+    .trust-stat {
+      text-align: left;
+      padding: 0 1rem;
+      border-left: 1px solid var(--rule-ink);
+    }
+    .trust-stat:first-child { border-left: none; }
+    .trust-num {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 3.5vw, 2.8rem);
+      color: var(--gold-bright);
+      letter-spacing: -0.02em;
+      display: block;
+      line-height: 1;
+      margin-bottom: 0.45rem;
+    }
+    .trust-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(245, 241, 232, 0.6);
+    }
+
+    /* ─────────── SERVICES ─────────── */
+    .services {
+      padding: 8rem 0 7rem;
+      background: var(--cream);
+      position: relative;
+    }
+    .section-head {
+      max-width: 720px;
+      margin-bottom: 4rem;
+    }
+    .section-head .eyebrow { margin-bottom: 1rem; }
+    .section-head h2 {
+      font-size: clamp(2rem, 4.2vw, 3.6rem);
+      color: var(--ink);
+      margin-bottom: 1.2rem;
+    }
+    .section-head h2 .italic-accent {
+      font-style: italic;
+      font-weight: 600;
+      color: var(--sunset-coral);
+    }
+    .section-head p {
+      font-size: 1.1rem;
+      color: var(--ink);
+      opacity: 0.7;
+      max-width: 560px;
+    }
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.4rem;
+    }
+    .service-card {
+      background: var(--warm-white);
+      border: 1px solid rgba(10, 25, 41, 0.08);
+      border-radius: 4px;
+      padding: 2.2rem 2rem 2.4rem;
+      position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      cursor: pointer;
+    }
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 36px rgba(10, 25, 41, 0.08);
+      border-color: var(--gold);
+    }
+    .service-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.16em;
+      color: var(--sunset-coral);
+      margin-bottom: 1rem;
+    }
+    .service-icon {
+      width: 32px;
+      height: 32px;
+      color: var(--sunset-coral);
+      margin-bottom: 1.1rem;
+      display: block;
+      stroke-width: 1.8;
+    }
+    .service-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.45rem;
+      margin-bottom: 0.7rem;
+      color: var(--ink);
+    }
+    .service-card p {
+      font-size: 0.95rem;
+      color: var(--ink);
+      opacity: 0.72;
+      margin-bottom: 1.2rem;
+    }
+    .service-price {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      color: var(--ink);
+      padding-top: 1rem;
+      border-top: 1px solid rgba(10, 25, 41, 0.08);
+    }
+    .service-price strong { color: var(--gold); font-weight: 500; }
+
+    /* ─────────── BEFORE / AFTER ─────────── */
+    .before-after {
+      padding: 8rem 0;
+      background: var(--ink);
+      color: var(--ivory);
+      position: relative;
+      overflow: hidden;
+    }
+    .before-after .section-head h2 { color: var(--ivory); }
+    .before-after .section-head h2 .italic-accent { color: var(--gold-bright); }
+    .before-after .section-head p { color: rgba(245, 241, 232, 0.75); }
+    .ba-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-width: 1180px;
+      margin: 0 auto;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    }
+    .ba-img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      background-size: cover;
+      background-position: center;
+    }
+    .ba-img.before {
+      background-image: url('assets/pool-before.webp');
+    }
+    .ba-img.after {
+      background-image: url('assets/pool-after.webp');
+      clip-path: inset(0 0 0 50%);
+    }
+    .ba-divider {
+      position: absolute; top: 0; bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: var(--gold);
+      box-shadow: 0 0 12px rgba(212, 161, 87, 0.6);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .ba-handle {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: ew-resize;
+      pointer-events: auto;
+      z-index: 4;
+    }
+    .ba-handle svg { width: 22px; height: 22px; color: var(--ink); }
+    .ba-label {
+      position: absolute; top: 1.4rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 0.45em 1em;
+      background: rgba(10, 25, 41, 0.75);
+      backdrop-filter: blur(8px);
+      color: var(--ivory);
+      border-radius: 2px;
+      z-index: 5;
+    }
+    .ba-label.left { left: 1.4rem; }
+    .ba-label.right { right: 1.4rem; }
+    .ba-caption {
+      max-width: 720px;
+      margin: 2.4rem auto 0;
+      text-align: center;
+      font-size: 1rem;
+      color: rgba(245, 241, 232, 0.7);
+    }
+
+    /* ─────────── REVIEWS ─────────── */
+    .reviews {
+      padding: 9rem 0;
+      background: var(--cream);
+      position: relative;
+    }
+    .reviews-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6rem;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    .review {
+      max-width: 720px;
+      position: relative;
+      padding-left: 4rem;
+    }
+    .review.right { margin-left: auto; }
+    .review.center { margin: 0 auto; }
+    .review-mark {
+      position: absolute;
+      top: -1.4rem; left: 0;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 7rem;
+      color: var(--sunset-coral);
+      opacity: 0.18;
+      line-height: 1;
+    }
+    .review-body {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-style: italic;
+      font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+      line-height: 1.35;
+      color: var(--ink);
+      margin-bottom: 1.4rem;
+      letter-spacing: -0.01em;
+    }
+    .review-attr {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink);
+      opacity: 0.6;
+    }
+    .review-attr .dot { color: var(--gold); padding: 0 0.4em; }
+
+    /* ─────────── FINAL CTA ─────────── */
+    .cta {
+      position: relative;
+      padding: 7rem 0 7rem;
+      background: var(--ink);
+      color: var(--ivory);
+      overflow: hidden;
+    }
+    .cta::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -20%;
+      width: 80%; height: 120%;
+      background: radial-gradient(circle at center, var(--sunset-coral) 0%, var(--sunset-violet) 40%, transparent 70%);
+      opacity: 0.22;
+      pointer-events: none;
+    }
+    .cta-content {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    .cta-left .eyebrow { color: var(--gold-bright); }
+    .cta h2 {
+      font-size: clamp(2rem, 3.8vw, 3.2rem);
+      margin: 1rem 0 1.4rem;
+      color: var(--ivory);
+    }
+    .cta-phone {
+      display: block;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.6rem, 7vw, 5.2rem);
+      letter-spacing: -0.02em;
+      color: var(--gold-bright);
+      text-decoration: none;
+      margin: 1.4rem 0 0.6rem;
+      line-height: 1;
+    }
+    .cta-urgency {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      color: rgba(245, 241, 232, 0.65);
+      margin-top: 0.6rem;
+    }
+    .cta-urgency .dot { color: var(--gold); padding: 0 0.4em; }
+
+    .cta-form {
+      background: var(--ink-soft);
+      border: 1px solid var(--rule-ink);
+      border-radius: 6px;
+      padding: 2.4rem 2rem;
+    }
+    .cta-form .form-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(245, 241, 232, 0.55);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    .cta-form input,
+    .cta-form select {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--rule-ink);
+      padding: 0.7rem 0 0.9rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      color: var(--ivory);
+      outline: none;
+      margin-bottom: 1.6rem;
+      transition: border-color 0.2s ease;
+    }
+    .cta-form select {
+      appearance: none;
+      cursor: pointer;
+    }
+    .cta-form input:focus,
+    .cta-form select:focus { border-bottom-color: var(--gold); }
+    .cta-form input::placeholder { color: rgba(245, 241, 232, 0.4); }
+    .cta-form .btn-primary { width: 100%; justify-content: center; }
+
+    /* ─────────── FOOTER ─────────── */
+    .footer {
+      background: #060f1a;
+      color: rgba(245, 241, 232, 0.7);
+      padding: 4rem 0 2.4rem;
+      border-top: 1px solid var(--rule-ink);
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      gap: 3rem;
+      margin-bottom: 3rem;
+    }
+    .footer h4 {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.2rem;
+    }
+    .footer-brand .brand-mark {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      color: var(--ivory);
+      margin-bottom: 1rem;
+      letter-spacing: -0.01em;
+    }
+    .footer p,
+    .footer a {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: rgba(245, 241, 232, 0.65);
+      text-decoration: none;
+    }
+    .footer a:hover { color: var(--gold); }
+    .footer ul { list-style: none; padding: 0; }
+    .footer li { margin-bottom: 0.5rem; }
+    .footer-bottom {
+      padding-top: 2rem;
+      border-top: 1px solid var(--rule-ink);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: rgba(245, 241, 232, 0.4);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    /* ─────────── MOBILE ─────────── */
+    @media (max-width: 900px) {
+      .services-grid { grid-template-columns: repeat(2, 1fr); }
+      .trust-grid { grid-template-columns: repeat(2, 1fr); gap: 2.4rem 1.4rem; }
+      .trust-stat:nth-child(3) { border-left: none; }
+      .cta-content { grid-template-columns: 1fr; gap: 3rem; }
+      .footer-grid { grid-template-columns: 1fr 1fr; gap: 2.4rem; }
+    }
+    @media (max-width: 600px) {
+      .container { padding: 0 6vw; }
+      .hero { padding: 8rem 0 5rem; min-height: 95vh; }
+      .hero h1 { font-size: clamp(2.2rem, 9vw, 3rem); }
+      .hero-subhead { font-size: 1rem; margin-bottom: 2rem; }
+      .hero-cta-row { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+      .btn-primary { width: 100%; justify-content: center; padding: 1rem 1.6rem; }
+      .trust { padding: 3rem 0; }
+      .trust-grid { grid-template-columns: repeat(2, 1fr); }
+      .trust-stat { padding: 0 0.4rem; }
+      .services { padding: 5rem 0 4.5rem; }
+      .services-grid { grid-template-columns: 1fr; gap: 1.2rem; }
+      .before-after { padding: 5rem 0; }
+      .reviews { padding: 5.5rem 0; }
+      .reviews-grid { gap: 4rem; }
+      .review { padding-left: 3rem; }
+      .review-mark { font-size: 5rem; top: -1rem; }
+      .review-body { font-size: 1.15rem; }
+      .cta { padding: 5rem 0; }
+      .cta-form { padding: 1.8rem 1.4rem; }
+      .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+      .section-head { margin-bottom: 2.8rem; }
+      .section-head h2 { font-size: 1.85rem; }
+      .ba-label { font-size: 0.6rem; padding: 0.35em 0.7em; top: 0.8rem; }
+      .ba-label.left { left: 0.8rem; }
+      .ba-label.right { right: 0.8rem; }
+      .ba-handle { width: 44px; height: 44px; }
+      .scroll-cue { display: none; }
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      canvas#hero-canvas { display: none; }
+      .hero-fallback { opacity: 1; }
+      .scroll-cue { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ───────────── LOADER ───────────── -->
+  <div id="loader">
+    <div class="loader-mark">DESERT BLUE</div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+  </div>
+
+  <!-- ───────────── STICKY CALL ───────────── -->
+  <a class="mobile-call" href="tel:+17025550142" aria-label="Call Desert Blue Pools">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57-.35-.11-.74-.03-1.02.24l-2.2 2.2c-2.83-1.44-5.15-3.75-6.59-6.58l2.2-2.21c.28-.27.36-.66.25-1.01C8.7 6.45 8.5 5.25 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/></svg>
+    Call Now
+  </a>
+
+  <!-- ───────────── SCROLL CONTAINER ───────────── -->
+  <div class="scroll-container">
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+      <div class="hero-fallback"></div>
+      <div class="container">
+        <div class="hero-content">
+          <span class="eyebrow hero-eyebrow">LAS VEGAS · EST. 2014</span>
+          <h1>
+            Vegas Pools,<br>
+            <span class="italic-accent">Serviced Right.</span>
+          </h1>
+          <p class="hero-subhead">
+            Year-round pool service for the only city where pool season never ends.
+            Crystal-clear water, balanced chemistry, equipment that actually runs.
+            Built for Vegas homeowners who are done getting ghosted by their last pool guy.
+          </p>
+          <div class="hero-cta-row">
+            <a href="#cta" class="btn-primary">
+              Get a Free Pool Quote
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </a>
+            <a href="tel:+17025550142" class="hero-phone">(702) 555-0142</a>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-cue">
+        <span>SCROLL</span>
+        <span class="line"></span>
+      </div>
+    </section>
+
+    <!-- TRUST -->
+    <section class="trust" id="trust">
+      <div class="container">
+        <div class="trust-grid">
+          <div class="trust-stat">
+            <span class="trust-num" data-count="12">0</span>
+            <span class="trust-label">Years Serving Vegas</span>
+          </div>
+          <div class="trust-stat">
+            <span class="trust-num" data-count="500" data-suffix="+">0</span>
+            <span class="trust-label">Pools Maintained</span>
+          </div>
+          <div class="trust-stat">
+            <span class="trust-num" data-count="24" data-prefix="" data-suffix="hr">0</span>
+            <span class="trust-label">Callback Window</span>
+          </div>
+          <div class="trust-stat">
+            <span class="trust-num" data-count="4.9" data-decimals="1" data-prefix="★ ">0</span>
+            <span class="trust-label">Google Rating</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services" id="services">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">WHAT WE DO</span>
+          <h2>From routine maintenance to <span class="italic-accent">total restoration.</span></h2>
+          <p>Six services that cover every pool problem a Vegas homeowner runs into — from "water looks weird" to "the pump just died at 4pm Friday."</p>
+        </div>
+        <div class="services-grid">
+          <div class="service-card">
+            <div class="service-num">01 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+            <h3>Weekly Maintenance</h3>
+            <p>Chemicals balanced, baskets emptied, equipment checked. Same tech every week so they know your pool by heart.</p>
+            <div class="service-price"><strong>$179/mo</strong> · flat rate</div>
+          </div>
+          <div class="service-card">
+            <div class="service-num">02 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z"/>
+              <path d="M19 3 L19.8 5.2 L22 6 L19.8 6.8 L19 9 L18.2 6.8 L16 6 L18.2 5.2 Z" stroke-width="1.4"/>
+            </svg>
+            <h3>One-Time Cleaning</h3>
+            <p>Restoring your pool fast for a party, a home listing, or a rental turnaround. Done in 24 hours.</p>
+            <div class="service-price"><strong>From $295</strong> · one-time</div>
+          </div>
+          <div class="service-card">
+            <div class="service-num">03 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <h3>Equipment Repair</h3>
+            <p>Pumps, filters, heaters, salt cells. Most fixes same-day. Diagnosis-only fee waived if you book the repair.</p>
+            <div class="service-price"><strong>Quote in 1 hour</strong> · same-day</div>
+          </div>
+          <div class="service-card">
+            <div class="service-num">04 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="6" r="3"/>
+              <circle cx="6.5" cy="15.5" r="3"/>
+              <circle cx="17.5" cy="15.5" r="3"/>
+              <circle cx="12" cy="12.5" r="1.4" fill="currentColor"/>
+              <path d="M12 9 L12 11 M9.5 13.5 L10.8 13 M14.5 13.5 L13.2 13"/>
+            </svg>
+            <h3>Green-to-Clean</h3>
+            <p>Algae bloom? We chemically restart your pool to crystal clear in 48 hours. Real chemistry, not pool-store shotgun shocks.</p>
+            <div class="service-price"><strong>From $495</strong> · 48-hour turnaround</div>
+          </div>
+          <div class="service-card">
+            <div class="service-num">05 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 3 H15"/>
+              <path d="M10 3 V9 L4.5 19 a1.5 1.5 0 0 0 1.3 2.25 H18.2 a1.5 1.5 0 0 0 1.3-2.25 L14 9 V3"/>
+              <circle cx="11" cy="16" r="0.9" fill="currentColor" stroke="none"/>
+              <circle cx="14" cy="18.5" r="0.7" fill="currentColor" stroke="none"/>
+              <circle cx="9.5" cy="19" r="0.6" fill="currentColor" stroke="none"/>
+            </svg>
+            <h3>Acid Wash</h3>
+            <p>Stained plaster, bad waterline buildup. We drain, scrub, neutralize, refill. Done in a weekend.</p>
+            <div class="service-price"><strong>Custom quote</strong> · 2-day project</div>
+          </div>
+          <div class="service-card">
+            <div class="service-num">06 / SERVICE</div>
+            <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M13 2 L4 14 H11 L10 22 L20 10 H13 L13 2 Z"/>
+            </svg>
+            <h3>Emergency Service</h3>
+            <p>Leak, broken pump, party in 6 hours? We pick up the phone. Most calls answered in under 18 seconds.</p>
+            <div class="service-price"><strong>24/7 dispatch</strong> · emergency rate</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BEFORE / AFTER -->
+    <section class="before-after" id="before-after">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">THE GREEN-TO-CLEAN</span>
+          <h2>Same pool. <span class="italic-accent">Forty-eight hours apart.</span></h2>
+          <p>Algae blooms happen — especially after a Vegas haboob or a heater that ran too hot for too long. The fix isn't shocking the pool to death and hoping. Drag the slider.</p>
+        </div>
+        <div class="ba-stage" id="ba-stage">
+          <div class="ba-img before"></div>
+          <div class="ba-img after" id="ba-after"></div>
+          <div class="ba-divider" id="ba-divider"></div>
+          <div class="ba-handle" id="ba-handle" aria-label="Drag to compare">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline><polyline points="9 6 15 12 9 18" transform="translate(6,0)"></polyline></svg>
+          </div>
+          <div class="ba-label left">BEFORE · DAY 0</div>
+          <div class="ba-label right">AFTER · DAY 2</div>
+        </div>
+        <p class="ba-caption">No drain, no acid wash, no replaster. Just balanced chemistry, the right equipment, and a tech who actually knows what they're doing.</p>
+      </div>
+    </section>
+
+    <!-- REVIEWS -->
+    <section class="reviews" id="reviews">
+      <div class="container">
+        <div class="section-head" style="text-align: center; margin: 0 auto 5rem;">
+          <span class="eyebrow">WHAT VEGAS SAYS</span>
+          <h2 style="margin-top: 1rem;">Real homeowners. <span class="italic-accent">Real water.</span></h2>
+        </div>
+        <div class="reviews-grid">
+          <div class="review left">
+            <span class="review-mark">"</span>
+            <p class="review-body">These guys saved our pool the week before my daughter's quinceañera. Showed up Saturday morning at 7am, had crystal water by Sunday night. Insane.</p>
+            <p class="review-attr">MARIA L. <span class="dot">·</span> SUMMERLIN <span class="dot">·</span> APR 2026</p>
+          </div>
+          <div class="review right">
+            <span class="review-mark">"</span>
+            <p class="review-body">Switched from a big-name service that kept missing weeks. Desert Blue actually shows up. Three months in and the water hasn't dropped a notch on the test strip.</p>
+            <p class="review-attr">DARYL K. <span class="dot">·</span> HENDERSON <span class="dot">·</span> MAR 2026</p>
+          </div>
+          <div class="review center">
+            <span class="review-mark">"</span>
+            <p class="review-body">Pump died on Memorial Day weekend. Tech named Mike was at my house within 90 minutes with a replacement on the truck. Most pool companies would've told me Tuesday.</p>
+            <p class="review-attr">SANDRA P. <span class="dot">·</span> SPRING VALLEY <span class="dot">·</span> MAY 2026</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="cta" id="cta">
+      <div class="container">
+        <div class="cta-content">
+          <div class="cta-left">
+            <span class="eyebrow">READY WHEN YOU ARE</span>
+            <h2>Get a quote in <span style="font-style: italic; color: var(--gold-bright); font-weight: 600;">2 hours.</span></h2>
+            <p style="color: rgba(245, 241, 232, 0.7); font-size: 1.05rem; max-width: 460px;">
+              Tell us where the pool is and what's going on. We'll call back same-day with a real number — no "we'll send someone Tuesday" runaround.
+            </p>
+            <a href="tel:+17025550142" class="cta-phone">(702) 555-0142</a>
+            <p class="cta-urgency">MON–SAT 7AM–7PM <span class="dot">·</span> SUN ON-CALL <span class="dot">·</span> EMERGENCY 24/7</p>
+          </div>
+          <form class="cta-form" onsubmit="event.preventDefault(); alert('Demo form — wire into GHL on real client build');">
+            <label class="form-label" for="cta-name">YOUR NAME</label>
+            <input id="cta-name" type="text" placeholder="Maria L." required>
+
+            <label class="form-label" for="cta-phone">PHONE</label>
+            <input id="cta-phone" type="tel" placeholder="(702) 555-0123" required>
+
+            <label class="form-label" for="cta-service">WHAT YOU NEED</label>
+            <select id="cta-service" required style="background: transparent;">
+              <option value="" style="background: var(--ink);">Choose one…</option>
+              <option value="weekly" style="background: var(--ink);">Weekly Maintenance</option>
+              <option value="one-time" style="background: var(--ink);">One-Time Cleaning</option>
+              <option value="repair" style="background: var(--ink);">Equipment Repair</option>
+              <option value="green" style="background: var(--ink);">Green-to-Clean</option>
+              <option value="emergency" style="background: var(--ink);">Emergency</option>
+              <option value="other" style="background: var(--ink);">Something Else</option>
+            </select>
+
+            <button type="submit" class="btn-primary">
+              Get My Quote
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer" id="footer">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <div class="brand-mark">Desert Blue Pools</div>
+            <p>Year-round residential pool service for Las Vegas, Henderson, and Summerlin. Family-run since 2014.</p>
+          </div>
+          <div>
+            <h4>CONTACT</h4>
+            <ul>
+              <li><a href="tel:+17025550142">(702) 555-0142</a></li>
+              <li><a href="mailto:hello@desertbluepools.com">hello@desertbluepools.com</a></li>
+              <li>6225 S Valley View Blvd<br>Suite 213<br>Las Vegas, NV 89118</li>
+            </ul>
+          </div>
+          <div>
+            <h4>HOURS</h4>
+            <ul>
+              <li>Mon–Sat <strong style="color: var(--ivory);">7am–7pm</strong></li>
+              <li>Sun <strong style="color: var(--ivory);">On-call</strong></li>
+              <li>Emergency <strong style="color: var(--ivory);">24/7</strong></li>
+            </ul>
+          </div>
+          <div>
+            <h4>SERVICE AREA</h4>
+            <ul>
+              <li>89113 · 89117 · 89123</li>
+              <li>89134 · 89135 · 89141</li>
+              <li>89144 · 89145 · 89146</li>
+              <li>89147 · 89148 · 89149</li>
+              <li>89178 · 89183</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 DESERT BLUE POOLS LLC · NV CONTRACTOR #82741</span>
+          <span>SITE BY VALDES AGENCY</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ───────────── SCRIPTS ───────────── -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    (function() {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const isMobile = window.innerWidth < 768;
+
+      // ─── THREE.JS HERO SHADER ───
+      let scene, camera, renderer, mesh, shaderMat, clock;
+
+      function initShader() {
+        if (reducedMotion) return;
+        const canvas = document.createElement('canvas');
+        canvas.id = 'hero-canvas';
+        document.body.appendChild(canvas);
+
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const geo = new THREE.PlaneGeometry(2, 2);
+
+        shaderMat = new THREE.ShaderMaterial({
+          uniforms: {
+            uTime: { value: 0 },
+            uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+            uColorDeep:    { value: new THREE.Color(0x06283d) }, // dark pool floor — text contrast
+            uColorMid:     { value: new THREE.Color(0x1a6a8a) }, // Pattern 2J reference midtone
+            uColorBright:  { value: new THREE.Color(0x2a9df4) }, // matches --pool-blue CSS var
+            uColorCaustic: { value: new THREE.Color(0xa8e6ff) }, // pale turquoise caustic highlight
+            uSpeed: { value: 0.18 },
+            uShimmer: { value: 1.0 },
+            uCausticScale: { value: 4.0 },
+            uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform float uTime;
+            uniform vec2 uResolution;
+            uniform vec3 uColorDeep;
+            uniform vec3 uColorMid;
+            uniform vec3 uColorBright;
+            uniform vec3 uColorCaustic;
+            uniform float uSpeed;
+            uniform float uShimmer;
+            uniform float uCausticScale;
+            uniform vec2 uMouse;
+            varying vec2 vUv;
+
+            // Cheap 2D random — Pattern 8B helper
+            vec2 random2(vec2 p) {
+              return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
+                                    dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+            }
+
+            // Animated Voronoi caustic — adapted from PATTERNS.md Pattern 8B
+            float caustic(vec2 uv) {
+              vec2 i_st = floor(uv);
+              vec2 f_st = fract(uv);
+              float minDist = 1.0;
+              for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                  vec2 neighbor = vec2(float(x), float(y));
+                  vec2 pt = random2(i_st + neighbor);
+                  pt = 0.5 + 0.5 * sin(uTime * 0.8 + 6.2831 * pt);
+                  minDist = min(minDist, length(neighbor + pt - f_st));
+                }
+              }
+              return minDist;
+            }
+
+            void main() {
+              vec2 uv = vUv;
+              float aspect = uResolution.x / uResolution.y;
+              vec2 p = vec2(uv.x * aspect, uv.y);
+              float t = uTime * uSpeed;
+
+              // 1. Vertical depth gradient — looking down into a pool
+              float depth = smoothstep(0.0, 1.0, uv.y);
+              vec3 col = mix(uColorDeep, uColorMid, smoothstep(0.0, 0.6, depth));
+              col = mix(col, uColorBright, smoothstep(0.55, 1.0, depth));
+
+              // 2. Sine-wave surface shimmer — Pattern 2J adapted to screen-space
+              float wave = sin(p.x * 6.0 + uTime * 0.9) * 0.04
+                         + sin(p.y * 7.0 + uTime * 1.1) * 0.03
+                         + sin((p.x + p.y) * 5.0 + uTime * 0.6) * 0.025;
+              col += wave * uShimmer;
+
+              // 3. Two-layer Voronoi caustic web — Pattern 8B
+              vec2 cuv = p * uCausticScale;
+              float c = caustic(cuv) * caustic(cuv * 1.5 + 3.0);
+              float pattern = pow(c, 0.55) * 3.2;
+              pattern = smoothstep(0.0, 1.0, pattern);
+              col = mix(col, uColorCaustic, pattern * 0.55);
+
+              // 4. Sun shimmer — bright glow near top-right (Vegas sun overhead)
+              vec2 sunPos = vec2(0.78 * aspect, 0.78);
+              float sunGlow = smoothstep(0.55, 0.0, distance(p, sunPos)) * 0.18;
+              col += vec3(1.0, 0.95, 0.78) * sunGlow;
+
+              // 5. Lower-left text-readability vignette — bias darkness where hero copy sits
+              float textBias = smoothstep(0.4, 0.0, uv.x) * smoothstep(0.7, 0.2, uv.y);
+              col *= mix(1.0, 0.75, textBias);
+
+              // 6. Subtle film grain
+              float grain = fract(sin(dot(uv * uResolution, vec2(12.9898, 78.233)) + uTime * 0.1) * 43758.5453);
+              col -= (grain - 0.5) * 0.02;
+
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `,
+        });
+
+        mesh = new THREE.Mesh(geo, shaderMat);
+        scene.add(mesh);
+
+        clock = new THREE.Clock();
+        animate();
+
+        window.addEventListener('resize', onResize);
+        if (!isMobile) {
+          window.addEventListener('mousemove', onMouseMove);
+        }
+      }
+
+      function onResize() {
+        if (!renderer) return;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        shaderMat.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+      }
+
+      function onMouseMove(e) {
+        if (!shaderMat) return;
+        shaderMat.uniforms.uMouse.value.set(
+          e.clientX / window.innerWidth,
+          1.0 - e.clientY / window.innerHeight
+        );
+      }
+
+      function animate() {
+        if (!renderer) return;
+        requestAnimationFrame(animate);
+        const t = clock.getElapsedTime();
+        shaderMat.uniforms.uTime.value = t;
+        renderer.render(scene, camera);
+      }
+
+      // ─── LOADER ───
+      window.addEventListener('load', () => {
+        initShader();
+        setTimeout(() => {
+          document.getElementById('loader').classList.add('hidden');
+          runIntroAnimations();
+        }, 900);
+      });
+
+      // ─── GSAP INTRO ───
+      function runIntroAnimations() {
+        if (reducedMotion) {
+          gsap.set(['.hero-eyebrow', '.hero h1', '.hero-subhead', '.hero-cta-row'], { opacity: 1, y: 0 });
+          return;
+        }
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.from('.hero-eyebrow', { opacity: 0, y: 24, duration: 0.7 })
+          .from('.hero h1', { opacity: 0, y: 40, duration: 0.9 }, '-=0.4')
+          .from('.hero-subhead', { opacity: 0, y: 24, duration: 0.7 }, '-=0.5')
+          .from('.hero-cta-row', { opacity: 0, y: 20, duration: 0.6 }, '-=0.4')
+          .from('.scroll-cue', { opacity: 0, duration: 0.5 }, '-=0.2');
+      }
+
+      // ─── SCROLLTRIGGER ───
+      window.addEventListener('load', () => {
+        if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Fade hero canvas out as user scrolls past hero
+        if (!reducedMotion) {
+          gsap.to('#hero-canvas', {
+            opacity: 0,
+            scrollTrigger: {
+              trigger: '.hero',
+              start: 'bottom 80%',
+              end: 'bottom 20%',
+              scrub: 1,
+            }
+          });
+        }
+
+        // Trust CountUp
+        document.querySelectorAll('.trust-num').forEach(el => {
+          const target = parseFloat(el.dataset.count);
+          const decimals = parseInt(el.dataset.decimals || '0');
+          const prefix = el.dataset.prefix || '';
+          const suffix = el.dataset.suffix || '';
+          const obj = { v: 0 };
+          gsap.to(obj, {
+            v: target,
+            duration: 1.6,
+            ease: 'power2.out',
+            scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+            onUpdate: () => {
+              el.textContent = prefix + obj.v.toFixed(decimals) + suffix;
+            }
+          });
+        });
+
+        // Services stagger
+        gsap.from('.service-card', {
+          opacity: 0,
+          y: 40,
+          rotation: 2,
+          transformOrigin: 'bottom center',
+          duration: 0.7,
+          stagger: 0.12,
+          ease: 'power2.out',
+          scrollTrigger: { trigger: '.services-grid', start: 'top 78%' }
+        });
+
+        // Reviews fade-in stagger
+        gsap.utils.toArray('.review').forEach((el) => {
+          gsap.from(el, {
+            opacity: 0,
+            y: 40,
+            duration: 0.9,
+            ease: 'power2.out',
+            scrollTrigger: { trigger: el, start: 'top 80%' }
+          });
+        });
+
+        // Section heads fade-up
+        gsap.utils.toArray('.section-head').forEach((el) => {
+          gsap.from(el.children, {
+            opacity: 0,
+            y: 24,
+            stagger: 0.1,
+            duration: 0.8,
+            ease: 'power2.out',
+            scrollTrigger: { trigger: el, start: 'top 82%' }
+          });
+        });
+
+        // CTA reveal
+        gsap.from('.cta-content > *', {
+          opacity: 0,
+          y: 30,
+          duration: 0.9,
+          stagger: 0.2,
+          ease: 'power2.out',
+          scrollTrigger: { trigger: '.cta', start: 'top 70%' }
+        });
+
+        // ── BEFORE/AFTER SLIDER ──
+        const stage = document.getElementById('ba-stage');
+        const after = document.getElementById('ba-after');
+        const divider = document.getElementById('ba-divider');
+        const handle = document.getElementById('ba-handle');
+        let manualOverride = false;
+
+        function setBA(pct) {
+          // pct: 0 → all BEFORE (handle at right), 1 → all AFTER (handle at left)
+          // Actually we want: pct 0 = handle at 50% revealing half, pct 1 = handle at 0% revealing all AFTER
+          // Re-spec: x is the left-position of the divider in 0..1 of stage width.
+          const x = Math.max(0.04, Math.min(0.96, pct));
+          after.style.clipPath = `inset(0 0 0 ${x * 100}%)`;
+          divider.style.left = `${x * 100}%`;
+          handle.style.left = `${x * 100}%`;
+        }
+
+        // Auto-scrub via scroll
+        if (!reducedMotion) {
+          const ba = { x: 0.92 };
+          gsap.to(ba, {
+            x: 0.08,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: '.before-after',
+              start: 'top 65%',
+              end: 'bottom 35%',
+              scrub: 1,
+              onUpdate: () => { if (!manualOverride) setBA(ba.x); }
+            }
+          });
+        } else {
+          setBA(0.5);
+        }
+
+        // Manual drag
+        let dragging = false;
+        function dragMove(clientX) {
+          const rect = stage.getBoundingClientRect();
+          const x = (clientX - rect.left) / rect.width;
+          setBA(x);
+        }
+        handle.addEventListener('mousedown', () => { dragging = true; manualOverride = true; });
+        window.addEventListener('mouseup', () => { dragging = false; });
+        window.addEventListener('mousemove', (e) => { if (dragging) dragMove(e.clientX); });
+        handle.addEventListener('touchstart', (e) => { dragging = true; manualOverride = true; e.preventDefault(); }, { passive: false });
+        window.addEventListener('touchend', () => { dragging = false; });
+        window.addEventListener('touchmove', (e) => { if (dragging && e.touches[0]) dragMove(e.touches[0].clientX); }, { passive: true });
+
+        // Initialize at 50/50 visible split before scrub kicks in
+        setBA(0.5);
+      });
+    })();
+  </script>
+</body>
+</html>

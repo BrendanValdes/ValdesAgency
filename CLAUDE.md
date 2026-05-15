@@ -84,6 +84,11 @@ FULL TOOL STACK
 | Railway | Bot hosting |
 | Google Workspace | Email, docs, sheets |
 | agency-agents (msitarzewski) | 147 specialized agent personalities for Claude Code |
+| GSAP skills (greensock) | 8 official GSAP modules (core, timeline, scrolltrigger, react, plugins, performance, frameworks, utils) |
+| frontend-design (Anthropic) | Official anti-AI-slop skill — bold aesthetic commitment, banned generic fonts/patterns |
+| Mobbin | Real production UI pattern reference library (mobbin.com) |
+| Shadergradient | Animated WebGL gradient backgrounds for hero sections (shadergradient.co) |
+| 3d-frontend skill (zyliu0) | Scroll-driven 3D websites — Three.js r128 + GSAP ScrollTrigger, single-file HTML, 1800-line patterns library |
 
 GITNEXUS RULES (every code edit)
 - Before modifying any function/class/method: run `gitnexus_impact({target: "symbolName", direction: "upstream"})`. Report blast radius (callers, affected processes, risk level). Warn if HIGH or CRITICAL before proceeding.
@@ -109,6 +114,11 @@ skills/website-build.md  → Lovable workflow, design brief, components, hero vi
                            niche playbooks (11 niches), design standards, delivery
                            USE WHEN: starting a new client website, choosing colors/fonts,
                            picking components, troubleshooting Lovable, prepping delivery
+
+skills/design-references.md → Mobbin (UI pattern library) + Shadergradient (animated hero
+                              backgrounds). Decision tree: Higgsfield video vs Shadergradient.
+                              USE WHEN: picking UI patterns, building hero sections, choosing
+                              between literal product imagery and animated gradient backgrounds
 
 [future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt

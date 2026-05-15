@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS ONE — The Future is Neural</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { overflow-x: hidden; background: #020008; color: #e0e0f0; }
+    body { font-family: 'Share Tech Mono', monospace; }
+
+    /* Loading screen */
+    #loader {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #020008;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+    .loader-ring {
+      width: 80px; height: 80px;
+      border: 3px solid transparent;
+      border-top-color: #00ffff;
+      border-bottom-color: #ff00ff;
+      border-radius: 50%;
+      animation: spin 1.2s linear infinite;
+    }
+    .loader-text {
+      margin-top: 24px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      letter-spacing: 6px;
+      color: #00ffff;
+      text-transform: uppercase;
+      animation: pulse-text 1.5s ease-in-out infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse-text { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Canvas */
+    canvas { position: fixed; top: 0; left: 0; z-index: 0; }
+
+    /* Scan lines overlay */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.04) 2px,
+        rgba(0, 0, 0, 0.04) 4px
+      );
+    }
+
+    /* Scroll container */
+    .scroll-container {
+      position: relative;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Sections */
+    .section {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4vh 6vw;
+      position: relative;
+    }
+    #s0 { height: 160vh; }
+    #s1 { height: 130vh; }
+    #s2 { height: 130vh; }
+    #s3 { height: 130vh; }
+    #s4 { height: 100vh; }
+
+    /* Content positioning */
+    .content { pointer-events: auto; max-width: 600px; }
+    .content.left { margin-right: auto; margin-left: 6vw; }
+    .content.right { margin-left: auto; margin-right: 6vw; }
+    .content.center { text-align: center; margin: 0 auto; }
+
+    /* Glass panel */
+    .glass-panel {
+      background: rgba(5, 5, 20, 0.6);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 255, 255, 0.1);
+      border-radius: 4px;
+      padding: 2.5rem 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .glass-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #00ffff, transparent);
+      opacity: 0.6;
+    }
+    .glass-panel::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #ff00ff, transparent);
+      opacity: 0.4;
+    }
+
+    /* Typography */
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif; }
+    h1 {
+      font-size: clamp(3rem, 8vw, 7rem);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: 0.04em;
+      background: linear-gradient(135deg, #00ffff 0%, #ffffff 40%, #ff00ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 40px rgba(0, 255, 255, 0.3));
+    }
+    .hero-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(1rem, 2.5vw, 1.6rem);
+      color: rgba(0, 255, 255, 0.7);
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      margin-top: 1.2rem;
+    }
+    .hero-line {
+      width: 80px; height: 2px;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      margin: 2rem auto 0;
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+    }
+    h2 {
+      font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #00ffff;
+      margin-bottom: 1.2rem;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+    }
+    h3 {
+      font-size: clamp(0.9rem, 1.6vw, 1.2rem);
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: #ff00ff;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      font-size: clamp(0.85rem, 1.3vw, 1.05rem);
+      line-height: 1.75;
+      color: rgba(200, 200, 230, 0.85);
+      margin-bottom: 1rem;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 1.8rem;
+    }
+    .stat-item { text-align: center; }
+    .stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: rgba(0, 255, 255, 0.6);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: 0.3rem;
+    }
+    .stat-divider {
+      width: 40px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.4), transparent);
+      margin: 0.5rem auto 0;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin-top: 1.5rem;
+    }
+    .feature-item {
+      background: rgba(0, 255, 255, 0.03);
+      border: 1px solid rgba(0, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 1.2rem 1.4rem;
+      position: relative;
+    }
+    .feature-item::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: linear-gradient(180deg, #00ffff, #ff00ff);
+      border-radius: 2px 0 0 2px;
+    }
+    .feature-icon {
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature-item h3 {
+      font-size: 0.8rem;
+      margin-bottom: 0.4rem;
+    }
+    .feature-item p {
+      font-size: 0.78rem;
+      margin-bottom: 0;
+      color: rgba(200, 200, 230, 0.7);
+      line-height: 1.5;
+    }
+
+    /* CTA section */
+    .cta-price {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1rem, 2vw, 1.3rem);
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.1em;
+      margin-bottom: 2rem;
+    }
+    .cta-price span {
+      color: #ffffff;
+      font-size: clamp(1.6rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+    }
+    .btn-waitlist {
+      display: inline-block;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(0.85rem, 1.3vw, 1rem);
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 1.1rem 3.5rem;
+      color: #020008;
+      background: linear-gradient(135deg, #00ffff, #00ccff);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+    .btn-waitlist:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+    .btn-waitlist::after {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: linear-gradient(transparent, rgba(255, 255, 255, 0.15), transparent);
+      transform: rotate(45deg);
+      animation: btn-shine 3s ease-in-out infinite;
+    }
+    @keyframes btn-shine {
+      0% { transform: translateX(-100%) rotate(45deg); }
+      30%, 100% { transform: translateX(100%) rotate(45deg); }
+    }
+    .cta-note {
+      font-size: 0.7rem;
+      color: rgba(200, 200, 230, 0.4);
+      letter-spacing: 0.1em;
+      margin-top: 1.5rem;
+    }
+
+    /* Section label decoration */
+    .section-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      color: rgba(255, 0, 255, 0.4);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .glass-panel { padding: 1.8rem 1.5rem; }
+      .content.left, .content.right { margin-left: 4vw; margin-right: 4vw; }
+      .content { max-width: 90vw; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Initializing Neural Link</div>
+  </div>
+
+  <!-- Scan lines overlay -->
+  <div class="scanlines"></div>
+
+  <!-- Scroll content -->
+  <div class="scroll-container" id="scroll-container">
+
+    <!-- Section 0: Hero -->
+    <div class="section" id="s0">
+      <div class="content center">
+        <div class="section-label">// neural_interface.v1.0</div>
+        <h1>NEXUS<br>ONE</h1>
+        <div class="hero-sub">The Future is Neural</div>
+        <div class="hero-line"></div>
+      </div>
+    </div>
+
+    <!-- Section 1: Quantum Processing -->
+    <div class="section" id="s1">
+      <div class="content left glass-panel">
+        <div class="section-label">// 001 &mdash; core_specs</div>
+        <h2>Quantum Processing</h2>
+        <p>The NEXUS ONE houses a next-generation quantum processing unit engineered for real-time neural signal decoding. Sub-millisecond latency ensures seamless integration between thought and action.</p>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">12</div>
+            <div class="stat-label">Qubits</div>
+            <div class="stat-divider"></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">0.3<span style="font-size:0.6em">ms</span></div>
+            <div class="stat-label">Latency</div>
+            <div class="stat-divider"></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">99.97<span style="font-size:0.5em">%</span></div>
+            <div class="stat-label">Accuracy</div>
+            <div class="stat-divider"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Neural Bridge -->
+    <div class="section" id="s2">
+      <div class="content right glass-panel">
+        <div class="section-label">// 002 &mdash; neural_bridge</div>
+        <h2>Neural Bridge</h2>
+        <p>Our proprietary brain-computer interface utilizes non-invasive nanoscale electrodes that form a symbiotic bridge between biological neural networks and digital systems.</p>
+        <p>Thought-to-data conversion happens in real time. The Neural Bridge adapts to your unique neural signature, growing more intuitive with every interaction. No surgery. No implants. Pure thought, amplified.</p>
+      </div>
+    </div>
+
+    <!-- Section 3: Infinite Possibilities -->
+    <div class="section" id="s3">
+      <div class="content left glass-panel">
+        <div class="section-label">// 003 &mdash; capabilities</div>
+        <h2>Infinite Possibilities</h2>
+        <div class="feature-grid">
+          <div class="feature-item">
+            <div class="feature-icon">&#9670;</div>
+            <h3>Thought Control</h3>
+            <p>Command any connected device with pure neural impulse. Zero physical input required.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">&#9674;</div>
+            <h3>Memory Augment</h3>
+            <p>Instant recall and perfect memory indexing powered by quantum-assisted storage.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">&#9733;</div>
+            <h3>Shared Cognition</h3>
+            <p>Peer-to-peer neural mesh networking for collaborative thought in real time.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">&#9788;</div>
+            <h3>Dream Rendering</h3>
+            <p>Convert subconscious imagery into high-fidelity visual output at 8K resolution.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: CTA -->
+    <div class="section" id="s4">
+      <div class="content center">
+        <div class="section-label">// 004 &mdash; initialize</div>
+        <h2 style="color:#ffffff; text-shadow: 0 0 30px rgba(0,255,255,0.4), 0 0 60px rgba(255,0,255,0.2);">Join the Waitlist</h2>
+        <div class="cta-price">Starting at <span>$2,499</span></div>
+        <a href="#" class="btn-waitlist" onclick="return false;">Reserve Now</a>
+        <div class="cta-note">Expected ship date: Q4 2027 &mdash; Limited first-run allocation</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    // ==========================================
+    // NEXUS ONE — Sci-Fi Launch Page
+    // ==========================================
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const isMobile = window.innerWidth < 768;
+
+    // ---- Scene Setup ----
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020008);
+    scene.fog = new THREE.FogExp2(0x020018, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 0, 28);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.prepend(renderer.domElement);
+
+    // ---- Lighting ----
+    const ambientLight = new THREE.AmbientLight(0x100020, 0.3);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0x4400ff, 0.4);
+    keyLight.position.set(5, 8, 10);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x00ffff, 0.2);
+    fillLight.position.set(-5, 3, -5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xff00ff, 0.25);
+    rimLight.position.set(0, 5, -10);
+    scene.add(rimLight);
+
+    // ---- Tunnel (Pattern 5C) ----
+    const tunnelPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 30),
+      new THREE.Vector3(0, 0, 20),
+      new THREE.Vector3(0.5, 0, 10),
+      new THREE.Vector3(-0.5, 0.5, 0),
+      new THREE.Vector3(0.3, -0.3, -10),
+      new THREE.Vector3(-0.3, 0.2, -20),
+      new THREE.Vector3(0, 0, -30),
+      new THREE.Vector3(0.5, 0, -40),
+      new THREE.Vector3(0, 0, -55),
+    ], false, 'catmullrom', 0.5);
+
+    const tunnelGeo = new THREE.TubeGeometry(tunnelPath, 300, 4, 24, false);
+    const tunnelMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0a1a,
+      side: THREE.BackSide,
+      metalness: 0.8,
+      roughness: 0.3,
+      emissive: 0x050510,
+      emissiveIntensity: 0.3,
+    });
+    const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
+    scene.add(tunnel);
+
+    // ---- Wireframe tunnel overlay for grid lines ----
+    const tunnelWireGeo = new THREE.TubeGeometry(tunnelPath, 300, 4.02, 24, false);
+    const tunnelWireMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.04,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+    });
+    const tunnelWire = new THREE.Mesh(tunnelWireGeo, tunnelWireMat);
+    scene.add(tunnelWire);
+
+    // ---- Ring Lights along tunnel ----
+    const ringLightGroup = new THREE.Group();
+    const ringCount = 40;
+    for (let i = 0; i < ringCount; i++) {
+      const t = i / (ringCount - 1);
+      const pos = tunnelPath.getPointAt(t);
+      const tangent = tunnelPath.getTangentAt(t);
+
+      // Ring geometry
+      const ringGeo = new THREE.TorusGeometry(3.8, 0.03, 8, 48);
+      const isCyan = i % 2 === 0;
+      const ringColor = isCyan ? 0x00ffff : 0xff00ff;
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ringColor,
+        transparent: true,
+        opacity: 0.25 + Math.sin(i * 0.5) * 0.1,
+        blending: THREE.AdditiveBlending,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.copy(pos);
+
+      // Align ring to tunnel tangent
+      const up = new THREE.Vector3(0, 1, 0);
+      const quat = new THREE.Quaternion();
+      const axis = new THREE.Vector3().crossVectors(up, tangent).normalize();
+      const angle = Math.acos(Math.min(1, Math.max(-1, up.dot(tangent))));
+      if (axis.length() > 0.001) {
+        quat.setFromAxisAngle(axis, angle);
+      }
+      // Rings should face along the tunnel — rotate 90 degrees so they wrap around it
+      const faceQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+      ring.quaternion.copy(quat).multiply(faceQuat);
+
+      // Actually, simpler: orient ring so its normal aligns with tangent
+      ring.lookAt(pos.clone().add(tangent));
+
+      ringLightGroup.add(ring);
+
+      // Add a subtle point light every 5 rings
+      if (i % 5 === 0) {
+        const pl = new THREE.PointLight(ringColor, 0.6, 8, 2);
+        pl.position.copy(pos);
+        ringLightGroup.add(pl);
+      }
+    }
+    scene.add(ringLightGroup);
+
+    // ---- Hero Object: TorusKnot with Fresnel Glow (Pattern 2H) ----
+    const heroGroup = new THREE.Group();
+    const heroPos = tunnelPath.getPointAt(0.22);
+    heroGroup.position.copy(heroPos);
+
+    // Core torus knot
+    const torusKnotGeo = new THREE.TorusKnotGeometry(1.2, 0.35, 128, 32, 2, 3);
+    const torusKnotMat = new THREE.MeshStandardMaterial({
+      color: 0x111133,
+      emissive: 0x4400aa,
+      emissiveIntensity: 0.6,
+      metalness: 0.9,
+      roughness: 0.15,
+    });
+    const torusKnot = new THREE.Mesh(torusKnotGeo, torusKnotMat);
+    heroGroup.add(torusKnot);
+
+    // Fresnel glow shell
+    const fresnelMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        glowColor: { value: new THREE.Color(0x00ffff) },
+        glowColor2: { value: new THREE.Color(0xff00ff) },
+        intensity: { value: 2.0 },
+        uTime: { value: 0 },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        varying vec3 vWorldPos;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 glowColor;
+        uniform vec3 glowColor2;
+        uniform float intensity;
+        uniform float uTime;
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        varying vec3 vWorldPos;
+        void main() {
+          float fresnel = 1.0 - dot(vNormal, vViewDir);
+          fresnel = pow(fresnel, 3.0) * intensity;
+          float pulse = 0.8 + 0.2 * sin(uTime * 2.0);
+          fresnel *= pulse;
+          float blend = 0.5 + 0.5 * sin(vWorldPos.y * 3.0 + uTime * 1.5);
+          vec3 col = mix(glowColor, glowColor2, blend);
+          gl_FragColor = vec4(col, fresnel);
+        }
+      `,
+      side: THREE.FrontSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const fresnelShell = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(1.3, 0.45, 128, 32, 2, 3),
+      fresnelMat
+    );
+    heroGroup.add(fresnelShell);
+
+    // Outer glow shell
+    const outerGlowMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.04,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+    });
+    const outerGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(2.5, 24, 24),
+      outerGlowMat
+    );
+    heroGroup.add(outerGlow);
+
+    scene.add(heroGroup);
+
+    // ---- Particle Field ----
+    const particleCount = isMobile ? 500 : 1500;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleSpeeds = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      // Distribute along the tunnel path
+      const t = Math.random();
+      const pathPoint = tunnelPath.getPointAt(t);
+      const spread = 3.5;
+      particlePositions[i * 3] = pathPoint.x + (Math.random() - 0.5) * spread;
+      particlePositions[i * 3 + 1] = pathPoint.y + (Math.random() - 0.5) * spread;
+      particlePositions[i * 3 + 2] = pathPoint.z + (Math.random() - 0.5) * spread;
+      particleSpeeds[i] = 0.3 + Math.random() * 0.7;
+    }
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+      color: 0x00ffff,
+      size: isMobile ? 0.06 : 0.04,
+      transparent: true,
+      opacity: 0.6,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
+
+    // Second particle layer (magenta, sparser)
+    const p2Count = isMobile ? 200 : 600;
+    const p2Geo = new THREE.BufferGeometry();
+    const p2Positions = new Float32Array(p2Count * 3);
+    for (let i = 0; i < p2Count; i++) {
+      const t = Math.random();
+      const pathPoint = tunnelPath.getPointAt(t);
+      const spread = 5.0;
+      p2Positions[i * 3] = pathPoint.x + (Math.random() - 0.5) * spread;
+      p2Positions[i * 3 + 1] = pathPoint.y + (Math.random() - 0.5) * spread;
+      p2Positions[i * 3 + 2] = pathPoint.z + (Math.random() - 0.5) * spread;
+    }
+    p2Geo.setAttribute('position', new THREE.BufferAttribute(p2Positions, 3));
+    const p2Mat = new THREE.PointsMaterial({
+      color: 0xff00ff,
+      size: isMobile ? 0.05 : 0.035,
+      transparent: true,
+      opacity: 0.4,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const particles2 = new THREE.Points(p2Geo, p2Mat);
+    scene.add(particles2);
+
+    // ---- Floating geometric accents ----
+    const accentGroup = new THREE.Group();
+    const accentGeos = [
+      new THREE.OctahedronGeometry(0.15, 0),
+      new THREE.TetrahedronGeometry(0.12, 0),
+      new THREE.IcosahedronGeometry(0.1, 0),
+    ];
+    const accentCount = isMobile ? 20 : 50;
+    for (let i = 0; i < accentCount; i++) {
+      const t = Math.random();
+      const pt = tunnelPath.getPointAt(t);
+      const geo = accentGeos[Math.floor(Math.random() * accentGeos.length)];
+      const isC = Math.random() > 0.5;
+      const mat = new THREE.MeshBasicMaterial({
+        color: isC ? 0x00ffff : 0xff00ff,
+        transparent: true,
+        opacity: 0.15 + Math.random() * 0.2,
+        wireframe: true,
+        blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(
+        pt.x + (Math.random() - 0.5) * 6,
+        pt.y + (Math.random() - 0.5) * 6,
+        pt.z + (Math.random() - 0.5) * 4
+      );
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      mesh.userData.rotSpeed = {
+        x: (Math.random() - 0.5) * 0.02,
+        y: (Math.random() - 0.5) * 0.02,
+        z: (Math.random() - 0.5) * 0.02,
+      };
+      accentGroup.add(mesh);
+    }
+    scene.add(accentGroup);
+
+    // ---- Scroll Progress ----
+    let scrollProgress = 0;
+
+    ScrollTrigger.create({
+      trigger: '#scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: function(self) {
+        scrollProgress = self.progress;
+      },
+    });
+
+    // ---- Camera Animation via Scroll (Master Timeline with scrub) ----
+    const cam = { progress: 0 };
+    const camTL = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#scroll-container',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 1.5,
+      },
+    });
+    camTL.to(cam, { progress: 1, duration: 1, ease: 'none' });
+
+    // ---- Mouse Parallax ----
+    const mouse = { x: 0, y: 0 };
+    document.addEventListener('mousemove', function(e) {
+      mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // ---- Content Fade Animations ----
+    var sections = ['#s0', '#s1', '#s2', '#s3', '#s4'];
+    sections.forEach(function(sel, i) {
+      var el = document.querySelector(sel + ' .content');
+      if (!el) return;
+
+      // Fade in
+      gsap.fromTo(el,
+        { opacity: 0, y: 60 },
+        {
+          opacity: 1, y: 0,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'top 70%',
+            end: 'top 30%',
+            scrub: 1,
+          },
+        }
+      );
+
+      // Fade out (except last section)
+      if (i < sections.length - 1) {
+        gsap.to(el, {
+          opacity: 0, y: -40,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'bottom 60%',
+            end: 'bottom 20%',
+            scrub: 1,
+          },
+        });
+      }
+    });
+
+    // ---- Fog Color Transitions ----
+    const fogColors = [
+      new THREE.Color(0x020018), // dark blue
+      new THREE.Color(0x0a0030), // deeper
+      new THREE.Color(0x150040), // purple
+      new THREE.Color(0x0a0025), // back toward dark
+      new THREE.Color(0x020010), // dark end
+    ];
+
+    const bgColors = [
+      new THREE.Color(0x020008),
+      new THREE.Color(0x050015),
+      new THREE.Color(0x0a0025),
+      new THREE.Color(0x050012),
+      new THREE.Color(0x020008),
+    ];
+
+    function lerpColorArray(colors, t) {
+      var ct = Math.max(0, Math.min(1, t));
+      var idx = ct * (colors.length - 1);
+      var low = Math.floor(idx);
+      var high = Math.min(low + 1, colors.length - 1);
+      var frac = idx - low;
+      var c = new THREE.Color();
+      c.copy(colors[low]).lerp(colors[high], frac);
+      return c;
+    }
+
+    // ---- Clock ----
+    const clock = new THREE.Clock();
+
+    // ---- Render Loop ----
+    function animate() {
+      requestAnimationFrame(animate);
+
+      var elapsed = clock.getElapsedTime();
+      var progress = cam.progress;
+
+      // Camera follows tunnel path
+      var camT = Math.min(progress * 0.85 + 0.02, 0.98);
+      var camPos = tunnelPath.getPointAt(camT);
+      var lookT = Math.min(camT + 0.015, 0.999);
+      var lookPos = tunnelPath.getPointAt(lookT);
+
+      // Mouse parallax
+      var parallaxStrength = 0.3;
+      camera.position.set(
+        camPos.x + mouse.x * parallaxStrength,
+        camPos.y - mouse.y * parallaxStrength * 0.5,
+        camPos.z
+      );
+      camera.lookAt(lookPos.x, lookPos.y, lookPos.z);
+
+      // Fog + background color transition
+      var fogCol = lerpColorArray(fogColors, progress);
+      var bgCol = lerpColorArray(bgColors, progress);
+      scene.fog.color.copy(fogCol);
+      scene.background.copy(bgCol);
+
+      // Fog density: thicker in the middle sections, thinner at start/end
+      scene.fog.density = 0.02 + Math.sin(progress * Math.PI) * 0.015;
+
+      // Hero object rotation and pulse
+      torusKnot.rotation.x = elapsed * 0.15;
+      torusKnot.rotation.y = elapsed * 0.25;
+      torusKnot.rotation.z = elapsed * 0.1;
+      fresnelShell.rotation.x = elapsed * 0.15;
+      fresnelShell.rotation.y = elapsed * 0.25;
+      fresnelShell.rotation.z = elapsed * 0.1;
+
+      // Pulsing emissive
+      var pulse = 0.4 + 0.3 * Math.sin(elapsed * 1.5);
+      torusKnotMat.emissiveIntensity = pulse;
+      fresnelMat.uniforms.uTime.value = elapsed;
+
+      // Outer glow pulse
+      outerGlow.scale.setScalar(1.0 + 0.1 * Math.sin(elapsed * 2.0));
+      outerGlowMat.opacity = 0.03 + 0.02 * Math.sin(elapsed * 1.8);
+
+      // Animate ring lights — subtle pulse
+      ringLightGroup.children.forEach(function(child, idx) {
+        if (child.isMesh) {
+          child.material.opacity = (0.2 + Math.sin(idx * 0.5) * 0.1) * (0.7 + 0.3 * Math.sin(elapsed * 1.2 + idx * 0.3));
+        }
+      });
+
+      // Particle drift
+      var posArr = particleGeo.attributes.position.array;
+      for (var i = 0; i < particleCount; i++) {
+        posArr[i * 3] += Math.sin(elapsed * 0.3 + i * 0.2) * 0.001;
+        posArr[i * 3 + 1] += Math.cos(elapsed * 0.4 + i * 0.15) * 0.001;
+      }
+      particleGeo.attributes.position.needsUpdate = true;
+
+      // Second particle layer drift
+      var p2Arr = p2Geo.attributes.position.array;
+      for (var j = 0; j < p2Count; j++) {
+        p2Arr[j * 3] += Math.cos(elapsed * 0.25 + j * 0.3) * 0.0008;
+        p2Arr[j * 3 + 1] += Math.sin(elapsed * 0.35 + j * 0.25) * 0.0008;
+      }
+      p2Geo.attributes.position.needsUpdate = true;
+
+      // Particle color shift on scroll
+      var pColor = new THREE.Color().setHSL(0.5 + progress * 0.1, 1.0, 0.6);
+      particleMat.color.copy(pColor);
+
+      // Rotate accent shapes
+      accentGroup.children.forEach(function(mesh) {
+        mesh.rotation.x += mesh.userData.rotSpeed.x;
+        mesh.rotation.y += mesh.userData.rotSpeed.y;
+        mesh.rotation.z += mesh.userData.rotSpeed.z;
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    // ---- Resize Handler ----
+    window.addEventListener('resize', function() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ---- Loading Screen ----
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('loader').classList.add('hidden');
+      }, 1200);
+    });
+
+    // ---- Start ----
+    animate();
+  </script>
+</body>
+</html>

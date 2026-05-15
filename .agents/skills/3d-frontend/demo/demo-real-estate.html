@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Meridian — Luxury Living Redefined</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: auto; }
+    html, body { overflow-x: hidden; font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; }
+    canvas { position: fixed; top: 0; left: 0; z-index: 0; }
+
+    /* Loading screen */
+    #loader {
+      position: fixed; inset: 0; z-index: 1000; background: #0a0a0a;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 1s ease, visibility 1s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    #loader h2 {
+      font-family: 'Playfair Display', serif; font-size: 2.2rem;
+      letter-spacing: 0.2em; margin-bottom: 2rem; color: #e8d5a3;
+    }
+    .loader-bar { width: 220px; height: 2px; background: rgba(255,255,255,0.08); border-radius: 1px; overflow: hidden; }
+    .loader-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #c9a86c, #e8d5a3); animation: loadFill 2s ease-out forwards; }
+    @keyframes loadFill { to { width: 100%; } }
+    #loader .loader-sub {
+      margin-top: 1.5rem; font-size: 0.65rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: rgba(255,255,255,0.3);
+    }
+
+    /* Scroll container */
+    .scroll-container { position: relative; z-index: 1; pointer-events: none; }
+    .section { height: 120vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .section.cta { height: 100vh; }
+
+    /* Content panels */
+    .content { pointer-events: auto; max-width: 520px; opacity: 0; }
+    .content.left { margin-right: auto; margin-left: 6vw; }
+    .content.right { margin-left: auto; margin-right: 6vw; }
+    .content.center { text-align: center; margin: 0 auto; }
+
+    .tag {
+      display: inline-block; font-size: 0.62rem; font-weight: 600;
+      letter-spacing: 0.25em; text-transform: uppercase; color: #c9a86c;
+      margin-bottom: 1.2rem; border: 1px solid rgba(201,168,108,0.3);
+      padding: 0.45em 1.1em; border-radius: 2px;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 5vw, 4.2rem);
+      font-weight: 700; line-height: 1.08; margin-bottom: 1.2rem; letter-spacing: -0.01em;
+    }
+    h2 {
+      font-family: 'Playfair Display', serif; font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+      font-weight: 700; line-height: 1.12; margin-bottom: 0.8rem;
+    }
+    p { font-size: 0.95rem; line-height: 1.75; color: rgba(255,255,255,0.65); margin-bottom: 1.25rem; font-weight: 300; }
+    .accent { color: #c9a86c; }
+
+    .stat-row { display: flex; gap: 2.5rem; margin-top: 1.5rem; flex-wrap: wrap; }
+    .stat { text-align: left; }
+    .stat-num { font-family: 'Playfair Display', serif; font-size: 1.9rem; color: #c9a86c; }
+    .stat-label { font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-top: 0.25rem; }
+
+    .btn {
+      display: inline-block; padding: 1em 2.5em;
+      background: linear-gradient(135deg, #c9a86c, #b8944f); color: #0a0a0a;
+      font-weight: 600; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+      text-decoration: none; border: none; cursor: pointer; border-radius: 3px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 40px rgba(201,168,108,0.35); }
+
+    .glass-panel {
+      background: rgba(10,10,10,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 2.5rem;
+    }
+
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+    .feature-item { display: flex; align-items: flex-start; gap: 0.75rem; }
+    .feature-icon {
+      width: 36px; height: 36px; min-width: 36px;
+      border: 1px solid rgba(201,168,108,0.3); border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      color: #c9a86c; font-size: 0.9rem;
+    }
+    .feature-text { font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.4; }
+    .feature-text strong { display: block; color: #fff; margin-bottom: 0.15rem; font-weight: 500; font-size: 0.85rem; }
+
+    /* Progress indicator */
+    .progress-track {
+      position: fixed; right: 2rem; top: 50%; transform: translateY(-50%);
+      z-index: 100; display: flex; flex-direction: column; gap: 14px; align-items: center;
+    }
+    .progress-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2); background: transparent;
+      transition: all 0.4s; cursor: pointer; pointer-events: auto;
+    }
+    .progress-dot.active { background: #c9a86c; border-color: #c9a86c; transform: scale(1.4); }
+
+    /* Room label */
+    #room-label {
+      position: fixed; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
+      z-index: 100; font-size: 0.62rem; letter-spacing: 0.35em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); transition: opacity 0.5s;
+    }
+
+    /* Scroll indicator */
+    .scroll-indicator {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+    .scroll-indicator span {
+      font-size: 0.7rem; color: rgba(255,255,255,0.3);
+      letter-spacing: 0.18em; text-transform: uppercase;
+    }
+    .scroll-line {
+      width: 1px; height: 40px; background: linear-gradient(to bottom, rgba(201,168,108,0.6), transparent);
+      animation: scrollPulse 2s ease-in-out infinite;
+    }
+    @keyframes scrollPulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    @media (max-width: 768px) {
+      .content.left, .content.right { margin: 0 auto; }
+      .features-grid { grid-template-columns: 1fr; }
+      .stat-row { gap: 1.5rem; }
+      .progress-track { right: 1rem; }
+      .glass-panel { padding: 1.5rem; }
+      .section { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loader -->
+  <div id="loader">
+    <h2>THE MERIDIAN</h2>
+    <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+    <div class="loader-sub">Preparing your private tour</div>
+  </div>
+
+  <!-- Progress dots -->
+  <div class="progress-track" id="progress">
+    <div class="progress-dot active" data-section="0"></div>
+    <div class="progress-dot" data-section="1"></div>
+    <div class="progress-dot" data-section="2"></div>
+    <div class="progress-dot" data-section="3"></div>
+    <div class="progress-dot" data-section="4"></div>
+    <div class="progress-dot" data-section="5"></div>
+  </div>
+
+  <div id="room-label">Entrance</div>
+
+  <!-- Scroll container -->
+  <div class="scroll-container" id="scroll-container">
+
+    <!-- Hero -->
+    <div class="section" id="s0">
+      <div class="content center">
+        <div class="tag">Now Accepting Reservations</div>
+        <h1>Step Inside<br><span class="accent">The Meridian</span></h1>
+        <p>Scroll to walk through 4,200 sq ft of architectural mastery. A home where every room tells a story of light, space, and intention.</p>
+        <div class="scroll-indicator">
+          <span>Scroll to explore</span>
+          <div class="scroll-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Living Room -->
+    <div class="section" id="s1">
+      <div class="content left glass-panel">
+        <div class="tag">The Living Room</div>
+        <h2>Open-Plan<br>Grandeur</h2>
+        <p>Double-height ceilings flood the space with natural light. Floor-to-ceiling windows frame panoramic city views, while warm oak floors ground the airy volume.</p>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-num">22'</div><div class="stat-label">Ceiling Height</div></div>
+          <div class="stat"><div class="stat-num">840</div><div class="stat-label">Sq Ft</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kitchen -->
+    <div class="section" id="s2">
+      <div class="content right glass-panel">
+        <div class="tag">The Kitchen</div>
+        <h2>Where Form<br>Meets Function</h2>
+        <p>Calacatta marble countertops, integrated Gaggenau appliances, and a 12-foot island designed for both intimate dinners and grand entertaining.</p>
+        <div class="features-grid">
+          <div class="feature-item">
+            <div class="feature-icon">&#9670;</div>
+            <div class="feature-text"><strong>Wine Cellar</strong>200-bottle climate-controlled</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">&#9670;</div>
+            <div class="feature-text"><strong>Butler's Pantry</strong>Hidden service kitchen</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Master Suite -->
+    <div class="section" id="s3">
+      <div class="content left glass-panel">
+        <div class="tag">Master Suite</div>
+        <h2>Your Private<br>Sanctuary</h2>
+        <p>A sprawling retreat with a sitting area, dual walk-in closets, and a spa-inspired ensuite bath with soaking tub overlooking the skyline.</p>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-num">5</div><div class="stat-label">Bedrooms</div></div>
+          <div class="stat"><div class="stat-num">4.5</div><div class="stat-label">Bathrooms</div></div>
+          <div class="stat"><div class="stat-num">2</div><div class="stat-label">Terraces</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terrace -->
+    <div class="section" id="s4">
+      <div class="content right glass-panel">
+        <div class="tag">The Terrace</div>
+        <h2>Elevated<br>Living</h2>
+        <p>Step outside to 800 square feet of private terrace. An outdoor kitchen, fire pit lounge, and infinity-edge plunge pool create your personal rooftop oasis.</p>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="section cta" id="s5">
+      <div class="content center">
+        <div class="tag">Starting at $4.2M</div>
+        <h1>Make It<br><span class="accent">Yours</span></h1>
+        <p>Only 6 residences available. Private viewings now open by appointment.</p>
+        <a href="#" class="btn" onclick="return false;">Schedule a Private Tour</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    var isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    // ─── Scene Setup ──────────────────────────────────────────────────
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0a);
+    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.018);
+
+    var camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 250);
+    camera.position.set(0, 2, 14);
+
+    var renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    renderer.shadowMap.enabled = !isMobile;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.prepend(renderer.domElement);
+
+    // ─── Procedural Textures ──────────────────────────────────────────
+    function createMarbleTexture() {
+      var c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#e8e0d0';
+      ctx.fillRect(0, 0, 512, 512);
+      for (var i = 0; i < 30; i++) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(180,170,155,' + (0.1 + Math.random() * 0.15) + ')';
+        ctx.lineWidth = 0.5 + Math.random() * 2;
+        var x = Math.random() * 512, y = Math.random() * 512;
+        ctx.moveTo(x, y);
+        for (var j = 0; j < 8; j++) {
+          x += (Math.random() - 0.5) * 80;
+          y += (Math.random() - 0.5) * 80;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      var tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createWoodTexture() {
+      var c = document.createElement('canvas');
+      c.width = 512; c.height = 256;
+      var ctx = c.getContext('2d');
+      var base = [60, 40, 25];
+      for (var y = 0; y < 256; y++) {
+        var noise = Math.sin(y * 0.3) * 10 + Math.sin(y * 0.7) * 5;
+        var r = Math.max(0, Math.min(255, base[0] + noise + Math.random() * 8));
+        var g = Math.max(0, Math.min(255, base[1] + noise * 0.7 + Math.random() * 5));
+        var b = Math.max(0, Math.min(255, base[2] + noise * 0.3 + Math.random() * 3));
+        ctx.fillStyle = 'rgb(' + Math.floor(r) + ',' + Math.floor(g) + ',' + Math.floor(b) + ')';
+        ctx.fillRect(0, y, 512, 1);
+      }
+      var tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    var marbleTex = createMarbleTexture();
+    var woodTex = createWoodTexture();
+    woodTex.repeat.set(4, 4);
+
+    // ─── Materials ────────────────────────────────────────────────────
+    var matWall = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide, roughness: 0.92 });
+    var matFloor = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.65, metalness: 0.05 });
+    var matCeiling = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95 });
+    var matAccent = new THREE.MeshStandardMaterial({ color: 0xc9a86c, roughness: 0.3, metalness: 0.6 });
+    var matMarble = new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.15, metalness: 0.05 });
+    var matGlass = new THREE.MeshStandardMaterial({ color: 0x88bbdd, transparent: true, opacity: 0.12, roughness: 0.05, metalness: 0.9 });
+    var matDark = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+    var matWarm = new THREE.MeshStandardMaterial({ color: 0x3d2b1a, roughness: 0.6 });
+    var matEmissive = new THREE.MeshStandardMaterial({ color: 0xffeedd, emissive: 0xffeedd, emissiveIntensity: 0.5 });
+    var matArch = new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.4 });
+    var matTerraceFloor = new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.55 });
+
+    // ─── Gradient Sky Dome ────────────────────────────────────────────
+    var skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x0a0a2e) },
+        bottomColor: { value: new THREE.Color(0x1a1520) },
+        offset: { value: 20.0 },
+        exponent: { value: 0.6 }
+      },
+      vertexShader: [
+        'varying vec3 vWorldPosition;',
+        'void main() {',
+        '  vec4 worldPos = modelMatrix * vec4(position, 1.0);',
+        '  vWorldPosition = worldPos.xyz;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 topColor;',
+        'uniform vec3 bottomColor;',
+        'uniform float offset;',
+        'uniform float exponent;',
+        'varying vec3 vWorldPosition;',
+        'void main() {',
+        '  float h = normalize(vWorldPosition + offset).y;',
+        '  gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);',
+        '}'
+      ].join('\n')
+    });
+    var skyDome = new THREE.Mesh(new THREE.SphereGeometry(120, 32, 16), skyMat);
+    scene.add(skyDome);
+
+    // ─── Water Shader Material ────────────────────────────────────────
+    var waterMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x1a6a8a) },
+        uOpacity: { value: 0.8 }
+      },
+      vertexShader: [
+        'uniform float uTime;',
+        'varying vec2 vUv;',
+        'varying float vWave;',
+        'void main() {',
+        '  vUv = uv;',
+        '  float wave = sin(position.x * 2.0 + uTime) * 0.08 + sin(position.y * 3.0 + uTime * 1.3) * 0.05;',
+        '  vWave = wave;',
+        '  vec3 pos = position;',
+        '  pos.z += wave;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 uColor;',
+        'uniform float uOpacity;',
+        'varying float vWave;',
+        'void main() {',
+        '  float highlight = smoothstep(0.05, 0.15, vWave);',
+        '  vec3 color = mix(uColor, uColor * 1.8, highlight);',
+        '  gl_FragColor = vec4(color, uOpacity);',
+        '}'
+      ].join('\n'),
+      side: THREE.DoubleSide
+    });
+
+    // ─── Room Builder ─────────────────────────────────────────────────
+    function createRoom(w, h, d, pos, wallColor, noCeiling) {
+      var group = new THREE.Group();
+      group.position.copy(pos);
+      var mat = wallColor ? new THREE.MeshStandardMaterial({ color: wallColor, side: THREE.DoubleSide, roughness: 0.92 }) : matWall;
+
+      var floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matFloor);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      group.add(floor);
+
+      if (!noCeiling) {
+        var ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matCeiling);
+        ceil.rotation.x = Math.PI / 2;
+        ceil.position.y = h;
+        group.add(ceil);
+      }
+
+      var back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      back.position.set(0, h / 2, -d / 2);
+      group.add(back);
+
+      var left = new THREE.Mesh(new THREE.PlaneGeometry(d, h), mat);
+      left.rotation.y = Math.PI / 2;
+      left.position.set(-w / 2, h / 2, 0);
+      group.add(left);
+
+      var right = new THREE.Mesh(new THREE.PlaneGeometry(d, h), mat);
+      right.rotation.y = -Math.PI / 2;
+      right.position.set(w / 2, h / 2, 0);
+      group.add(right);
+
+      scene.add(group);
+      return group;
+    }
+
+    function addWindow(parent, w, h, pos, rotY) {
+      var frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.15, h + 0.15, 0.06), matAccent);
+      frame.position.copy(pos);
+      frame.rotation.y = rotY || 0;
+      parent.add(frame);
+
+      var glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), matGlass);
+      glass.position.copy(pos);
+      if (rotY) glass.position.x += (rotY > 0 ? 0.04 : -0.04);
+      else glass.position.z += 0.04;
+      glass.rotation.y = rotY || 0;
+      parent.add(glass);
+    }
+
+    // ─── Architectural Arches ─────────────────────────────────────────
+    function createArch(width, height, depth, position) {
+      var group = new THREE.Group();
+      var pillarL = new THREE.Mesh(new THREE.BoxGeometry(0.25, height, depth), matArch);
+      pillarL.position.set(-width / 2, height / 2, 0);
+      pillarL.castShadow = true;
+      group.add(pillarL);
+
+      var pillarR = new THREE.Mesh(new THREE.BoxGeometry(0.25, height, depth), matArch);
+      pillarR.position.set(width / 2, height / 2, 0);
+      pillarR.castShadow = true;
+      group.add(pillarR);
+
+      var beam = new THREE.Mesh(new THREE.BoxGeometry(width + 0.25, 0.28, depth), matArch);
+      beam.position.set(0, height, 0);
+      beam.castShadow = true;
+      group.add(beam);
+
+      // Subtle keystone accent
+      var keystone = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.28, depth + 0.02), matAccent);
+      keystone.position.set(0, height, 0);
+      group.add(keystone);
+
+      group.position.copy(position);
+      scene.add(group);
+      return group;
+    }
+
+    // ─── Glow Lights (Fake Bloom) ─────────────────────────────────────
+    var glowLights = [];
+    function createGlowLight(position, color, radius) {
+      var group = new THREE.Group();
+      group.position.copy(position);
+
+      var core = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 16, 16),
+        new THREE.MeshBasicMaterial({ color: color })
+      );
+      group.add(core);
+
+      var glow = new THREE.Mesh(
+        new THREE.SphereGeometry(radius * 3, 16, 16),
+        new THREE.MeshBasicMaterial({
+          color: color, transparent: true, opacity: 0.1,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide
+        })
+      );
+      group.add(glow);
+
+      var outerGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(radius * 6, 16, 16),
+        new THREE.MeshBasicMaterial({
+          color: color, transparent: true, opacity: 0.04,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide
+        })
+      );
+      group.add(outerGlow);
+
+      scene.add(group);
+      glowLights.push(group);
+      return group;
+    }
+
+    // ─── Furniture Builder ────────────────────────────────────────────
+    function addFurniture(parent, type, pos, scale, rot) {
+      var mesh;
+      switch (type) {
+        case 'sofa':
+          mesh = new THREE.Group();
+          var base = new THREE.Mesh(new THREE.BoxGeometry(3, 0.5, 1.2), matDark);
+          base.position.y = 0.3; base.castShadow = true;
+          mesh.add(base);
+          var backrest = new THREE.Mesh(new THREE.BoxGeometry(3, 0.6, 0.3), matDark);
+          backrest.position.set(0, 0.7, -0.45); backrest.castShadow = true;
+          mesh.add(backrest);
+          var armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.45, 1.2), matDark);
+          armL.position.set(-1.4, 0.55, 0);
+          mesh.add(armL);
+          var armR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.45, 1.2), matDark);
+          armR.position.set(1.4, 0.55, 0);
+          mesh.add(armR);
+          // Cushions
+          var cush1 = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.9), new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 0.9 }));
+          cush1.position.set(-0.6, 0.62, 0);
+          mesh.add(cush1);
+          var cush2 = cush1.clone(); cush2.position.x = 0.6;
+          mesh.add(cush2);
+          break;
+        case 'table':
+          mesh = new THREE.Group();
+          var top = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.9), matMarble);
+          top.position.y = 0.5; top.castShadow = true;
+          mesh.add(top);
+          for (var i = 0; i < 4; i++) {
+            var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), matAccent);
+            leg.position.set((i % 2 === 0 ? -0.8 : 0.8), 0.25, (i < 2 ? -0.35 : 0.35));
+            mesh.add(leg);
+          }
+          break;
+        case 'island':
+          mesh = new THREE.Group();
+          var counter = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.08, 1.4), matMarble);
+          counter.position.y = 1.0; counter.castShadow = true;
+          mesh.add(counter);
+          var cab = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.92, 1.3), matDark);
+          cab.position.y = 0.5;
+          mesh.add(cab);
+          // Accent strip on island
+          var accentStrip = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.02, 0.02), matAccent);
+          accentStrip.position.set(0, 1.04, 0.7);
+          mesh.add(accentStrip);
+          break;
+        case 'bed':
+          mesh = new THREE.Group();
+          var mattress = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.35, 2.2), new THREE.MeshStandardMaterial({ color: 0xeee8dd, roughness: 0.9 }));
+          mattress.position.y = 0.45; mattress.castShadow = true;
+          mesh.add(mattress);
+          var frame2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.25, 2.4), matWarm);
+          frame2.position.y = 0.2;
+          mesh.add(frame2);
+          var headboard = new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 0.12), matWarm);
+          headboard.position.set(0, 0.9, -1.1); headboard.castShadow = true;
+          mesh.add(headboard);
+          // Pillows
+          var pillow1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.4), new THREE.MeshStandardMaterial({ color: 0xd4cec0, roughness: 0.95 }));
+          pillow1.position.set(-0.5, 0.7, -0.7);
+          mesh.add(pillow1);
+          var pillow2 = pillow1.clone(); pillow2.position.x = 0.5;
+          mesh.add(pillow2);
+          break;
+        case 'lamp':
+          mesh = new THREE.Group();
+          var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.8, 8), matAccent);
+          pole.position.y = 0.9;
+          mesh.add(pole);
+          var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 0.4, 16), matEmissive);
+          shade.position.y = 1.85;
+          mesh.add(shade);
+          break;
+        case 'planter':
+          mesh = new THREE.Group();
+          var pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.5, 12), matAccent);
+          pot.position.y = 0.25;
+          mesh.add(pot);
+          var plant = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.9 }));
+          plant.position.y = 0.7;
+          mesh.add(plant);
+          break;
+        case 'nightstand':
+          mesh = new THREE.Group();
+          var nsTop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.45), matWarm);
+          nsTop.position.y = 0.55;
+          mesh.add(nsTop);
+          var nsBody = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.4), matDark);
+          nsBody.position.y = 0.27;
+          mesh.add(nsBody);
+          break;
+        case 'rug':
+          mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.5, 2.5),
+            new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.95, side: THREE.DoubleSide })
+          );
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.y = 0.01;
+          break;
+        default:
+          mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), matDark);
+      }
+      mesh.position.copy(pos);
+      if (scale) mesh.scale.set(scale, scale, scale);
+      if (rot) mesh.rotation.y = rot;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    // ─── Build Rooms ──────────────────────────────────────────────────
+
+    // 1. Foyer / Entrance
+    var foyer = createRoom(8, 4, 10, new THREE.Vector3(0, 0, 5), 0x1a1a1a);
+    addFurniture(foyer, 'planter', new THREE.Vector3(-3, 0, 2), 1.2, 0);
+    addFurniture(foyer, 'planter', new THREE.Vector3(3, 0, 2), 1.2, 0);
+    var strip = new THREE.Mesh(new THREE.BoxGeometry(6, 0.02, 0.08), matAccent);
+    strip.position.set(0, 0.01, 0);
+    foyer.add(strip);
+    // Foyer accent wall panel
+    var foyerPanel = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 0.05), new THREE.MeshStandardMaterial({ color: 0x1e1a16, roughness: 0.7 }));
+    foyerPanel.position.set(0, 2, -4.95);
+    foyer.add(foyerPanel);
+
+    // Arch: Foyer -> Living
+    createArch(3.5, 3.8, 0.35, new THREE.Vector3(0, 0, 0));
+
+    // 2. Living Room
+    var living = createRoom(14, 5.5, 14, new THREE.Vector3(0, 0, -9), 0x181818);
+    addWindow(living, 4, 3.5, new THREE.Vector3(-7, 2.5, 0), Math.PI / 2);
+    addWindow(living, 4, 3.5, new THREE.Vector3(-7, 2.5, -3.5), Math.PI / 2);
+    addFurniture(living, 'sofa', new THREE.Vector3(-2, 0, 2), 1, Math.PI / 6);
+    addFurniture(living, 'table', new THREE.Vector3(0, 0, 2.5), 1, 0);
+    addFurniture(living, 'lamp', new THREE.Vector3(-4, 0, 4.5), 1.1, 0);
+    addFurniture(living, 'lamp', new THREE.Vector3(4, 0, -4.5), 1.1, 0);
+    addFurniture(living, 'planter', new THREE.Vector3(5.5, 0, 5.5), 1.5, 0);
+    addFurniture(living, 'rug', new THREE.Vector3(-1, 0, 2), 1.2, 0.1);
+
+    // Arch: Living -> Kitchen (opening in shared wall)
+    createArch(3.2, 3.6, 0.35, new THREE.Vector3(7, 0, -9));
+
+    // 3. Kitchen
+    var kitchen = createRoom(12, 4, 10, new THREE.Vector3(13, 0, -9), 0x1c1c1c);
+    addFurniture(kitchen, 'island', new THREE.Vector3(0, 0, 1), 1, 0);
+    addWindow(kitchen, 3.5, 2.8, new THREE.Vector3(6, 2.2, 0), -Math.PI / 2);
+    var cabinets = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 0.5), matDark);
+    cabinets.position.set(0, 3.0, -4.7);
+    kitchen.add(cabinets);
+    var counterBack = new THREE.Mesh(new THREE.BoxGeometry(8, 0.08, 0.8), matMarble);
+    counterBack.position.set(0, 1.0, -4.5);
+    kitchen.add(counterBack);
+    // Lower cabinets
+    var lowerCab = new THREE.Mesh(new THREE.BoxGeometry(8, 0.92, 0.7), matDark);
+    lowerCab.position.set(0, 0.46, -4.55);
+    kitchen.add(lowerCab);
+
+    // Arch: Living -> Master passage
+    createArch(3.5, 3.8, 0.35, new THREE.Vector3(0, 0, -16));
+
+    // 4. Master Bedroom
+    var master = createRoom(12, 4, 12, new THREE.Vector3(0, 0, -27), 0x191515);
+    addFurniture(master, 'bed', new THREE.Vector3(0, 0, -2), 1, 0);
+    addFurniture(master, 'lamp', new THREE.Vector3(-4.5, 0, -3), 1, 0);
+    addFurniture(master, 'lamp', new THREE.Vector3(4.5, 0, -3), 1, 0);
+    addFurniture(master, 'nightstand', new THREE.Vector3(-2.2, 0, -2), 1, 0);
+    addFurniture(master, 'nightstand', new THREE.Vector3(2.2, 0, -2), 1, 0);
+    addWindow(master, 5, 3, new THREE.Vector3(-6, 2.2, -1), Math.PI / 2);
+    addWindow(master, 5, 3, new THREE.Vector3(6, 2.2, -1), -Math.PI / 2);
+    addFurniture(master, 'rug', new THREE.Vector3(0, 0, 0), 1.3, 0);
+    // Bench at foot of bed
+    var bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 0.85 }));
+    bench.position.set(0, 0.2, 1);
+    master.add(bench);
+
+    // Arch: Master -> Terrace opening
+    createArch(3.2, 3.2, 0.35, new THREE.Vector3(6, 0, -27));
+
+    // 5. Terrace (open top — no ceiling)
+    var terrace = new THREE.Group();
+    terrace.position.set(14, 0, -27);
+    var tFloor = new THREE.Mesh(new THREE.PlaneGeometry(14, 12), matTerraceFloor);
+    tFloor.rotation.x = -Math.PI / 2;
+    tFloor.receiveShadow = true;
+    terrace.add(tFloor);
+
+    // Low walls
+    var tWallBack = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 0.15), matDark);
+    tWallBack.position.set(0, 0.6, -6);
+    terrace.add(tWallBack);
+    var tWallSide1 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, 12), matDark);
+    tWallSide1.position.set(-7, 0.6, 0);
+    terrace.add(tWallSide1);
+    var tWallSide2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, 12), matDark);
+    tWallSide2.position.set(7, 0.6, 0);
+    terrace.add(tWallSide2);
+    // Railing accents
+    var railAccent1 = new THREE.Mesh(new THREE.BoxGeometry(14, 0.04, 0.06), matAccent);
+    railAccent1.position.set(0, 1.22, -6);
+    terrace.add(railAccent1);
+    var railAccent2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 12), matAccent);
+    railAccent2.position.set(7, 1.22, 0);
+    terrace.add(railAccent2);
+
+    // Plunge pool with water shader
+    var poolBed = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.02, 3.2), new THREE.MeshStandardMaterial({ color: 0x0a3a4a, roughness: 0.3 }));
+    poolBed.position.set(2, -0.15, -2);
+    terrace.add(poolBed);
+    var poolWalls = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.35, 3.2), new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a, roughness: 0.6, transparent: true, opacity: 0.9
+    }));
+    poolWalls.position.set(2, -0.02, -2);
+    terrace.add(poolWalls);
+
+    var poolWater = new THREE.Mesh(new THREE.PlaneGeometry(4, 3, 32, 32), waterMat);
+    poolWater.rotation.x = -Math.PI / 2;
+    poolWater.position.set(2, 0.12, -2);
+    terrace.add(poolWater);
+
+    // Fire pit
+    var pit = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 16), matDark);
+    pit.position.set(-3, 0.2, 1);
+    terrace.add(pit);
+    var pitRing = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.06, 16), matAccent);
+    pitRing.position.set(-3, 0.41, 1);
+    terrace.add(pitRing);
+
+    // Fire (multi-layer for flickering effect)
+    var fireMat1 = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.7 });
+    var fireMat2 = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.5 });
+    var fire1 = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), fireMat1);
+    fire1.position.set(-3, 0.6, 1);
+    terrace.add(fire1);
+    var fire2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), fireMat2);
+    fire2.position.set(-3, 0.75, 1);
+    terrace.add(fire2);
+
+    // Lounge chairs near fire
+    var lounger1 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.25, 0.8), matDark);
+    lounger1.position.set(-3, 0.15, 3);
+    terrace.add(lounger1);
+    var lounger2 = lounger1.clone();
+    lounger2.position.set(-1, 0.15, 2.5);
+    lounger2.rotation.y = -0.3;
+    terrace.add(lounger2);
+
+    scene.add(terrace);
+
+    // ─── Glow Light Orbs ──────────────────────────────────────────────
+    createGlowLight(new THREE.Vector3(0, 3.5, 5), 0xffeedd, 0.08);
+    createGlowLight(new THREE.Vector3(-4, 2.2, -4.5), 0xffd4a0, 0.06);
+    createGlowLight(new THREE.Vector3(4, 2.2, -13.5), 0xffd4a0, 0.06);
+    createGlowLight(new THREE.Vector3(13, 3.2, -9), 0xfff5e6, 0.07);
+    createGlowLight(new THREE.Vector3(-4.5, 2.2, -30), 0xffddaa, 0.06);
+    createGlowLight(new THREE.Vector3(4.5, 2.2, -30), 0xffddaa, 0.06);
+    createGlowLight(new THREE.Vector3(11, 1.5, -26), 0xff5500, 0.1);
+
+    // ─── Lighting ─────────────────────────────────────────────────────
+    var ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+    scene.add(ambientLight);
+
+    var foyerLight = new THREE.PointLight(0xffeedd, 0.8, 15);
+    foyerLight.position.set(0, 3.5, 5);
+    scene.add(foyerLight);
+
+    var livingLight1 = new THREE.PointLight(0xffeedd, 0.9, 22);
+    livingLight1.position.set(-2, 4.5, -7);
+    livingLight1.castShadow = !isMobile;
+    if (!isMobile) {
+      livingLight1.shadow.mapSize.width = 512;
+      livingLight1.shadow.mapSize.height = 512;
+    }
+    scene.add(livingLight1);
+
+    var livingLight2 = new THREE.PointLight(0xffd4a0, 0.5, 15);
+    livingLight2.position.set(4, 3, -12);
+    scene.add(livingLight2);
+
+    var kitchenLight = new THREE.PointLight(0xfff5e6, 0.9, 18);
+    kitchenLight.position.set(13, 3.5, -9);
+    scene.add(kitchenLight);
+
+    var masterLight = new THREE.PointLight(0xffddb5, 0.7, 18);
+    masterLight.position.set(0, 3.5, -27);
+    scene.add(masterLight);
+
+    var moonLight = new THREE.DirectionalLight(0x6688bb, 0.6);
+    moonLight.position.set(20, 15, -30);
+    scene.add(moonLight);
+
+    var fireLight = new THREE.PointLight(0xff5500, 1.2, 8);
+    fireLight.position.set(11, 1.5, -26);
+    scene.add(fireLight);
+
+    // Pool glow
+    var poolLight = new THREE.PointLight(0x2299bb, 0.5, 6);
+    poolLight.position.set(16, 0.5, -29);
+    scene.add(poolLight);
+
+    // ─── Floating Particles ───────────────────────────────────────────
+    var particleCount = isMobile ? 200 : 600;
+    var pGeo = new THREE.BufferGeometry();
+    var pPositions = new Float32Array(particleCount * 3);
+    for (var pi = 0; pi < particleCount; pi++) {
+      pPositions[pi * 3] = (Math.random() - 0.5) * 50;
+      pPositions[pi * 3 + 1] = Math.random() * 6;
+      pPositions[pi * 3 + 2] = (Math.random() - 0.5) * 80 - 10;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+    var particles = new THREE.Points(pGeo, new THREE.PointsMaterial({
+      color: 0xc9a86c, size: 0.05, transparent: true, opacity: 0.4,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+    }));
+    scene.add(particles);
+
+    // ─── CatmullRomCurve3 Camera Path ─────────────────────────────────
+    var cameraPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 2, 14),         // Start — facing foyer
+      new THREE.Vector3(0, 2.1, 7),        // Mid-foyer
+      new THREE.Vector3(0, 2, 3),          // End foyer
+      new THREE.Vector3(-1, 2.3, -2),      // Entering living
+      new THREE.Vector3(-2, 2.5, -5),      // In living room
+      new THREE.Vector3(-1, 2.4, -8),      // Living room middle
+      new THREE.Vector3(4, 2.2, -7),       // Toward kitchen
+      new THREE.Vector3(8, 2, -7.5),       // Kitchen transition
+      new THREE.Vector3(10, 2, -8),        // In kitchen
+      new THREE.Vector3(7, 2, -12),        // Leaving kitchen
+      new THREE.Vector3(3, 2, -18),        // Corridor to master
+      new THREE.Vector3(1, 2, -22),        // Approaching master
+      new THREE.Vector3(0, 2, -25),        // In master
+      new THREE.Vector3(3, 2.2, -26),      // Master to terrace
+      new THREE.Vector3(8, 2.3, -26),      // Entering terrace
+      new THREE.Vector3(10, 2.5, -25),     // On terrace
+      new THREE.Vector3(7, 4, -23),        // Rising
+      new THREE.Vector3(5, 6, -20),        // Final elevated
+    ]);
+
+    var lookAtPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 2, 5),          // Look into foyer
+      new THREE.Vector3(0, 2, 2),          // Into foyer
+      new THREE.Vector3(0, 1.8, -4),       // Through foyer
+      new THREE.Vector3(-1, 2, -8),        // Into living
+      new THREE.Vector3(1, 1.8, -10),      // Living center
+      new THREE.Vector3(3, 1.5, -12),      // Living far
+      new THREE.Vector3(10, 2, -9),        // Toward kitchen
+      new THREE.Vector3(13, 2, -9),        // Kitchen center
+      new THREE.Vector3(14, 1.8, -10),     // Kitchen deep
+      new THREE.Vector3(2, 1.8, -18),      // Toward master
+      new THREE.Vector3(0, 1.8, -25),      // Master approach
+      new THREE.Vector3(0, 1.5, -28),      // Master bedroom
+      new THREE.Vector3(0, 1.5, -29),      // Master deep
+      new THREE.Vector3(10, 1.5, -27),     // Terrace
+      new THREE.Vector3(14, 1, -28),       // Terrace pool
+      new THREE.Vector3(14, 1, -27),       // Terrace fire
+      new THREE.Vector3(8, 0, -28),        // Looking down
+      new THREE.Vector3(5, 0, -30),        // Final look down
+    ]);
+
+    var scrollProgress = 0;
+    var currentLookAt = new THREE.Vector3(0, 2, 5);
+
+    ScrollTrigger.create({
+      trigger: '#scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: function(self) {
+        scrollProgress = self.progress;
+      }
+    });
+
+    // ─── Fog/Mood Transitions ─────────────────────────────────────────
+    var moods = [
+      { bg: new THREE.Color(0x0a0a0a), fog: 0.018, ambient: new THREE.Color(0x404040) },
+      { bg: new THREE.Color(0x0a0808), fog: 0.015, ambient: new THREE.Color(0x605040) },
+      { bg: new THREE.Color(0x0a0a0c), fog: 0.016, ambient: new THREE.Color(0x505050) },
+      { bg: new THREE.Color(0x080606), fog: 0.018, ambient: new THREE.Color(0x504030) },
+      { bg: new THREE.Color(0x060810), fog: 0.012, ambient: new THREE.Color(0x405060) },
+      { bg: new THREE.Color(0x050508), fog: 0.010, ambient: new THREE.Color(0x404050) }
+    ];
+    var tempColor = new THREE.Color();
+
+    function updateMood(progress) {
+      var count = moods.length;
+      var scaled = progress * (count - 1);
+      var idx = Math.min(Math.floor(scaled), count - 2);
+      var t = scaled - idx;
+      tempColor.copy(moods[idx].bg).lerp(moods[idx + 1].bg, t);
+      scene.background.copy(tempColor);
+      scene.fog.color.copy(tempColor);
+      scene.fog.density = moods[idx].fog + (moods[idx + 1].fog - moods[idx].fog) * t;
+      tempColor.copy(moods[idx].ambient).lerp(moods[idx + 1].ambient, t);
+      ambientLight.color.copy(tempColor);
+    }
+
+    // ─── Content Fade Animations ──────────────────────────────────────
+    var sections = ['#s0', '#s1', '#s2', '#s3', '#s4', '#s5'];
+    var roomLabels = ['Entrance', 'Living Room', 'Kitchen', 'Master Suite', 'Terrace', 'The Meridian'];
+
+    sections.forEach(function(sel, i) {
+      var el = document.querySelector(sel + ' .content');
+      if (!el) return;
+
+      gsap.fromTo(el,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1, y: 0,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'top 65%',
+            end: 'top 20%',
+            scrub: 1.5
+          }
+        }
+      );
+
+      if (i < sections.length - 1) {
+        gsap.to(el, {
+          opacity: 0, y: -35,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'bottom 60%',
+            end: 'bottom 25%',
+            scrub: 1.5
+          }
+        });
+      }
+    });
+
+    // ─── Progress Dots + Room Label ───────────────────────────────────
+    var dots = document.querySelectorAll('.progress-dot');
+    var roomLabel = document.getElementById('room-label');
+
+    ScrollTrigger.create({
+      trigger: '#scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: function(self) {
+        var idx = Math.min(Math.floor(self.progress * sections.length), sections.length - 1);
+        dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+        roomLabel.textContent = roomLabels[idx];
+      }
+    });
+
+    dots.forEach(function(dot) {
+      dot.addEventListener('click', function() {
+        var idx = parseInt(dot.dataset.section);
+        var target = document.querySelector(sections[idx]);
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // ─── Mouse Parallax ───────────────────────────────────────────────
+    var mouse = { x: 0, y: 0 };
+    document.addEventListener('mousemove', function(e) {
+      mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // ─── Render Loop ──────────────────────────────────────────────────
+    var time = 0;
+    var targetLookAt = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      time += 0.005;
+
+      // Sample camera and lookAt from spline paths
+      var clampedProgress = Math.max(0.0001, Math.min(0.9999, scrollProgress));
+      var pos = cameraPath.getPointAt(clampedProgress);
+      var look = lookAtPath.getPointAt(clampedProgress);
+
+      // Apply mouse parallax offset
+      camera.position.set(
+        pos.x + mouse.x * 0.25,
+        pos.y - mouse.y * 0.12,
+        pos.z
+      );
+
+      // Smooth lookAt interpolation
+      currentLookAt.lerp(look, 0.08);
+      camera.lookAt(currentLookAt);
+
+      // Update mood/fog based on scroll
+      updateMood(clampedProgress);
+
+      // Particle float
+      var positions = particles.geometry.attributes.position.array;
+      for (var i = 0; i < particleCount; i++) {
+        positions[i * 3 + 1] += Math.sin(time * 2 + i * 0.1) * 0.001;
+      }
+      particles.geometry.attributes.position.needsUpdate = true;
+
+      // Fire flicker
+      var flicker1 = 0.8 + Math.sin(time * 20) * 0.15 + Math.sin(time * 33) * 0.1;
+      var flicker2 = 0.7 + Math.sin(time * 25 + 1) * 0.2 + Math.cos(time * 30) * 0.1;
+      fire1.scale.set(flicker1, flicker1 * 1.2, flicker1);
+      fire2.scale.set(flicker2, flicker2 * 1.4, flicker2);
+      fire2.position.y = 0.75 + Math.sin(time * 15) * 0.05;
+      fireLight.intensity = 1.0 + Math.sin(time * 18) * 0.3 + Math.sin(time * 27) * 0.15;
+
+      // Pool light subtle pulse
+      poolLight.intensity = 0.5 + Math.sin(time * 3) * 0.1;
+
+      // Water shader time
+      waterMat.uniforms.uTime.value = time * 4;
+
+      renderer.render(scene, camera);
+    }
+
+    // ─── Resize ───────────────────────────────────────────────────────
+    window.addEventListener('resize', function() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    });
+
+    // ─── Hide Loader ──────────────────────────────────────────────────
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('loader').classList.add('hidden');
+      }, 2200);
+    });
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURUM — Crafted in Light</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@200;300;400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      overflow-x: hidden;
+      background: #000;
+      color: #e8e0d4;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Loading screen */
+    #loader {
+      position: fixed; inset: 0; z-index: 1000;
+      background: #000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 1.2s ease, visibility 1.2s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    #loader .brand {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(28px, 5vw, 48px);
+      letter-spacing: 0.5em;
+      color: #c9a86c;
+      margin-bottom: 40px;
+    }
+    #loader .bar-track {
+      width: 180px; height: 1px;
+      background: rgba(201,168,108,0.15);
+      position: relative; overflow: hidden;
+    }
+    #loader .bar-fill {
+      position: absolute; top: 0; left: 0;
+      width: 0%; height: 100%;
+      background: #c9a86c;
+      transition: width 0.3s ease;
+    }
+
+    /* Canvas */
+    canvas {
+      position: fixed; top: 0; left: 0;
+      z-index: 0; display: block;
+    }
+
+    /* Scroll container */
+    .scroll-container {
+      position: relative; z-index: 1;
+      pointer-events: none;
+    }
+
+    .section {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .content {
+      pointer-events: auto;
+      opacity: 0;
+    }
+
+    /* Typography */
+    .serif { font-family: 'Playfair Display', serif; }
+    .sans { font-family: 'Montserrat', sans-serif; }
+
+    /* Section 1 — Hero */
+    #s0 { height: 140vh; }
+    #s0 .content {
+      text-align: center;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .hero-brand {
+      font-size: clamp(48px, 10vw, 140px);
+      letter-spacing: 0.4em;
+      color: #c9a86c;
+      font-weight: 400;
+      line-height: 1;
+      margin-right: -0.4em;
+    }
+    .hero-tagline {
+      font-size: clamp(12px, 1.8vw, 20px);
+      letter-spacing: 0.35em;
+      color: rgba(201,168,108,0.55);
+      margin-top: 24px;
+      font-weight: 200;
+      text-transform: uppercase;
+    }
+    .hero-line {
+      width: 60px; height: 1px;
+      background: rgba(201,168,108,0.3);
+      margin: 28px auto 0;
+    }
+
+    /* Section 2 — The Eternal Ring */
+    #s1 { height: 120vh; }
+    #s1 .content {
+      max-width: 480px;
+      padding: 3rem;
+      margin-left: 8%;
+    }
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: rgba(201,168,108,0.5);
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: clamp(28px, 4vw, 52px);
+      color: #c9a86c;
+      font-weight: 400;
+      line-height: 1.15;
+      margin-bottom: 24px;
+    }
+    .section-body {
+      font-size: clamp(13px, 1.1vw, 15px);
+      line-height: 1.9;
+      color: rgba(232,224,212,0.6);
+      margin-bottom: 32px;
+    }
+    .stats-row {
+      display: flex; gap: 40px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      text-align: left;
+    }
+    .stat-value {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(20px, 2.5vw, 32px);
+      color: #c9a86c;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(201,168,108,0.4);
+      margin-top: 6px;
+    }
+
+    /* Section 3 — Atelier */
+    #s2 { height: 120vh; }
+    #s2 .content {
+      max-width: 460px;
+      padding: 3rem;
+      margin-left: auto;
+      margin-right: 8%;
+      text-align: right;
+    }
+
+    /* Section 4 — Collection */
+    #s3 { height: 110vh; }
+    #s3 .content {
+      text-align: center;
+      max-width: 600px;
+    }
+    .collection-item {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(22px, 3.5vw, 44px);
+      color: #c9a86c;
+      letter-spacing: 0.15em;
+      padding: 18px 0;
+      border-bottom: 1px solid rgba(201,168,108,0.08);
+      font-weight: 400;
+    }
+    .collection-item:first-child {
+      border-top: 1px solid rgba(201,168,108,0.08);
+    }
+    .collection-item .year {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      font-weight: 200;
+      letter-spacing: 0.3em;
+      color: rgba(201,168,108,0.35);
+      display: block;
+      margin-top: 4px;
+    }
+
+    /* Section 5 — Heritage */
+    #s4 { height: 120vh; }
+    #s4 .content {
+      max-width: 480px;
+      padding: 3rem;
+      margin-left: 8%;
+    }
+    .heritage-year {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(60px, 8vw, 100px);
+      color: rgba(201,168,108,0.12);
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    /* Section 6 — CTA */
+    #s5 { height: 100vh; }
+    #s5 .content {
+      text-align: center;
+    }
+    .cta-title {
+      font-size: clamp(24px, 3.5vw, 48px);
+      color: #c9a86c;
+      letter-spacing: 0.12em;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+    .cta-sub {
+      font-size: 11px;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: rgba(201,168,108,0.4);
+      margin-bottom: 48px;
+    }
+    .cta-btn {
+      display: inline-block;
+      padding: 16px 48px;
+      border: 1px solid rgba(201,168,108,0.35);
+      color: #c9a86c;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      text-decoration: none;
+      font-weight: 300;
+      transition: all 0.5s ease;
+      cursor: pointer;
+      background: transparent;
+    }
+    .cta-btn:hover {
+      background: rgba(201,168,108,0.08);
+      border-color: rgba(201,168,108,0.6);
+    }
+
+    /* Thin separator */
+    .sep {
+      width: 40px; height: 1px;
+      background: rgba(201,168,108,0.2);
+      margin: 24px 0;
+    }
+    #s2 .sep, #s2 .section-label { margin-left: auto; }
+
+    /* Scroll hint */
+    .scroll-hint {
+      position: fixed; bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 5; pointer-events: none;
+      text-align: center;
+      transition: opacity 0.6s ease;
+    }
+    .scroll-hint span {
+      font-size: 9px;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: rgba(201,168,108,0.3);
+    }
+    .scroll-hint .arrow {
+      display: block;
+      width: 1px; height: 28px;
+      background: linear-gradient(to bottom, rgba(201,168,108,0.3), transparent);
+      margin: 8px auto 0;
+      animation: scrollArrow 2s ease infinite;
+    }
+    @keyframes scrollArrow {
+      0%, 100% { transform: translateY(0); opacity: 1; }
+      50% { transform: translateY(8px); opacity: 0.3; }
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+      #s1 .content, #s4 .content { margin-left: 5%; padding: 2rem; }
+      #s2 .content { margin-right: 5%; padding: 2rem; }
+      .stats-row { gap: 24px; }
+      .hero-brand { letter-spacing: 0.25em; margin-right: -0.25em; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="brand serif">AURUM</div>
+    <div class="bar-track"><div class="bar-fill" id="loader-fill"></div></div>
+  </div>
+
+  <!-- Scroll hint -->
+  <div class="scroll-hint" id="scroll-hint">
+    <span>Scroll</span>
+    <div class="arrow"></div>
+  </div>
+
+  <!-- Scroll Container -->
+  <div class="scroll-container" id="scroll-container">
+
+    <!-- Section 0: Hero -->
+    <div class="section" id="s0">
+      <div class="content" id="hero-content">
+        <h1 class="hero-brand serif">AURUM</h1>
+        <p class="hero-tagline sans">Crafted in Light</p>
+        <div class="hero-line"></div>
+      </div>
+    </div>
+
+    <!-- Section 1: The Eternal Ring -->
+    <div class="section" id="s1">
+      <div class="content">
+        <div class="section-label sans">01 — The Piece</div>
+        <div class="sep"></div>
+        <h2 class="section-title serif">The Eternal Ring</h2>
+        <p class="section-body sans">
+          A singular expression of luminous precision. Each facet
+          hand-polished to capture light from every angle, the Eternal Ring
+          embodies the quiet confidence of those who need no introduction.
+        </p>
+        <div class="stats-row">
+          <div class="stat">
+            <div class="stat-value serif">18K</div>
+            <div class="stat-label sans">Gold</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value serif">2.4<span style="font-size:0.6em">ct</span></div>
+            <div class="stat-label sans">Diamond</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value serif" style="font-style:italic">Hand</div>
+            <div class="stat-label sans">Forged</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Atelier -->
+    <div class="section" id="s2">
+      <div class="content">
+        <div class="section-label sans">02 — The Craft</div>
+        <div class="sep"></div>
+        <h2 class="section-title serif">Atelier</h2>
+        <p class="section-body sans">
+          In the hushed light of our Parisian atelier, master artisans
+          spend four hundred hours shaping each piece. There is no
+          shortcut to permanence. Every curve is a conversation between
+          the hand and the metal, between tradition and the courage
+          to reimagine it.
+        </p>
+        <p class="section-body sans" style="font-style:italic; color:rgba(201,168,108,0.45);">
+          "We do not make jewelry. We make heirlooms."
+        </p>
+      </div>
+    </div>
+
+    <!-- Section 3: Collection -->
+    <div class="section" id="s3">
+      <div class="content">
+        <div class="section-label sans" style="text-align:center;">03 — Collections</div>
+        <div class="sep" style="margin:24px auto;"></div>
+        <div class="collection-item">Solstice d'Or<span class="year">Autumn / Winter</span></div>
+        <div class="collection-item">Lune Noire<span class="year">Spring / Summer</span></div>
+        <div class="collection-item">Eclat Eternel<span class="year">Haute Joaillerie</span></div>
+      </div>
+    </div>
+
+    <!-- Section 4: Heritage -->
+    <div class="section" id="s4">
+      <div class="content">
+        <div class="heritage-year serif">1887</div>
+        <div class="section-label sans">04 — Heritage</div>
+        <div class="sep"></div>
+        <h2 class="section-title serif">Three Generations<br>of Light</h2>
+        <p class="section-body sans">
+          Founded in the gaslit workshops of Place Vendome, Maison Aurum
+          has passed its secrets from hand to hand for over a century.
+          What began as a single goldsmith's obsession with capturing
+          candlelight in metal has become one of the world's most
+          revered houses of fine jewelry.
+        </p>
+      </div>
+    </div>
+
+    <!-- Section 5: CTA -->
+    <div class="section" id="s5">
+      <div class="content">
+        <h2 class="cta-title serif">Request a<br>Private Viewing</h2>
+        <p class="cta-sub sans">By Appointment Only</p>
+        <a href="#" class="cta-btn sans">Enquire</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    /* ============================================================
+       AURUM — Luxury Fashion Editorial 3D Experience
+       ============================================================ */
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    // ── Mobile detection ──
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    // ── Scene setup ──
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.5, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.prepend(renderer.domElement);
+
+    // ── Lighting (Studio setup — Pattern 2A adapted for jewelry) ──
+    // Key light — warm white, the main illumination
+    const keyLight = new THREE.DirectionalLight(0xfff0d6, 1.2);
+    keyLight.position.set(5, 8, 5);
+    scene.add(keyLight);
+
+    // Fill light — cooler, softer, from the opposite side
+    const fillLight = new THREE.DirectionalLight(0xb0c4de, 0.35);
+    fillLight.position.set(-6, 4, -2);
+    scene.add(fillLight);
+
+    // Rim light — back light for edge highlights, slightly gold
+    const rimLight = new THREE.DirectionalLight(0xc9a86c, 0.5);
+    rimLight.position.set(0, 3, -8);
+    scene.add(rimLight);
+
+    // Top spot — dramatic downward light
+    const topLight = new THREE.PointLight(0xffeedd, 0.6, 20);
+    topLight.position.set(0, 7, 0);
+    scene.add(topLight);
+
+    // Ambient — very low, to keep the blacks deep
+    const ambientLight = new THREE.AmbientLight(0x1a1520, 0.3);
+    scene.add(ambientLight);
+
+    // ── Materials ──
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc9a86c,
+      metalness: 0.9,
+      roughness: 0.15,
+      emissive: 0x2a1f0a,
+      emissiveIntensity: 0.15,
+    });
+
+    const roseGoldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb76e79,
+      metalness: 0.85,
+      roughness: 0.2,
+      emissive: 0x1a0a0f,
+      emissiveIntensity: 0.1,
+    });
+
+    const darkGoldMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8a7040,
+      metalness: 0.8,
+      roughness: 0.3,
+    });
+
+    // ── Hero ring (Torus — the jewelry piece) ──
+    const ringGroup = new THREE.Group();
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.8, 0.35, 48, 128),
+      goldMaterial
+    );
+    ring.rotation.x = Math.PI * 0.15;
+    ringGroup.add(ring);
+
+    // Inner detail ring — thinner, darker
+    const innerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.8, 0.12, 32, 128),
+      darkGoldMaterial
+    );
+    innerRing.rotation.x = Math.PI * 0.15;
+    innerRing.position.z = 0.01;
+    ringGroup.add(innerRing);
+
+    ringGroup.position.set(0, 0.8, 0);
+    scene.add(ringGroup);
+
+    // ── Fake bloom glow on the ring (Pattern 2B) ──
+    function createGlowShell(radius, tube, opacity, scale) {
+      const mesh = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 24, 64),
+        new THREE.MeshBasicMaterial({
+          color: 0xc9a86c,
+          transparent: true,
+          opacity: opacity,
+          blending: THREE.AdditiveBlending,
+          side: THREE.BackSide,
+          depthWrite: false,
+        })
+      );
+      mesh.rotation.x = Math.PI * 0.15;
+      mesh.scale.setScalar(scale);
+      return mesh;
+    }
+
+    const glow1 = createGlowShell(1.8, 0.55, 0.08, 1.0);
+    ringGroup.add(glow1);
+
+    const glow2 = createGlowShell(1.8, 0.8, 0.04, 1.05);
+    ringGroup.add(glow2);
+
+    const glow3 = createGlowShell(1.8, 1.2, 0.02, 1.1);
+    ringGroup.add(glow3);
+
+    // ── Glow sprite behind the ring ──
+    (function createRingGlowSprite() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256; canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      gradient.addColorStop(0, "rgba(201,168,108,0.6)");
+      gradient.addColorStop(0.3, "rgba(201,168,108,0.15)");
+      gradient.addColorStop(0.7, "rgba(183,110,121,0.05)");
+      gradient.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: tex,
+        color: 0xc9a86c,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      }));
+      sprite.scale.set(6, 6, 1);
+      sprite.position.set(0, 0.8, -1.5);
+      scene.add(sprite);
+    })();
+
+    // ── Floating decorative elements (Pattern 7A) ──
+    const floatingObjects = [];
+
+    function addFloatingObject(mesh, amplitude, speed, phase) {
+      floatingObjects.push({
+        mesh,
+        baseY: mesh.position.y,
+        amplitude: amplitude || 0.25,
+        speed: speed || 0.8,
+        phase: phase || Math.random() * Math.PI * 2,
+        rotSpeed: {
+          x: (Math.random() - 0.5) * 0.004,
+          y: (Math.random() - 0.5) * 0.006,
+          z: (Math.random() - 0.5) * 0.003,
+        }
+      });
+    }
+
+    function animateFloatingObjects(time) {
+      floatingObjects.forEach(function(obj) {
+        obj.mesh.position.y = obj.baseY + Math.sin(time * obj.speed + obj.phase) * obj.amplitude;
+        obj.mesh.rotation.x += obj.rotSpeed.x;
+        obj.mesh.rotation.y += obj.rotSpeed.y;
+        obj.mesh.rotation.z += obj.rotSpeed.z;
+      });
+    }
+
+    // Octahedrons — gold
+    const decoPositions = [
+      { pos: [3.5, 2.2, -1], scale: 0.18, type: 'oct', mat: goldMaterial },
+      { pos: [-3.2, 1.8, -0.5], scale: 0.14, type: 'oct', mat: roseGoldMaterial },
+      { pos: [2.8, -0.5, 1.5], scale: 0.12, type: 'oct', mat: goldMaterial },
+      { pos: [-2.5, 3.0, -2], scale: 0.16, type: 'ico', mat: goldMaterial },
+      { pos: [4.0, 0.5, -2.5], scale: 0.1, type: 'ico', mat: roseGoldMaterial },
+      { pos: [-3.8, -0.2, 1], scale: 0.13, type: 'ico', mat: goldMaterial },
+      { pos: [1.8, 3.5, -3], scale: 0.08, type: 'sph', mat: roseGoldMaterial },
+      { pos: [-1.5, 3.2, 2], scale: 0.1, type: 'sph', mat: goldMaterial },
+      { pos: [3.0, 3.8, 0.5], scale: 0.09, type: 'sph', mat: darkGoldMaterial },
+      { pos: [-4.2, 2.5, -1.5], scale: 0.11, type: 'oct', mat: roseGoldMaterial },
+      { pos: [0.8, -0.8, 3], scale: 0.15, type: 'ico', mat: darkGoldMaterial },
+      { pos: [-1.0, 4.0, -0.5], scale: 0.07, type: 'sph', mat: goldMaterial },
+    ];
+
+    const segDetail = isMobile ? 1 : 2;
+
+    decoPositions.forEach(function(item) {
+      var geo;
+      if (item.type === 'oct') geo = new THREE.OctahedronGeometry(1, segDetail);
+      else if (item.type === 'ico') geo = new THREE.IcosahedronGeometry(1, segDetail);
+      else geo = new THREE.SphereGeometry(1, 12, 12);
+
+      var mesh = new THREE.Mesh(geo, item.mat);
+      mesh.position.set(item.pos[0], item.pos[1], item.pos[2]);
+      mesh.scale.setScalar(item.scale);
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      scene.add(mesh);
+      addFloatingObject(mesh, 0.15 + Math.random() * 0.2, 0.5 + Math.random() * 0.6);
+    });
+
+    // ── Particle dust (sparse, gold) ──
+    const particleCount = isMobile ? 100 : 200;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleSpeeds = [];
+
+    for (var i = 0; i < particleCount; i++) {
+      particlePositions[i * 3]     = (Math.random() - 0.5) * 20;
+      particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 12;
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+      particleSpeeds.push({
+        vx: (Math.random() - 0.5) * 0.002,
+        vy: (Math.random() - 0.5) * 0.001 + 0.0005,
+        vz: (Math.random() - 0.5) * 0.002,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+      color: 0xc9a86c,
+      size: isMobile ? 0.025 : 0.03,
+      transparent: true,
+      opacity: 0.5,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
+
+    // ── Camera animation state ──
+    var cam = { x: 0, y: 1.5, z: 8, lx: 0, ly: 0.8, lz: 0 };
+
+    // Orbit state for hero section
+    var orbit = { angle: 0 };
+
+    // Master scroll progress
+    var scrollProgress = 0;
+
+    // ── GSAP Timeline — camera journey ──
+    var tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: "#scroll-container",
+        start: "top top",
+        end: "bottom bottom",
+        scrub: 1.5,
+        onUpdate: function(self) {
+          scrollProgress = self.progress;
+        }
+      }
+    });
+
+    // Hero to Section 1: Orbit around the ring then pull out
+    tl.to(cam, {
+      x: 0, y: 1.5, z: 8,
+      lx: 0, ly: 0.8, lz: 0,
+      duration: 0.5, ease: "none"
+    })
+    // Section 1 (ring details, left side content): camera shifts right
+    .to(cam, {
+      x: 4, y: 1.2, z: 6,
+      lx: 0, ly: 0.8, lz: 0,
+      duration: 1.2, ease: "none"
+    })
+    // Section 2 (atelier, right side content): camera shifts left
+    .to(cam, {
+      x: -3.5, y: 2, z: 5.5,
+      lx: 0, ly: 1.0, lz: 0,
+      duration: 1.2, ease: "none"
+    })
+    // Section 3 (collection, centered): pull back, top-down angle
+    .to(cam, {
+      x: 0, y: 4.5, z: 7,
+      lx: 0, ly: 0.5, lz: 0,
+      duration: 1, ease: "none"
+    })
+    // Section 4 (heritage, left content): closer, dramatic angle
+    .to(cam, {
+      x: 3, y: 1.8, z: 4.5,
+      lx: 0, ly: 0.6, lz: 0,
+      duration: 1.2, ease: "none"
+    })
+    // Section 5 (CTA): front and center, intimate
+    .to(cam, {
+      x: 0, y: 1.2, z: 5,
+      lx: 0, ly: 0.8, lz: 0,
+      duration: 1, ease: "none"
+    });
+
+    // Orbit the ring hero object on scroll (first portion)
+    gsap.to(orbit, {
+      angle: Math.PI * 2,
+      scrollTrigger: {
+        trigger: "#scroll-container",
+        start: "top top",
+        end: "bottom bottom",
+        scrub: 1.5,
+      }
+    });
+
+    // ── Content fade-in animations (Pattern 4B) ──
+    var sections = ["#s0", "#s1", "#s2", "#s3", "#s4", "#s5"];
+
+    // Hero fades in immediately
+    gsap.set("#s0 .content", { opacity: 1 });
+
+    // Hero parallax and fade out
+    gsap.to("#s0 .content", {
+      opacity: 0, y: -80,
+      scrollTrigger: {
+        trigger: "#s0",
+        start: "top top",
+        end: "40% top",
+        scrub: 1,
+      }
+    });
+
+    // Fade scroll hint
+    gsap.to("#scroll-hint", {
+      opacity: 0,
+      scrollTrigger: {
+        trigger: "#s0",
+        start: "5% top",
+        end: "15% top",
+        scrub: true,
+      }
+    });
+
+    // Sections 1-5 fade in/out
+    for (var si = 1; si < sections.length; si++) {
+      (function(idx) {
+        var sel = sections[idx];
+        var el = document.querySelector(sel + " .content");
+        if (!el) return;
+
+        gsap.fromTo(el,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1, y: 0,
+            scrollTrigger: {
+              trigger: sel,
+              start: "top 65%",
+              end: "top 30%",
+              scrub: 1,
+            }
+          }
+        );
+
+        if (idx < sections.length - 1) {
+          gsap.to(el, {
+            opacity: 0, y: -40,
+            scrollTrigger: {
+              trigger: sel,
+              start: "bottom 60%",
+              end: "bottom 25%",
+              scrub: 1,
+            }
+          });
+        }
+      })(si);
+    }
+
+    // ── Mouse parallax (Pattern 7E) ──
+    var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+
+    if (!isMobile) {
+      document.addEventListener('mousemove', function(e) {
+        mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
+        mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
+      });
+    }
+
+    // ── Resize handler ──
+    window.addEventListener('resize', function() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ── Loading ──
+    var loadProgress = 0;
+    var loaderFill = document.getElementById('loader-fill');
+    var loaderInterval = setInterval(function() {
+      loadProgress += Math.random() * 15 + 5;
+      if (loadProgress >= 100) {
+        loadProgress = 100;
+        clearInterval(loaderInterval);
+      }
+      loaderFill.style.width = loadProgress + '%';
+    }, 150);
+
+    function hideLoader() {
+      renderer.render(scene, camera);
+      setTimeout(function() {
+        document.getElementById('loader').classList.add('hidden');
+      }, 600);
+    }
+
+    window.addEventListener('load', function() {
+      setTimeout(hideLoader, 1800);
+    });
+
+    // ── Render loop ──
+    var clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      var elapsed = clock.getElapsedTime();
+
+      // Smooth mouse parallax
+      mouse.x += (mouse.tx - mouse.x) * 0.04;
+      mouse.y += (mouse.ty - mouse.y) * 0.04;
+
+      var parallaxX = mouse.x * 0.2;
+      var parallaxY = -mouse.y * 0.1;
+
+      // Apply camera position from scroll animation + parallax
+      camera.position.set(
+        cam.x + parallaxX,
+        cam.y + parallaxY,
+        cam.z
+      );
+      camera.lookAt(cam.lx, cam.ly, cam.lz);
+
+      // Ring rotation — independent of scroll, slow constant spin plus orbit influence
+      ringGroup.rotation.y = elapsed * 0.15 + orbit.angle * 0.3;
+
+      // Slight ring tilt based on scroll
+      ring.rotation.z = Math.sin(elapsed * 0.3) * 0.05;
+
+      // Glow pulse (Pattern 7B)
+      var glowPulse = 0.85 + Math.sin(elapsed * 1.2) * 0.15;
+      glow1.material.opacity = 0.08 * glowPulse;
+      glow2.material.opacity = 0.04 * glowPulse;
+      glow3.material.opacity = 0.02 * glowPulse;
+
+      // Animate floating decorative elements
+      animateFloatingObjects(elapsed);
+
+      // Animate particles — gentle drift
+      var posArr = particleGeo.attributes.position.array;
+      for (var i = 0; i < particleCount; i++) {
+        var sp = particleSpeeds[i];
+        posArr[i * 3]     += Math.sin(elapsed * 0.3 + sp.phase) * sp.vx;
+        posArr[i * 3 + 1] += sp.vy * 0.3 + Math.sin(elapsed * 0.5 + sp.phase) * 0.0005;
+        posArr[i * 3 + 2] += Math.cos(elapsed * 0.25 + sp.phase) * sp.vz;
+
+        // Reset particles that drift too far
+        if (posArr[i * 3 + 1] > 8) posArr[i * 3 + 1] = -6;
+        if (Math.abs(posArr[i * 3]) > 12) posArr[i * 3] *= -0.5;
+        if (Math.abs(posArr[i * 3 + 2]) > 12) posArr[i * 3 + 2] *= -0.5;
+      }
+      particleGeo.attributes.position.needsUpdate = true;
+
+      // Subtle particle opacity breathing
+      particleMat.opacity = 0.35 + Math.sin(elapsed * 0.7) * 0.15;
+
+      // Renderer
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+  </script>
+</body>
+</html>

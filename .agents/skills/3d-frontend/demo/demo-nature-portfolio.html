@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elena Voss — Wilderness Photography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { overflow-x: hidden; background: #1a1c16; color: #e8e4da; }
+    body { font-family: 'DM Sans', sans-serif; font-weight: 300; }
+
+    canvas { position: fixed; top: 0; left: 0; z-index: 0; }
+
+    /* --- Loading Screen --- */
+    #loader {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #1a1c16; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+    #loader .loader-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem; font-weight: 300; letter-spacing: 0.3em;
+      color: #c9a86c; text-transform: uppercase;
+    }
+    #loader .loader-bar-track {
+      width: 180px; height: 1px; background: rgba(201,168,108,0.15);
+      margin-top: 1.5rem; position: relative; overflow: hidden;
+    }
+    #loader .loader-bar-fill {
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 0%; background: #c9a86c;
+      animation: loaderFill 1.2s ease-in-out forwards;
+    }
+    @keyframes loaderFill { to { width: 100%; } }
+
+    /* --- Scroll Container --- */
+    .scroll-container { position: relative; z-index: 1; pointer-events: none; }
+
+    .section {
+      min-height: 120vh; display: flex; align-items: center; justify-content: center;
+      padding: 4rem 2rem; position: relative;
+    }
+    .section:first-child { min-height: 140vh; }
+
+    .content {
+      pointer-events: auto; max-width: 700px; opacity: 0;
+    }
+
+    /* --- Typography --- */
+    h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 300; }
+    h1 {
+      font-size: clamp(3.2rem, 8vw, 7rem); line-height: 1.05;
+      letter-spacing: -0.02em; color: #f0ece2;
+    }
+    h2 {
+      font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.15;
+      letter-spacing: -0.01em; color: #f0ece2; margin-bottom: 1.2rem;
+    }
+    h3 {
+      font-size: 1.1rem; letter-spacing: 0.25em; text-transform: uppercase;
+      color: #c9a86c; font-weight: 400; margin-bottom: 0.6rem;
+    }
+    p {
+      font-size: 1rem; line-height: 1.75; color: rgba(232,228,218,0.7);
+      max-width: 500px;
+    }
+    .subtitle {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: clamp(1.1rem, 2.2vw, 1.5rem); color: rgba(201,168,108,0.8);
+      margin-top: 1rem; letter-spacing: 0.05em;
+    }
+
+    /* --- Hero --- */
+    #s0 { justify-content: center; text-align: center; flex-direction: column; }
+    #s0 .content { display: flex; flex-direction: column; align-items: center; }
+    .hero-line {
+      display: block; overflow: hidden;
+    }
+    .scroll-hint {
+      position: absolute; bottom: 8vh; left: 50%; transform: translateX(-50%);
+      font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase;
+      color: rgba(201,168,108,0.4); pointer-events: auto;
+    }
+    .scroll-hint span {
+      display: inline-block;
+      animation: scrollBounce 2s ease-in-out infinite;
+    }
+    @keyframes scrollBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
+    /* --- Section 2: Mountain Ranges --- */
+    #s1 { justify-content: flex-start; padding-left: 6vw; }
+    #s1 .content { max-width: 550px; }
+    .stats-row {
+      display: flex; gap: 2.5rem; margin-top: 2rem; flex-wrap: wrap;
+    }
+    .stat { text-align: left; }
+    .stat-number {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.8rem; font-weight: 300; color: #c9a86c; line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+      color: rgba(232,228,218,0.4); margin-top: 0.3rem;
+    }
+
+    /* --- Section 3: Golden Hour --- */
+    #s2 { justify-content: flex-end; padding-right: 6vw; }
+    #s2 .content { text-align: right; }
+    #s2 p { margin-left: auto; }
+
+    /* --- Section 4: Selected Works --- */
+    #s3 { justify-content: center; }
+    #s3 .content { max-width: 800px; width: 100%; }
+    .works-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    .work-card {
+      background: rgba(30,32,24,0.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(201,168,108,0.1);
+      padding: 2rem; cursor: default;
+      transition: border-color 0.4s ease, background 0.4s ease;
+    }
+    .work-card:hover {
+      border-color: rgba(201,168,108,0.35);
+      background: rgba(40,42,32,0.7);
+    }
+    .work-card h3 { margin-bottom: 0.3rem; }
+    .work-card p { font-size: 0.85rem; line-height: 1.6; color: rgba(232,228,218,0.5); }
+    .work-year {
+      font-size: 0.7rem; letter-spacing: 0.15em; color: rgba(201,168,108,0.5);
+      margin-top: 0.8rem; display: block;
+    }
+
+    /* --- Section 5: CTA --- */
+    #s4 { justify-content: center; text-align: center; min-height: 100vh; }
+    #s4 .content { display: flex; flex-direction: column; align-items: center; }
+    .cta-btn {
+      display: inline-block; margin-top: 2rem; padding: 1rem 3rem;
+      border: 1px solid rgba(201,168,108,0.4);
+      color: #c9a86c; font-family: 'DM Sans', sans-serif; font-size: 0.8rem;
+      letter-spacing: 0.2em; text-transform: uppercase; text-decoration: none;
+      transition: all 0.4s ease; cursor: pointer; background: transparent;
+    }
+    .cta-btn:hover {
+      background: rgba(201,168,108,0.1);
+      border-color: #c9a86c;
+    }
+
+    /* --- Glass Panel Backgrounds --- */
+    .glass-panel {
+      background: rgba(20,22,16,0.5);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(201,168,108,0.06);
+      border-radius: 2px; padding: 2.5rem;
+    }
+
+    /* --- Nav dot tracker --- */
+    .nav-dots {
+      position: fixed; right: 2rem; top: 50%; transform: translateY(-50%);
+      z-index: 10; display: flex; flex-direction: column; gap: 1rem;
+      pointer-events: auto;
+    }
+    .nav-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(201,168,108,0.2); cursor: pointer;
+      transition: background 0.4s ease, transform 0.4s ease;
+    }
+    .nav-dot.active {
+      background: #c9a86c; transform: scale(1.5);
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      .section { padding: 3rem 1.5rem; }
+      #s1 { padding-left: 1.5rem; }
+      #s2 { padding-right: 1.5rem; }
+      .works-grid { grid-template-columns: 1fr; }
+      .stats-row { gap: 1.5rem; }
+      .nav-dots { right: 1rem; }
+      .glass-panel { padding: 1.5rem; }
+      h1 { font-size: clamp(2.5rem, 10vw, 4rem); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="loader-text">Elena Voss</div>
+    <div class="loader-bar-track"><div class="loader-bar-fill"></div></div>
+  </div>
+
+  <!-- Nav Dots -->
+  <div class="nav-dots" id="navDots">
+    <div class="nav-dot active" data-section="0"></div>
+    <div class="nav-dot" data-section="1"></div>
+    <div class="nav-dot" data-section="2"></div>
+    <div class="nav-dot" data-section="3"></div>
+    <div class="nav-dot" data-section="4"></div>
+  </div>
+
+  <!-- Scroll Container -->
+  <div class="scroll-container" id="scroll-container">
+
+    <!-- S0: Hero -->
+    <div class="section" id="s0">
+      <div class="content" id="hero-content">
+        <h3>Wilderness &mdash; Light &mdash; Stillness</h3>
+        <h1>
+          <span class="hero-line">Elena Voss</span>
+        </h1>
+        <div class="subtitle">Through the Lens of Wilderness</div>
+      </div>
+      <div class="scroll-hint"><span>Scroll to explore</span></div>
+    </div>
+
+    <!-- S1: Mountain Ranges -->
+    <div class="section" id="s1">
+      <div class="content glass-panel">
+        <h3>Portfolio</h3>
+        <h2>Mountain Ranges</h2>
+        <p>
+          Where stone meets sky, Elena captures the grandeur of tectonic time.
+          Each summit holds a different silence, each ridge a new geometry of light.
+          Her lens renders the monumental intimate, transforming the vast into the personal.
+        </p>
+        <div class="stats-row">
+          <div class="stat">
+            <div class="stat-number">47</div>
+            <div class="stat-label">Countries</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">12</div>
+            <div class="stat-label">Years</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">200+</div>
+            <div class="stat-label">Exhibitions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S2: Golden Hour -->
+    <div class="section" id="s2">
+      <div class="content glass-panel">
+        <h3>The Practice</h3>
+        <h2>Golden Hour</h2>
+        <p>
+          There is a moment, just after the sun slips below the ridgeline,
+          when the world holds its breath. The air turns amber.
+          Shadows stretch into poems. This is the hour she lives for &mdash;
+          when landscape becomes language and light becomes a verb.
+        </p>
+        <p style="margin-top:1rem; font-style:italic; color:rgba(201,168,108,0.6);">
+          "I do not photograph places. I photograph the way places feel
+          when no one is watching."
+        </p>
+      </div>
+    </div>
+
+    <!-- S3: Selected Works -->
+    <div class="section" id="s3">
+      <div class="content">
+        <h3>Selected Works</h3>
+        <h2>Recent Projects</h2>
+        <div class="works-grid">
+          <div class="work-card">
+            <h3>Patagonian Silences</h3>
+            <p>Wind-sculpted granite towers and glacial lakes at the edge of the world.</p>
+            <span class="work-year">2024 &mdash; Torres del Paine</span>
+          </div>
+          <div class="work-card">
+            <h3>Nordic Twilight</h3>
+            <p>The blue hour in the Lofoten Islands, where sea and sky become one.</p>
+            <span class="work-year">2023 &mdash; Norway</span>
+          </div>
+          <div class="work-card">
+            <h3>Volcanic Whispers</h3>
+            <p>Steam, sulphur, and obsidian. Iceland's interior highlands laid bare.</p>
+            <span class="work-year">2023 &mdash; Iceland</span>
+          </div>
+          <div class="work-card">
+            <h3>Monsoon Canopy</h3>
+            <p>Rainforest light filtered through infinite green in the Western Ghats.</p>
+            <span class="work-year">2022 &mdash; India</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S4: CTA -->
+    <div class="section" id="s4">
+      <div class="content" style="max-width:500px;">
+        <h3>Limited Edition Runs</h3>
+        <h2>Book a Print</h2>
+        <p style="text-align:center; margin: 0 auto;">
+          Each photograph is produced as a museum-grade archival print.
+          Editions are limited to 25 copies worldwide.
+          Inquire about availability and custom framing.
+        </p>
+        <a href="#" class="cta-btn" onclick="return false;">Request Availability</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <script>
+    // ============================================================
+    //  SETUP
+    // ============================================================
+    gsap.registerPlugin(ScrollTrigger);
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8a7a6a); // warm misty dawn
+    scene.fog = new THREE.FogExp2(0x8a7a6a, 0.012);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 300);
+    camera.position.set(0, 18, 35);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = !isMobile;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    document.body.prepend(renderer.domElement);
+
+    // ============================================================
+    //  LIGHTING — Golden Hour Recipe
+    // ============================================================
+    const ambientLight = new THREE.AmbientLight(0x604830, 0.5);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffaa55, 1.2);
+    keyLight.position.set(30, 25, 20);
+    if (!isMobile) {
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(1024, 1024);
+      keyLight.shadow.camera.near = 1;
+      keyLight.shadow.camera.far = 120;
+      keyLight.shadow.camera.left = -50;
+      keyLight.shadow.camera.right = 50;
+      keyLight.shadow.camera.top = 50;
+      keyLight.shadow.camera.bottom = -50;
+    }
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xcc8844, 0.35);
+    fillLight.position.set(-20, 10, -15);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0x6688bb, 0.25);
+    rimLight.position.set(-5, 5, -30);
+    scene.add(rimLight);
+
+    // ============================================================
+    //  SKY DOME — ShaderMaterial (Pattern 2G)
+    // ============================================================
+    const skyGeo = new THREE.SphereGeometry(200, 32, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor:    { value: new THREE.Color(0xd4868a) },   // dawn pink
+        bottomColor: { value: new THREE.Color(0xc9a86c) },   // warm amber
+        offset:      { value: 20 },
+        exponent:    { value: 0.5 },
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPos.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition + offset).y;
+          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+        }
+      `,
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(sky);
+
+    // ============================================================
+    //  TERRAIN — Procedural Noise Hills (Pattern 6A)
+    // ============================================================
+    function simpleNoise(x, z) {
+      return Math.sin(x * 0.15) * Math.cos(z * 0.15) * 3.0
+           + Math.sin(x * 0.35 + 1.3) * Math.cos(z * 0.25 + 0.7) * 1.8
+           + Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.7
+           + Math.sin(x * 0.05) * Math.cos(z * 0.08) * 5.0;
+    }
+
+    function getTerrainHeight(x, z) {
+      return simpleNoise(x, z);
+    }
+
+    const terrainRes = isMobile ? 80 : 150;
+    const terrainSize = 200;
+    const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainRes, terrainRes);
+    terrainGeo.rotateX(-Math.PI / 2);
+
+    const positions = terrainGeo.attributes.position.array;
+    const vertexCount = positions.length / 3;
+
+    // Vertex colors: low = dark green, high = sandy brown
+    const colors = new Float32Array(vertexCount * 3);
+    const darkGreen = new THREE.Color(0x2a4a22);
+    const sandyBrown = new THREE.Color(0xb8a070);
+    const midGreen = new THREE.Color(0x4a6a38);
+
+    let minH = Infinity, maxH = -Infinity;
+    for (let i = 0; i < vertexCount; i++) {
+      const x = positions[i * 3];
+      const z = positions[i * 3 + 2];
+      const h = getTerrainHeight(x, z);
+      positions[i * 3 + 1] = h;
+      if (h < minH) minH = h;
+      if (h > maxH) maxH = h;
+    }
+
+    for (let i = 0; i < vertexCount; i++) {
+      const h = positions[i * 3 + 1];
+      const t = (h - minH) / (maxH - minH); // 0 = lowest, 1 = highest
+      let c;
+      if (t < 0.4) {
+        c = darkGreen.clone().lerp(midGreen, t / 0.4);
+      } else {
+        c = midGreen.clone().lerp(sandyBrown, (t - 0.4) / 0.6);
+      }
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+
+    terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    terrainGeo.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.02,
+      flatShading: true,
+    });
+
+    const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+
+    // ============================================================
+    //  WATER PLANE — Transparent
+    // ============================================================
+    const waterLevel = minH + (maxH - minH) * 0.18;
+    const waterMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x2a5a5a) },
+        uOpacity: { value: 0.55 },
+      },
+      vertexShader: `
+        uniform float uTime;
+        varying vec2 vUv;
+        varying float vWave;
+        void main() {
+          vUv = uv;
+          float wave = sin(position.x * 0.8 + uTime * 0.6) * 0.08
+                      + sin(position.y * 1.2 + uTime * 0.4) * 0.05
+                      + sin((position.x + position.y) * 0.5 + uTime * 0.3) * 0.06;
+          vWave = wave;
+          vec3 pos = position;
+          pos.z += wave;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        varying float vWave;
+        void main() {
+          float highlight = smoothstep(0.02, 0.12, vWave);
+          vec3 color = mix(uColor, uColor * 1.6, highlight);
+          gl_FragColor = vec4(color, uOpacity - vWave * 0.3);
+        }
+      `,
+      side: THREE.DoubleSide,
+    });
+
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(terrainSize, terrainSize, isMobile ? 32 : 64, isMobile ? 32 : 64),
+      waterMat
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = waterLevel;
+    scene.add(water);
+
+    // ============================================================
+    //  TREES — InstancedMesh (Pattern 3A)
+    // ============================================================
+    const treeCount = isMobile ? 120 : 350;
+
+    // Trunk (cylinder)
+    const trunkGeo = new THREE.CylinderGeometry(0.08, 0.12, 1.0, 5);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.9 });
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
+
+    // Canopy (cone)
+    const canopyGeo = new THREE.ConeGeometry(0.6, 1.8, 6);
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.85 });
+    const canopyMesh = new THREE.InstancedMesh(canopyGeo, canopyMat, treeCount);
+
+    const dummy = new THREE.Object3D();
+    let treeIdx = 0;
+    const maxAttempts = treeCount * 5;
+    let attempts = 0;
+
+    while (treeIdx < treeCount && attempts < maxAttempts) {
+      attempts++;
+      const x = (Math.random() - 0.5) * (terrainSize * 0.85);
+      const z = (Math.random() - 0.5) * (terrainSize * 0.85);
+      const h = getTerrainHeight(x, z);
+
+      // Only place trees above water but not on the highest peaks
+      if (h < waterLevel + 0.3 || h > maxH - (maxH - minH) * 0.15) continue;
+
+      const scale = 0.7 + Math.random() * 1.8;
+
+      // Trunk
+      dummy.position.set(x, h + scale * 0.5, z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.updateMatrix();
+      trunkMesh.setMatrixAt(treeIdx, dummy.matrix);
+
+      // Canopy (sits above trunk)
+      dummy.position.set(x, h + scale * 1.3, z);
+      dummy.updateMatrix();
+      canopyMesh.setMatrixAt(treeIdx, dummy.matrix);
+
+      treeIdx++;
+    }
+
+    trunkMesh.castShadow = true;
+    canopyMesh.castShadow = true;
+    canopyMesh.receiveShadow = true;
+    scene.add(trunkMesh);
+    scene.add(canopyMesh);
+
+    // ============================================================
+    //  PARTICLES — Floating Dust / Pollen Motes (Pattern 2F)
+    // ============================================================
+    const particleCount = isMobile ? 250 : 700;
+    const particlesGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      particlePositions[i * 3]     = (Math.random() - 0.5) * 100;
+      particlePositions[i * 3 + 1] = waterLevel + Math.random() * 20;
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+    }
+
+    particlesGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+      color: 0xddc080,
+      size: 0.12,
+      transparent: true,
+      opacity: 0.45,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const particles = new THREE.Points(particlesGeo, particleMat);
+    scene.add(particles);
+
+    // ============================================================
+    //  SCROLL PROGRESS
+    // ============================================================
+    let scrollProgress = 0;
+
+    ScrollTrigger.create({
+      trigger: '#scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: (self) => {
+        scrollProgress = self.progress;
+      }
+    });
+
+    // ============================================================
+    //  CAMERA ANIMATION — Landscape Flyover (Pattern 1A)
+    // ============================================================
+    const cam = { x: 0, y: 22, z: 40, lx: 0, ly: 2, lz: 0 };
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#scroll-container',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 1.5,
+      }
+    });
+
+    // Hero — high above, looking down at terrain
+    tl.to(cam, { x: 8, y: 16, z: 25, lx: 5, ly: 1, lz: -10, duration: 1, ease: 'none' })
+      // Mountain Ranges — sweep left, descend
+      .to(cam, { x: -12, y: 10, z: 5, lx: -5, ly: 2, lz: -20, duration: 1.2, ease: 'none' })
+      // Golden Hour — low angle glide, warm atmosphere
+      .to(cam, { x: 5, y: 6, z: -15, lx: 10, ly: 3, lz: -35, duration: 1.2, ease: 'none' })
+      // Selected Works — rising overview
+      .to(cam, { x: 0, y: 14, z: -30, lx: 0, ly: 0, lz: -50, duration: 1, ease: 'none' })
+      // CTA — cinematic final ascent
+      .to(cam, { x: 0, y: 25, z: -45, lx: 0, ly: 5, lz: -65, duration: 1, ease: 'none' });
+
+    // ============================================================
+    //  CONTENT FADE IN/OUT (Pattern 4B)
+    // ============================================================
+    const sectionIDs = ['#s0', '#s1', '#s2', '#s3', '#s4'];
+
+    sectionIDs.forEach((sel, i) => {
+      const el = document.querySelector(sel + ' .content');
+      if (!el) return;
+
+      // Fade in
+      gsap.fromTo(el,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1, y: 0,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'top 65%',
+            end: 'top 25%',
+            scrub: true,
+          }
+        }
+      );
+
+      // Fade out (except last)
+      if (i < sectionIDs.length - 1) {
+        gsap.to(el, {
+          opacity: 0, y: -40,
+          scrollTrigger: {
+            trigger: sel,
+            start: 'bottom 55%',
+            end: 'bottom 20%',
+            scrub: true,
+          }
+        });
+      }
+    });
+
+    // Hero parallax text — moves faster
+    gsap.to('#hero-content', {
+      y: -200,
+      scrollTrigger: {
+        trigger: '#s0',
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 0.5,
+      }
+    });
+
+    // ============================================================
+    //  NAV DOTS
+    // ============================================================
+    const dots = document.querySelectorAll('.nav-dot');
+    ScrollTrigger.create({
+      trigger: '#scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: (self) => {
+        const idx = Math.min(Math.floor(self.progress * sectionIDs.length), sectionIDs.length - 1);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const idx = parseInt(dot.dataset.section);
+        const target = document.querySelector(sectionIDs[idx]);
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // ============================================================
+    //  FOG + SKY COLOR TRANSITIONS on Scroll (Pattern 7C)
+    // ============================================================
+    const fogMoods = [
+      { fog: new THREE.Color(0xb8a898), bg: new THREE.Color(0x8a7a6a), skyTop: new THREE.Color(0xd4868a), skyBot: new THREE.Color(0xc9a86c), ambColor: new THREE.Color(0x604830) },
+      { fog: new THREE.Color(0x907050), bg: new THREE.Color(0x604020), skyTop: new THREE.Color(0xd48050), skyBot: new THREE.Color(0xb87830), ambColor: new THREE.Color(0x806040) },
+      { fog: new THREE.Color(0xc9a050), bg: new THREE.Color(0x806020), skyTop: new THREE.Color(0xdd8844), skyBot: new THREE.Color(0xc99030), ambColor: new THREE.Color(0x907050) },
+      { fog: new THREE.Color(0x6a5a60), bg: new THREE.Color(0x3a3040), skyTop: new THREE.Color(0x5a4a70), skyBot: new THREE.Color(0x8a6a50), ambColor: new THREE.Color(0x504060) },
+      { fog: new THREE.Color(0x2a2a3a), bg: new THREE.Color(0x1a1a2a), skyTop: new THREE.Color(0x1a1a3a), skyBot: new THREE.Color(0x3a3040), ambColor: new THREE.Color(0x303050) },
+    ];
+
+    function updateAtmosphere(progress) {
+      const count = fogMoods.length;
+      const scaled = progress * (count - 1);
+      const i = Math.min(Math.floor(scaled), count - 2);
+      const t = scaled - i;
+
+      scene.fog.color.copy(fogMoods[i].fog).lerp(fogMoods[i + 1].fog, t);
+      scene.background.copy(fogMoods[i].bg).lerp(fogMoods[i + 1].bg, t);
+      ambientLight.color.copy(fogMoods[i].ambColor).lerp(fogMoods[i + 1].ambColor, t);
+
+      skyMat.uniforms.topColor.value.copy(fogMoods[i].skyTop).lerp(fogMoods[i + 1].skyTop, t);
+      skyMat.uniforms.bottomColor.value.copy(fogMoods[i].skyBot).lerp(fogMoods[i + 1].skyBot, t);
+    }
+
+    // ============================================================
+    //  MOUSE PARALLAX
+    // ============================================================
+    const mouse = { x: 0, y: 0 };
+    document.addEventListener('mousemove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // ============================================================
+    //  RESIZE HANDLER
+    // ============================================================
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ============================================================
+    //  LOADING COMPLETE
+    // ============================================================
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loader').classList.add('hidden');
+      }, 1400);
+    });
+
+    // ============================================================
+    //  RENDER LOOP
+    // ============================================================
+    const clock = new THREE.Clock();
+    const parallaxStrength = 0.4;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+
+      // Camera position from GSAP + mouse parallax
+      camera.position.set(
+        cam.x + mouse.x * parallaxStrength,
+        cam.y - mouse.y * parallaxStrength * 0.3,
+        cam.z
+      );
+      camera.lookAt(cam.lx, cam.ly, cam.lz);
+
+      // Atmosphere transitions
+      updateAtmosphere(scrollProgress);
+
+      // Water animation
+      waterMat.uniforms.uTime.value = elapsed;
+
+      // Particle drift
+      const pArr = particlesGeo.attributes.position.array;
+      for (let i = 0; i < particleCount; i++) {
+        pArr[i * 3]     += Math.cos(elapsed * 0.2 + i * 0.3) * 0.003;
+        pArr[i * 3 + 1] += Math.sin(elapsed * 0.4 + i * 0.15) * 0.002;
+        pArr[i * 3 + 2] += Math.sin(elapsed * 0.15 + i * 0.25) * 0.003;
+
+        // Wrap vertically
+        if (pArr[i * 3 + 1] > waterLevel + 22) pArr[i * 3 + 1] = waterLevel + 1;
+        if (pArr[i * 3 + 1] < waterLevel - 1) pArr[i * 3 + 1] = waterLevel + 20;
+      }
+      particlesGeo.attributes.position.needsUpdate = true;
+
+      // Particle opacity pulse based on scroll (more visible during golden hour)
+      const goldenIntensity = 1.0 - Math.abs(scrollProgress - 0.45) * 2.0;
+      particleMat.opacity = 0.25 + Math.max(0, goldenIntensity) * 0.35;
+
+      // Key light follows camera loosely for consistent golden illumination
+      keyLight.position.set(
+        cam.x + 30,
+        25 + Math.sin(elapsed * 0.1) * 2,
+        cam.z + 20
+      );
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
