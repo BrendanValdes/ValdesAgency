@@ -1,0 +1,20 @@
+# Source playbooks + memory + client work — bundled separately into bot/data/
+# by bot/scripts/bundle-data.mjs during prebuild, so the runtime image does
+# NOT need the root copies.
+skills
+memory
+clients
+assets
+
+# Dev + repo metadata
+.gitnexus
+.git
+.github
+README.md
+AGENTS.md
+CLAUDE.md
+skills-lock.json
+scripts
+.env
+.env.local
+*.log

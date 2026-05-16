@@ -1,0 +1,14 @@
+{
+  "name": "valdes-agency-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root package — delegates build + start to bot/ for Railway/Nixpacks",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm --prefix bot install && npm --prefix bot run build",
+    "start": "npm --prefix bot run start",
+    "postinstall": "npm --prefix bot install"
+  }
+}
