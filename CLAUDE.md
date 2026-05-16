@@ -42,8 +42,7 @@ Current clients:
 - **Trade N Travel** — Affiliate travel, setup phase, no ads yet.
 
 Team:
-- **Brendan:** Owner — strategy, ads, websites, code, sales. School until 1:11pm, works 2:30pm+.
-- **Tyler:** Cold caller — outbound dials to pool companies, logs in GHL.
+- **Brendan (solo):** Owner — strategy, ads, websites, code, AND all sales (prospecting, dials, discovery, close, GHL pipeline). School until 1:11pm, works 2:30pm+. No outsourced cold caller — quality over quantity, async outreach (cold email, DMs, LinkedIn) supplements dials given the time budget.
 
 → All sales work (cold call scripts, discovery, proposal, close, GHL pipeline) lives in `skills/sales.md`. Read it before any sales-related task.
 
@@ -107,8 +106,11 @@ Load these on demand. If the task touches the topic — READ THE FILE before ans
 
 ```
 skills/sales.md          → Cold calling, discovery, proposals, closing, GHL pipeline
-                           USE WHEN: Tyler's dials, objection handling, follow-ups,
-                           discovery prep, proposal drafts, close-call coaching
+                           USE WHEN: Brendan's outreach (dials/email/DMs), objection
+                           handling, follow-ups, discovery prep, proposal drafts,
+                           close-call coaching. NOTE: this playbook references a
+                           2-person motion that is no longer in place — read it as
+                           Brendan-solo until it gets refactored.
 
 skills/website-build.md  → Lovable workflow, design brief, components, hero video,
                            niche playbooks (11 niches), design standards, delivery
