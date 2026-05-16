@@ -1,0 +1,152 @@
+{
+  "name": "ROCCO Note",
+  "icon": "brain.head.profile",
+  "color": "blue",
+  "description": "Push a note from iPhone into memory/obsidian/ on ValdesAgency GitHub repo. ROCCO auto-loads it on next Claude Code session.",
+  "repo": {
+    "owner": "BrendanValdes",
+    "name": "ValdesAgency",
+    "branch": "main",
+    "target_dir": "memory/obsidian"
+  },
+  "actions": [
+    {
+      "step": 1,
+      "action": "Ask for Input",
+      "params": {
+        "input_type": "Text",
+        "prompt": "Note title",
+        "default_answer": ""
+      },
+      "save_as": "noteTitle"
+    },
+    {
+      "step": 2,
+      "action": "Ask for Input",
+      "params": {
+        "input_type": "Text",
+        "prompt": "Note body (long-press to dictate)",
+        "default_answer": "",
+        "allow_multiline": true
+      },
+      "save_as": "noteBody"
+    },
+    {
+      "step": 3,
+      "action": "Get Current Date",
+      "save_as": "now"
+    },
+    {
+      "step": 4,
+      "action": "Format Date",
+      "params": {
+        "input": "now",
+        "format": "yyyy-MM-dd"
+      },
+      "save_as": "today"
+    },
+    {
+      "step": 5,
+      "action": "Replace Text",
+      "params": {
+        "input": "noteTitle",
+        "find": "[^A-Za-z0-9]+",
+        "replace": "-",
+        "regex": true
+      },
+      "save_as": "slugRaw"
+    },
+    {
+      "step": 6,
+      "action": "Change Case",
+      "params": {
+        "input": "slugRaw",
+        "case": "lowercase"
+      },
+      "save_as": "slug"
+    },
+    {
+      "step": 7,
+      "action": "Text",
+      "params": {
+        "content": "{today}-{slug}.md"
+      },
+      "save_as": "filename",
+      "note": "Use Shortcuts variable pills for {today} and {slug}; this is the file name that will appear in memory/obsidian/"
+    },
+    {
+      "step": 8,
+      "action": "Text",
+      "params": {
+        "content": "---\ndate: {today}\ntitle: {noteTitle}\nsource: ios\n---\n\n{noteBody}\n"
+      },
+      "save_as": "fullMarkdown",
+      "note": "Variable pills for {today}, {noteTitle}, {noteBody}"
+    },
+    {
+      "step": 9,
+      "action": "Base64 Encode",
+      "params": {
+        "input": "fullMarkdown",
+        "encode_or_decode": "Encode"
+      },
+      "save_as": "encodedBody"
+    },
+    {
+      "step": 10,
+      "action": "Dictionary",
+      "params": {
+        "entries": [
+          { "key": "message", "type": "Text", "value": "obsidian: {noteTitle}" },
+          { "key": "content", "type": "Text", "value": "{encodedBody}" },
+          { "key": "branch", "type": "Text", "value": "main" }
+        ]
+      },
+      "save_as": "requestBody"
+    },
+    {
+      "step": 11,
+      "action": "Get Contents of URL",
+      "params": {
+        "url": "https://api.github.com/repos/BrendanValdes/ValdesAgency/contents/memory/obsidian/{filename}",
+        "method": "PUT",
+        "headers": {
+          "Authorization": "Bearer REPLACE_WITH_OBSIDIAN_GITHUB_TOKEN_AFTER_IMPORT",
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json"
+        },
+        "request_body_type": "JSON",
+        "request_body": "requestBody"
+      },
+      "save_as": "apiResponse",
+      "note": "CRITICAL: edit this action's Authorization header on-device after building. Replace the placeholder with the real OBSIDIAN_GITHUB_TOKEN. Never save the real token in this JSON file."
+    },
+    {
+      "step": 12,
+      "action": "Get Dictionary Value",
+      "params": {
+        "dictionary": "apiResponse",
+        "key": "content.html_url"
+      },
+      "save_as": "htmlUrl"
+    },
+    {
+      "step": 13,
+      "action": "Show Notification",
+      "params": {
+        "title": "ROCCO note saved",
+        "body": "{filename}",
+        "play_sound": true
+      }
+    }
+  ],
+  "token_placeholder": "REPLACE_WITH_OBSIDIAN_GITHUB_TOKEN_AFTER_IMPORT",
+  "token_storage_note": "Token lives ONLY inside the iOS Shortcut on-device, in action 11's Authorization header. This JSON file (committed to git) MUST contain only the placeholder. If you ever see the real token here, rotate it immediately.",
+  "suggested_triggers": [
+    "Add to Lock Screen widget",
+    "Add to Apple Watch face complication",
+    "\"Hey Siri, ROCCO Note\"",
+    "Share Sheet (so you can share text from any app into a note)"
+  ]
+}
