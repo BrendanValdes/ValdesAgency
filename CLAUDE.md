@@ -122,6 +122,18 @@ skills/design-references.md → Mobbin (UI pattern library) + Shadergradient (an
                               USE WHEN: picking UI patterns, building hero sections, choosing
                               between literal product imagery and animated gradient backgrounds
 
+skills/ghl-workflow-specs.md → Buildable specs for GHL workflows + fixes. Source of truth
+                               for what the automation SHOULD do; GHL is just the runtime.
+                               USE WHEN: building/modifying any GHL workflow, debugging
+                               automation, onboarding a new client into the pipeline.
+
+skills/email-sequences.md    → Full email body text for voicemail + Pool 5-email sequence
+                               + Pest Control 5-email sequence. Subjects, pre-headers,
+                               body copy, merge fields, A/B variants.
+                               USE WHEN: editing email copy, writing reply scripts that
+                               reference campaign content, building sequences for new
+                               niches (use Pool/Pest structure as the template).
+
 [future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
 [future] skills/content.md   → Content pillars, hooks, platform timing
@@ -138,6 +150,114 @@ MEMORY PROTOCOL
 Session start: Check MCP Knowledge Graph for client updates, recent decisions, active tasks.
 Session end: Save to MCP — key decisions made, client status changes, what was built, what's next.
 Brain dump: `/workspaces/ValdesAgency/memory/brain-dump.md` — running notes, ideas, things to do.
+
+GHL AUTOMATION — SOURCE OF TRUTH (as of 2026-05-17)
+13 workflows published. 11 pipelines live. Gatekeeper tag architecture controls niche email campaign entry. All notifications fire via Discord webhooks to #outreach. No SMS until A2P clears.
+A2P status: Submitted, awaiting carrier approval. SMS workflows stay disabled until approved.
+
+GATEKEEPER TAG ARCHITECTURE
+Each niche email campaign workflow is triggered by a niche-specific "gatekeeper tag." A contact does NOT enter an email sequence until they receive that tag. This decouples voicemail flow from email campaign flow and lets us control niche routing precisely.
+
+Gatekeeper tags (one per niche):
+- pool email campaign           → fires Workflow 4 (Pool Email Campaign)    [LIVE]
+- pest control email campaign   → fires Workflow 7 (Pest Email Campaign)    [LIVE]
+- handyman email campaign       → not built
+- house cleaning email campaign → not built
+- carpet cleaning email campaign→ not built
+- landscaping email campaign    → not built
+- garage door email campaign    → not built
+- hvac email campaign           → not built
+
+A/B split inside each campaign workflow (secondary tags):
+- pool list a / pool list b
+- pest control list a / pest control list b
+
+When to apply the gatekeeper tag:
+- After Voicemail Left workflow completes (post-voicemail email sent) → apply gatekeeper for the contact's niche
+- After manual import of new leads → apply gatekeeper in bulk
+- After a discovery call that doesn't close → optionally apply gatekeeper to re-enter sequence
+
+PIPELINES (11 total)
+
+Outreach & sales:
+1. VA Outreach Tracker (7 stages): New Lead → Voicemail/NA x1 → Voicemail email sent → Replied Voicemail email → Voicemail/NA x2 → Voicemail/NA x3 → Followed up After reply
+2. Warm Leads (5 stages)
+3. Sales Pipeline (9 stages)
+
+Email campaigns (25 stages each, identical structure across all 9 niches):
+Email 1A Sent → Opened 1A → Replied 1A → Email 1B Sent → Opened 1B → Replied 1B → Email 2A Sent → Opened 2A → Replied 2A → Email 2B Sent → Opened 2B → Replied 2B → Evergreen Loom Sent → Opened Evergreen Email → Clicked Website/Video → Replied to Evergreen → Last email Sent → Opened Last Email → Replied to Last Email → Personal Loom Sent → Opened personal loom → Replied to Personal Loom → Followed Up After Loom/Last Email → Dead → Unsubscribed
+
+Niche campaign status:
+4.  Pools Email Campaign           — STAGES + EMAILS + WORKFLOW LIVE. 41 enrolled / 26 active.
+5.  Pest Control Email Campaign    — STAGES + EMAILS + WORKFLOW LIVE. 0 enrolled.
+6.  Handyman Email Campaign        — stages only.
+7.  House Cleaning Email Campaign  — stages only.
+8.  Carpet Cleaning Email Campaign — stages only.
+9.  Landscaping Email Campaign     — stages only.
+10. Garage Door Email Campaign     — stages only.
+11. HVAC Email Campaign            — stages only.
+
+WORKFLOWS LIVE (13 published)
+0.  Voicemail EMAIL reply noti — triggers on email reply to voicemail email
+1.  Voicemail Left            — VM1/VM2/VM3 branches; VM1 sends voicemail email; updates VA Outreach Tracker
+2.  Hot Lead                  — tag "hot"; removes from workflow; updates Warm Leads; Discord webhook; adds task
+3.  Discovery Call Booked     — appointment booked; updates pipeline; Discord webhook; prep task
+4.  Pool Email Campaign       — TRIGGER tag "pool email campaign". A/B split → 1A/1B → 2A/2B → Evergreen → Last. 41 enrolled / 26 active.
+5.  Pool Email Noti           — pool-specific reply notifications
+6.  Pest Control Email Noties — pest-specific reply notifications
+7.  Pest Email Campaign       — TRIGGER tag "pest control email campaign". A/B split, same email flow as Pool. 0 enrolled.
+8.  Closed Lost               — tag "lost"; Discord webhook; 60-day re-engage ping
+9.  No Show                   — appointment no-showed
+10. Follow Up                 — tag "follow up" OR "come back later" branching
+11. Email Reply Notification  — generic reply notification
+12. Email Campaign            — pre-existing, may overlap with Workflow 4. AUDIT NEEDED before next pool import.
+
+EMAIL SEQUENCES
+Full email bodies (voicemail + Pool 5-email sequence + Pest 5-email sequence) live in `skills/email-sequences.md`. READ THAT FILE before editing any email copy or writing follow-ups that reference campaign content. Editing copy in CLAUDE.md is a mistake — the playbook is the source.
+
+TAGS IN USE
+- Voicemail flow:       voicemail left, voicemail 2 left, voicemail 3
+- Engagement state:     email sequence active, hot, lost, follow up, come back later, client
+- Gatekeeper (entry):   pool email campaign, pest control email campaign
+- A/B split (in-flow):  pool list a, pool list b, pest control list a, pest control list b
+- Per-email tracking:   [niche] [email] sent / opened / replied (applied by workflow as each email fires)
+
+DISCORD WEBHOOKS
+URLs stored in GitHub Codespaces Secrets, referenced by env var name:
+- #outreach        → `$DISCORD_WEBHOOK_OUTREACH`
+- #daily-briefing  → `$DISCORD_WEBHOOK_DAILY_BRIEFING`
+- #weekly-audit    → `$DISCORD_WEBHOOK_WEEKLY_AUDIT`
+- #onboarding      → `$DISCORD_WEBHOOK_ONBOARDING`
+GHL workflow Discord steps paste the raw URL into the workflow action (GHL doesn't pull from Codespaces Secrets). Secrets are the source of truth and feed local scripts (n8n, ROCCO bot, etc.).
+
+DIAL SCHEDULE
+- Best windows: Tue–Thu 8–11am and 4–6pm Pacific
+- Current capacity: 5.5 hrs/day until May 30, then 8–13 hrs/day
+- Target: 100–200 dials/day post May 30
+- Per-dial action: apply voicemail tag → Workflow 1 fires → 24hrs later apply niche gatekeeper tag → drops contact into email sequence
+
+YESTERDAY'S DIAL SESSION (2026-05-16)
+- 30 pool leads dialed → 1 live answer (Adam Apalategui, Big George's Pool Care, 702-596-5312 — brushed off with "it's the weekend")
+- 29 voicemails left
+- Pool campaign 41 enrolled / 26 active — confirm yesterday's 29 VM contacts have "pool email campaign" gatekeeper applied, otherwise they never enter the sequence
+
+WHAT'S NOT BUILT YET
+- Tag hygiene workflows (auto-remove old voicemail tags) — spec in `skills/ghl-workflow-specs.md`
+- VM tag-stacking test on dummy contact — moot once hygiene workflow ships
+- Workflow 7 Closed Won missing: "client" tag, onboarding task, #onboarding Discord webhook, auto-move to Scheduled Onboarding — spec in `skills/ghl-workflow-specs.md`
+- Evergreen Loom video for Pool (script + recording)
+- Evergreen Loom video for Pest Control (script + recording)
+- Personal Loom workflow (slot exists in 25-stage pipeline, no automation)
+- Email sequences for: Handyman, House Cleaning, Carpet Cleaning, Landscaping, Garage Door, HVAC
+- Workflows for the 6 unbuilt niche campaigns
+- Pest Control lead scraping (zero leads scraped, campaign dormant)
+- A2P 10DLC carrier approval (submitted, awaiting)
+- ROCCO daily brief wired to pull GHL pipeline counts via GHL MCP
+- Audit of older Workflow 12 ("Email Campaign") — possible duplicate of Pool campaign
+
+ROCCO BUILD TASKS (priority order)
+1. ROCCO Daily Brief Cron (6am Mon–Sat) — pull pipeline counts from all 11 pipelines via GHL MCP (`search_opportunities`, `search_contacts`, `get_pipelines`). Surface daily: counts at each stage of Pool + Pest campaigns, stale opportunities, replies awaiting follow-up.
+2. ROCCO SessionStart Routine — surface stale opportunities >48hrs in any "Sent" stage with no movement, hot leads without completed follow-up task, contacts at Voicemail x3 >7 days, recent replies needing response.
 
 TASK PRIORITY ORDER
 
