@@ -230,6 +230,72 @@ URLs stored in GitHub Codespaces Secrets, referenced by env var name:
 - #onboarding      → `$DISCORD_WEBHOOK_ONBOARDING`
 GHL workflow Discord steps paste the raw URL into the workflow action (GHL doesn't pull from Codespaces Secrets). Secrets are the source of truth and feed local scripts (n8n, ROCCO bot, etc.).
 
+GHL IMPORT WIZARD — MAPPING DRIFT LANDMINE (2026-05-20 incident)
+
+⚠ READ THIS FIRST — UI VERIFICATION GOTCHA (2026-05-20 follow-up):
+GHL contact card displays Company Name in the **General Info section, NOT in the header**. Half of this incident was a UI-zone misread: the patch import worked on the first try, but the verification step kept looking at the header and saw "blank." Before declaring any Company Name field empty, OPEN the contact in the UI and SCROLL to General Info. Header view is not authoritative. See KG entity GHL-Contact-Card-Field-Display-Locations.
+
+⏳ OPEN TEST — RUN ON BATCH 4 (next pool import):
+The "wizard drift" diagnosis from the 2026-05-20 incident is UNCONFIRMED. Both the original Pass 1 import and the patch import may have populated General Info correctly all along — the verification step kept reading the wrong UI zone. The 2-pass pattern is cheap insurance, but if Pass 1 works alone, every future 2-pass run is wasted effort. Batch 4 is the test:
+1. Run Pass 1 ONLY (full CSV import, no patch).
+2. Within 5 minutes of import completion, open 5 random Batch 4 contacts and SCROLL to General Info.
+3. Check Company Name populated on all 5.
+4. If 5/5 populated → wizard drift was a UI-zone misread. Downgrade the 2-pass rule to "optional — run only if the Pass-1 spot-check fails."
+5. If <5/5 populated → wizard drift confirmed. 2-pass pattern stays mandatory.
+6. Log the verdict in `memory/brain-dump.md` with the batch identifier and 5-contact spot-check results.
+7. If wizard drift is confirmed by the test, append an observation to KG entity `GHLImportBugFix-Batch3-CompanyName-2026-05-20` recording the confirmation.
+Until this test runs, the 2-pass pattern stays mandatory by default — do not skip Pass 2 on assumption.
+
+What happened: Batch 3 pool leads (30 contacts) imported via GHL CSV wizard. CSV was clean (UTF-8, no BOM, valid quoting, 12 fields per row, "Company Name" header). Wizard appeared to map "Company Name" correctly. On post-import verification, Company Name field appeared blank on contact card header views. All other fields (Phone, Email, Address, Tags, Notes) populated correctly.
+
+Root cause (revised 2026-05-20): Two compounding issues. (1) GHL's wizard mapping for the Company Name column may have failed to persist on Pass 1 — cannot retroactively confirm. (2) The verification step that flagged the failure was reading the contact card header instead of the General Info section, so even the successful patch import (Pass 2, 2-column update mode) initially read as "still blank." After scrolling to General Info, all 30 contacts were confirmed populated. The 2-pass pattern stays mandatory as cheap insurance regardless.
+
+Detection signal: Spot-check ANY contact after import, scrolling the FULL card. If Company Name is blank under General Info (not just the header) AND other fields are populated, you hit the wizard mapping bug.
+
+Wizard label alias: GHL's CSV import wizard may suggest "Business Name" as the mapping for the Company Name column. "Business Name" and "Company Name" appear to write to the same underlying field — accepting the wizard's "Business Name" suggestion does NOT cause data loss. Confirm via General Info post-import.
+
+THE 2-PASS IMPORT PATTERN (mandatory going forward)
+Every CSV import to GHL must run as TWO separate wizard passes:
+
+Pass 1 — Full import (all standard fields):
+- Upload the full CSV (First Name, Last Name, Company Name, Phone, Email, Address, City, State, Postal Code, Tags, Notes).
+- Map every column. Confirm Company Name maps to "Company Name" standard field.
+- Run the import.
+
+Pass 2 — Company Name patch (always, even if Pass 1 looks fine):
+- Generate a 2-column patch CSV: Phone (E.164: +1XXXXXXXXXX) + Company Name.
+- Use GHL's "Update existing contacts" import mode. Match identifier = Phone.
+- Two columns means no chance of mapping drift — there's nothing to drift TO.
+- This always-on second pass guarantees Company Name lands correctly.
+- Cost: 2 minutes per import. Insurance: 100%.
+
+PRE-IMPORT CHECKLIST (Pass 1)
+□ CSV opens cleanly in Python csv module — no field-count mismatches
+□ Headers exact: "First Name", "Last Name", "Company Name" (with space, title case)
+□ File is UTF-8, no BOM (check: `head -c 3 file.csv | hexdump -C` — should NOT show `ef bb bf`)
+□ Map every column in wizard, don't rely on auto-detect for Company Name
+□ Before clicking "Start Import": screenshot the mapping screen — keep as record in case wizard drifts
+□ Do NOT scroll or click around after setting mappings; go straight to "Start Import"
+
+POST-IMPORT VERIFICATION (run immediately, every import)
+□ Open 3 random imported contacts from the batch
+□ **SCROLL to the General Info section** of each contact card — Company Name displays there, NOT in the header. Header view is not authoritative.
+□ Check under General Info: First Name, Last Name, Company Name, Phone, Email all populated as expected
+□ Check Address, City, State, Zip under General Info too — those also live there, not in the header
+□ If Company Name is blank under General Info on ANY of the 3 → assume all are blank → run Pass 2 patch
+□ Do NOT diagnose "blank field" from the header view alone — that's the 2026-05-20 trap (see KG entity GHL-Contact-Card-Field-Display-Locations)
+□ Log result in `memory/brain-dump.md` with date + batch identifier
+
+CONTACTS WITHOUT PHONE OR EMAIL
+GHL allows creating contacts with no phone/email (name+address only). These cannot be matched in Update-mode CSV imports. They require manual UI edit — search contact in GHL, edit Company Name field directly. Flag these in source CSV during scraping so you know up front (batch 3 had 1: Cory Gorman / NO Worries Pool Care).
+
+REPAIR PROCEDURE (for already-broken imports)
+1. Identify source-of-truth CSV (the pre-conversion scrape file, NOT the broken ghl-ready version).
+2. Generate patch CSV: 2 columns (Phone E.164 + Company Name). Script pattern lives at `scripts/build-company-patch.py` (extract from batch-3 work when needed).
+3. Run Pass 2 wizard with Update mode + Phone matching.
+4. Spot-check 3 contacts post-patch.
+5. Manually fix any phone-less contacts in the UI.
+
 DIAL SCHEDULE
 - Best windows: Tue–Thu 8–11am and 4–6pm Pacific
 - Current capacity: 5.5 hrs/day until May 30, then 8–13 hrs/day

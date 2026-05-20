@@ -43,6 +43,7 @@ Sorted most-recent first. Status legend: **LIVE** = rule actively enforced | **R
 
 | ID | Date | Category | Lesson (one-line) | Cost | Status |
 |---|---|---|---|---|---|
+| L-019 | 2026-05-20 | Process | GHL contact card header doesn't show Company Name — scroll to General Info before declaring blank | ~2 hrs + diagnostic loop | LIVE |
 | L-018 | 2026-05-08 | Process | Banned tools deserve a controlled-use doc, not a flat "AVOID" list | ~3 wks premium-tier positioning loss | RESOLVED |
 | L-017 | 2026-05-08 | Tools | Skip Smithery CLI — direct npm or git clone instead | ~1.5 hrs failed installs | LIVE |
 | L-016 | 2026-05-08 | Tools | Skip "generic language killer" repo — private/dead | ~30 min | RESOLVED |
@@ -149,6 +150,13 @@ Each entry follows the same shape: **What happened** (2 sentences max) → **Why
 **Why it cost us:** Couldn't pitch 3D/animation capabilities to premium-tier prospects ($2.5k+ retainers, brand-led briefs) because our own playbook said no. Positioning loss compounds — every week without the menu is a week we don't pursue brand-led work.
 **The rule going forward:** When a tool/technique has real costs, document the controlled-use rules (when to use, when not, performance contract, fallback plan) — never ship a flat AVOID. AVOID is only for things with zero legitimate use case. Everything else gets a guardrail-based menu entry with a hard performance contract.
 **Lives also at:** `skills/website.md` STAGE 8 (the safe-use playbook for Three.js + 7 other motion tools that previously had no documented path)
+
+#### L-019 — Verify GHL field writes under General Info, not the contact card header
+**Date:** 2026-05-20 | **Category:** Process | **Cost:** ~2 hrs debugging a working patch + stop-everything diagnostic loop | **Status:** LIVE
+**What happened:** Batch 3 of 30 Vegas pool leads appeared to import with blank Company Name. Ran the 2-pass patch CSV remediation. After patch, opened Bob Jones and Saya Pools cards and Company Name still appeared blank in the header view — flagged as a second failure. Root cause: GHL displays Company Name in the General Info section, not the header. Both imports had worked all along.
+**Why it cost us:** Two hours on a remediation loop, plus a stop-everything diagnostic spiral that would have hit a hard auth blocker (GHL MCP token lacks contact-read scopes — see `memory/config/ghl-mcp-reauth-scopes.md` for the re-auth path) before resolving via API. Entirely avoidable if General Info had been checked on the first verification pass.
+**The rule going forward:** Before declaring any GHL field empty after an import/update/workflow write, open the contact in the UI, scroll past the header to the General Info section, and check there. Header view is NOT authoritative. When the user reports "field looks blank," the first response is "screenshot the General Info zone" — not propose a remediation write.
+**Lives also at:** `CLAUDE.md` GHL IMPORT WIZARD section (⚠ READ THIS FIRST callout + POST-IMPORT VERIFICATION checklist), `memory/memory.jsonl` KG entity `GHL-Contact-Card-Field-Display-Locations`, auto-memory `feedback_ghl_contact_card_zones.md`, `memory/config/ghl-mcp-reauth-scopes.md` (the parallel infrastructure gap)
 
 ---
 
@@ -261,6 +269,7 @@ When you make a mistake or reverse a decision, copy this block and fill it in. A
 - Don't generalize SonoView rules into pool/base templates — protected sub-playbook (L-011)
 - Don't silo ads platforms — one playbook, platform-branched where different (L-002)
 - Don't guess at MCP/API config — fetch official docs first (L-014)
+- Don't diagnose "blank GHL field" from the contact card header — scroll to General Info first (L-019)
 - Don't use Smithery CLI for installs — direct npm or git clone (L-017)
 - Don't waste time on banana-claude (broken) or generic-language-killer (dead) (L-015, L-016)
 - Don't skip Codespace startup checklist — Claude Code reinstalls every restart (L-013)
