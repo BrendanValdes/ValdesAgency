@@ -1,0 +1,234 @@
+# Valdes Agency — Brand Config v1
+# Active brand. v1 of the Content System runs exclusively on this config.
+# Schema reference: config/brands/_schema.yaml
+# Loader: bot/src/services/brand-config.ts
+
+schema_version: "1.0"
+brand_key: "valdes"
+display_name: "Valdes Agency"
+status: active
+default_brand: true
+
+# ============================================================
+# POSITIONING
+# ============================================================
+
+positioning:
+  one_liner: "Marketing expert running an agency for Vegas service businesses."
+  voice_anchors:
+    - path: "skills/sales.md"
+      weight: 0.25
+    - path: "skills/email-sequences.md"
+      weight: 0.15
+    - path: "memory/leads/vegas-pool-scripts-v2.md"
+      weight: 0.15
+    - path: "memory/voice/valdes-tone-samples.md"  # PENDING Brendan upload — blocks generation
+      weight: 0.45
+
+# ============================================================
+# VOICE
+# ============================================================
+
+voice:
+  banned_words:
+    - { term: "leverage" }
+    - { term: "unlock" }
+    - { term: "dive in" }
+    - { term: "deep-dive" }
+    - { term: "deep dive" }
+    - { term: "game-changer" }
+    - { term: "game changer" }
+    - { term: "level up" }
+    - { term: "hustle" }
+    - { term: "grind", pos: "verb" }
+    - { term: "journey" }
+    - { term: "mindset" }
+    - { term: "value-add" }
+    - { term: "value add" }
+    - { term: "synergy" }
+    - { term: "ecosystem" }
+    - { term: "robust" }
+    - { term: "seamless" }
+    - { term: "cutting-edge" }
+    - { term: "cutting edge" }
+    - { term: "paradigm" }
+    - { term: "ROI", context_exception: "paid ads" }
+    - { term: "pivot" }
+    - { term: "scale", pos: "verb" }
+    - { term: "10x" }
+    - { term: "north star" }
+    - { term: "double-click" }
+    - { term: "double click" }
+    - { term: "circle back" }
+    - { term: "master" }
+    - { term: "optimize" }    # use "fix" or "improve"
+    - { term: "revolutionize" }
+    - { term: "transform" }
+    - { term: "empower" }
+    - { term: "elevate" }
+    - { term: "curate" }
+    - { term: "craft", pos: "verb" }
+    - { term: "foster" }
+    - { term: "drive", pos: "verb" }   # verb meaning "cause"
+
+  banned_structures:
+    - pattern_id: "most_people_think"
+      description: 'Format: "Most people think X. But really Y."'
+      regex: "most people think .+\\.\\s+but really"
+    - pattern_id: "heres_the_thing"
+      description: "Opener: 'Here''s the thing.'"
+      regex: "\\bhere'?s the thing\\b"
+    - pattern_id: "three_things_list"
+      description: 'Format: "Three things I learned..."'
+      regex: "\\b(three|3) things (i|we) learned\\b"
+    - pattern_id: "in_todays_world"
+      description: "Opener: 'In today''s [adjective] world...'"
+      regex: "in today'?s \\w+ world"
+    - pattern_id: "stop_doing_start_doing"
+      description: 'Format: "Stop doing X. Start doing Y."'
+      regex: "stop doing .+\\.\\s+start doing"
+    - pattern_id: "its_not_its"
+      description: "Format: 'It''s not X. It''s Y.' overused contrast"
+      regex: "it'?s not [^\\.]+\\.\\s+it'?s "
+    - pattern_id: "closing_takeaway"
+      description: 'Closing summary: "The takeaway is..." / "Bottom line..."'
+      regex: "(the takeaway is|bottom line[,:])"
+
+  max_sentence_words: 20
+  # reading_level_max removed (Gate 1 Fix 2) — voice quality enforced by
+  # max_sentence_words + banned_words + banned_structures + manual review.
+  # Field is now optional in schema; SVFY/TNT can opt in later if desired.
+  # Note: opening_rhetorical_question regex removed (Gate 1 Fix 4) — regex
+  # can't reliably distinguish rhetorical from genuine question hooks.
+  # Question-opening posts get manually reviewed during approval flow.
+  required_per_post:
+    - "1+ specific concrete reference (named industry, named neighborhood, dollar amount, percentage, or specific business type)"
+  dash_policy: none
+
+# ============================================================
+# VISUAL IDENTITY
+# ============================================================
+
+visual:
+  palette:
+    primary: "#FFFFFF"
+    secondary: "#C8A653"      # muted warm gold — expert, not flashy
+    accent: "#7A1F2E"         # deep institutional maroon — authority
+    neutral_dark: "#1A1A1A"
+    neutral_soft: "#F5F2EB"
+  fonts:
+    display: "Fraunces"       # Google Fonts, free, 700-900 weight
+    body: "Inter"             # Google Fonts, free, 400/500 weight
+    accent: "Syne"            # Google Fonts, free, 600-700 weight (continuity with Desert Blue demo)
+  logo:
+    main: "memory/brand/valdes/logo.svg"               # PENDING Brendan upload
+    watermark: "memory/brand/valdes/logo-watermark.png" # PENDING Brendan upload
+    watermark_position: "bottom-right"
+    watermark_opacity: 0.6
+
+# ============================================================
+# CADENCE
+# ============================================================
+
+cadence:
+  posts_per_platform_per_day: 3
+  platforms:
+    - "linkedin"
+    - "instagram"
+    - "facebook"
+    - "x"
+    # tiktok deferred to v1.1 — Publer Business signup required first
+  exploration_ratio: 0.33     # 1 of 3 daily posts is a new-angle test
+  weekly_pattern:
+    monday: "framework"
+    tuesday: "tip_or_observation"
+    wednesday: "tip_or_observation"
+    thursday: "tip_or_observation"
+    friday: "weekly_roundup"
+    saturday: "lighter_or_grind"
+    sunday: "no_originals"
+
+# ============================================================
+# APPROVAL FLOW
+# ============================================================
+
+approval:
+  channel_env_var: "CHANNEL_CONTENT_VALDES"   # env var NAME, NEVER the literal channel ID
+  weekly_plan_time: "0 20 * * 0 America/Los_Angeles"      # Sun 8pm Vegas time
+  daily_preview_time: "0 7 * * * America/Los_Angeles"     # 7am Vegas time
+  daily_publish_pass_time: "0 9 * * * America/Los_Angeles" # 9am Vegas time
+  approval_lapse_hours: 48
+
+# ============================================================
+# ACCOUNTS (Composio connections — set during Phase 0)
+# ============================================================
+
+accounts:
+  linkedin:
+    composio_connection_id: "[set after connect]"
+    handle: "@valdesagency"
+  instagram:
+    composio_connection_id: "[set after connect]"
+    handle: "@valdesagency"
+  facebook:
+    composio_connection_id: "[set after connect]"
+    page_id: "[set after connect]"
+  x:
+    composio_connection_id: "[set after connect]"
+    handle: "@valdesagency"
+    analytics_mode: "blind"   # X API limits — accept blind for v1
+  # tiktok: deferred to v1.1
+
+# ============================================================
+# CONTENT SOURCES
+# ============================================================
+
+sources:
+  evergreen_dir: "memory/content/evergreen/valdes/"
+  lead_scrapes: "memory/leads/"
+  exa_queries:
+    - "pool service marketing 2026"
+    - "local SEO updates"
+    - "Google Ads changes service businesses"
+    - "home service business growth"
+    - "service business website conversion"
+  kg_filter:
+    - "abstracted marketing lesson"
+    - "industry observation"
+    - "voice-tested content pattern"
+  kg_blocked_patterns:
+    - "\\$0 MRR"
+    - "made \\d+ dials"
+    - "just started"
+    - "BrendanValdes-Context-.*"
+    - "Phase 1 goal: first paying"
+
+# ============================================================
+# CONTENT-TYPE GUARDRAILS
+# ============================================================
+
+grind_aesthetic:
+  max_per_week: 2
+  must_be_generic: true   # no real numbers, no real situation references
+
+face_content:
+  pct_of_visuals: 0.15
+  ai_generation: never
+  photo_dir: "memory/brand/valdes/photos/"
+  video_dir: "memory/brand/valdes/videos/"
+
+# ============================================================
+# PERFORMANCE
+# ============================================================
+
+performance:
+  collection_delay_hours: 24
+  weekly_analysis_time: "0 6 * * 0 America/Los_Angeles"   # Sun 6am Vegas time
+  metrics_per_post:
+    - "impressions"
+    - "likes"
+    - "comments"
+    - "shares"
+    - "saves"
+    - "click_through"
+    - "follow_conversions"

@@ -17,6 +17,9 @@ Hype wins loud and specific. Not "good job" — "3 booked out of 60 dials, that'
 Problems get: honest assessment + the fix immediately. Never just drop a problem.
 End every strategy answer with ONE clear next move
 
+Voice enforcement for ROCCO auto-content (Content System v1):
+Automated voice validation (banned words, banned structures, dash check, max sentence length, optional reading-level cap) lives in `bot/src/services/voice-check.ts` and runs at the END of Gate 3 (content generation) — NOT Gate 2 (content sourcing). The full banned-words and banned-structures lists are in `config/brands/valdes.yaml`, not duplicated here. Until Gate 3 ships, voice rules are honored by ROCCO's drafting-prompt prior (system message), not by post-generation validation. Question-opening posts get manual review during the approval flow (no regex catches the rhetorical vs. genuine distinction reliably).
+
 SCAFFOLD before every task:
 Break any project into a full action plan before writing a single line of code. No exceptions. Think: what are all the pieces, what order go in, what could break.
 ULTRATHINK before every answer:
@@ -222,13 +225,21 @@ TAGS IN USE
 - A/B split (in-flow):  pool list a, pool list b, pest control list a, pest control list b
 - Per-email tracking:   [niche] [email] sent / opened / replied (applied by workflow as each email fires)
 
-DISCORD WEBHOOKS
-URLs stored in GitHub Codespaces Secrets, referenced by env var name:
+DISCORD WEBHOOKS + CHANNELS
+URLs and channel IDs stored in GitHub Codespaces Secrets, referenced by env var name:
+
+Webhooks (used by GHL workflows + local scripts that POST via webhook URL):
 - #outreach        → `$DISCORD_WEBHOOK_OUTREACH`
 - #daily-briefing  → `$DISCORD_WEBHOOK_DAILY_BRIEFING`
 - #weekly-audit    → `$DISCORD_WEBHOOK_WEEKLY_AUDIT`
 - #onboarding      → `$DISCORD_WEBHOOK_ONBOARDING`
-GHL workflow Discord steps paste the raw URL into the workflow action (GHL doesn't pull from Codespaces Secrets). Secrets are the source of truth and feed local scripts (n8n, ROCCO bot, etc.).
+
+Channel IDs (used by ROCCO bot via discord.js — bot posts as itself, not via webhook):
+- #content-valdes  → `$CHANNEL_CONTENT_VALDES`   (Content System v1, Valdes brand)
+
+GHL workflow Discord steps paste the raw webhook URL into the workflow action (GHL doesn't pull from Codespaces Secrets). Secrets are the source of truth and feed local scripts (n8n, ROCCO bot, etc.). The ROCCO bot deployed on Railway requires the same env vars set in Railway env separately — Codespaces Secrets do NOT feed Railway. Sync both or the deployed bot can't see the channel.
+
+HARD RULE: Never reference literal channel IDs or webhook URLs in code, YAML configs, or markdown. Always use `$ENV_VAR_NAME`. v2 (SonoView) and v3 (TNT) will add `$CHANNEL_CONTENT_SONOVIEW` and `$CHANNEL_CONTENT_TNT`.
 
 GHL IMPORT WIZARD — MAPPING DRIFT LANDMINE (2026-05-20 incident)
 

@@ -45,11 +45,21 @@ export const env = {
     weeklyAudit: read("CHANNEL_WEEKLY_AUDIT"),
     outreach: read("CHANNEL_OUTREACH"),
     onboarding: read("CHANNEL_ONBOARDING"),
+    contentValdes: optional("CHANNEL_CONTENT_VALDES", ""),
   },
   models: {
     brief: optional("MODEL_BRIEF", "claude-sonnet-4-6"),
     audit: optional("MODEL_AUDIT", "claude-opus-4-6"),
     outreach: optional("MODEL_OUTREACH", "claude-sonnet-4-6"),
+    content: optional("MODEL_CONTENT", "claude-sonnet-4-6"),
+    contentAnalysis: optional("MODEL_CONTENT_ANALYSIS", "claude-opus-4-7"),
+  },
+  content: {
+    composioKey: optional("COMPOSIO_API_KEY", ""),
+    exaKey: optional("EXA_API_KEY", ""),
+    higgsfieldKey: optional("HIGGSFIELD_API_KEY", ""),
+    defaultBrand: optional("BRAND_DEFAULT", "valdes"),
+    configDir: optional("BRAND_CONFIG_DIR", "config/brands"),
   },
   http: {
     port: Number.parseInt(optional("PORT", "3000"), 10),
