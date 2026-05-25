@@ -28,6 +28,14 @@ voice:
     - pattern_id: "string"          # short identifier
       description: "string"         # human-readable
       regex: "string"               # JS regex (case-insensitive)
+  banned_scenarios:                 # OPTIONAL list of banned scenario patterns (Gate 3.1)
+    - scenario_id: "string"         # short identifier, e.g. "first_milestone"
+      description: "string"         # human-readable
+      regex_patterns: ["string"]    # Prong 1: hard-block JS regex patterns
+      keyword_triggers: ["string"]  # Prong 2: case-insensitive keyword auto-flag
+      structural_checks: ["string"] # Prong 3: structural rule names (manual review)
+      permanent: "boolean"          # true = no unlock path
+      rationale: "string"           # why this scenario is banned
   max_sentence_words: "integer"     # avg sentence length cap before regen trigger
   reading_level_max: "integer"      # OPTIONAL. Flesch-Kincaid grade cap. Omit to skip the check.
   required_per_post:                # soft requirements (warn if missing)
@@ -118,6 +126,10 @@ performance:
   metrics_per_post:
     - "string"
 
+feature_flags:                      # OPTIONAL top-level block (Gate 3.1)
+  scenario_3_client_proof_unlocked: "boolean"  # default false. Gate B for Scenario 3 unlock.
+  scenario_8_we_fixed_this_unlocked: "boolean" # default false. Gate B for Scenario 8 unlock.
+
 # ============================================================
 # CHANGE LOG
 # ============================================================
@@ -125,5 +137,8 @@ performance:
 #       TikTok field present but unused in v1; deferred to v1.1.
 #       Gate 1 Fixes (2026-05-21):
 #       - reading_level_max made OPTIONAL (Fix 2). Removed from valdes/sonoview/tnt.
-#       - opening_rhetorical_question banned_structure removed (Fix 4) — see valdes.yaml.
+#       - opening_rhetorical_question banned_structure removed (Fix 4). See valdes.yaml.
 #       - accounts schema tightened from z.record(unknown) to per-platform typed (Arch Gap 2).
+#       Gate 3.1 (2026-05-22):
+#       - voice.banned_scenarios array added (Scenario 12 first-milestone ban ported in).
+#       - feature_flags top-level block added (scenario_3 + scenario_8 unlock flags, both default false).

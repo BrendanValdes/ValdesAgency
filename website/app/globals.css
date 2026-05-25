@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/* ===================================================================
+ * Valdes Agency — Option C palette (locked 2026-05-24)
+ * Red dominant + orange power moments + pure white + near-black
+ * =================================================================== */
+
+:root {
+  --ink: #0A0A0A;
+  --paper: #FFFFFF;
+  --signal: #B91C1C;
+  --signal-deep: #7A0E0E;
+  --power: #E85D04;
+  --ink-soft: #1A1A1A;
+  --paper-dim: #9B9B9B;
+  --paper-soft: #F5F5F5;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-signal: var(--signal);
+  --color-signal-deep: var(--signal-deep);
+  --color-power: var(--power);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper-dim: var(--paper-dim);
+  --color-paper-soft: var(--paper-soft);
+
+  --font-display: var(--font-display-fallback), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: var(--font-body-fallback), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: var(--font-mono-fallback), ui-monospace, monospace;
+}
+
+/* Reset + base */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  height: 100%;
+  background: var(--ink);
+  overflow-x: clip;
+  overflow-y: scroll;
+}
+body {
+  min-height: 100%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection { background: var(--signal); color: var(--paper); }
+
+/* ===================================================================
+ * Apple-glass utilities (used ONLY by 5 element types per spec)
+ * 1. CTAs site-wide
+ * 2. 9 business cards (Section 2)
+ * 3. MacBook frame (Section 3)
+ * 4. Command Center dashboard mockup (Section 8)
+ * 5. Neural network nodes (Section 10)
+ * =================================================================== */
+
+@supports (backdrop-filter: blur(20px)) {
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 32px rgba(0, 0, 0, 0.24);
+  }
+  .glass-light {
+    background: rgba(10, 10, 10, 0.04);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(10, 10, 10, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 8px 32px rgba(0, 0, 0, 0.08);
+  }
+  .glass-hover:hover {
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    border-color: var(--signal);
+  }
+}
+
+@supports not (backdrop-filter: blur(20px)) {
+  .glass { background: rgba(20, 20, 20, 0.80); border: 1px solid rgba(255, 255, 255, 0.10); }
+  .glass-light { background: rgba(245, 245, 245, 0.92); border: 1px solid rgba(10, 10, 10, 0.08); }
+  .glass-hover:hover { border-color: var(--signal); }
+}
+
+/* ===================================================================
+ * Power-moment glow (orange dot used at Section 7 active node + S8 glow)
+ * =================================================================== */
+
+.power-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--power);
+  box-shadow: 0 0 14px var(--power), 0 0 28px rgba(232, 93, 4, 0.4);
+}
+
+/* ===================================================================
+ * Type utilities
+ * =================================================================== */
+
+.font-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; }
+.font-mono-accent { font-family: var(--font-mono); letter-spacing: 0.02em; }
+
+/* ===================================================================
+ * Section reveal — formerly had opacity:0 + translateX initial state
+ * that made snap targets invisible at layout position. Removed for
+ * Path A snap fix. Sections render at full opacity at their layout
+ * positions; native CSS scroll-snap handles the entry feel.
+ * =================================================================== */
+
+/* ===================================================================
+ * Page-flip snap scroll — CSS-native, all devices.
+ * Browser owns the snap math. `scroll-snap-stop: always` prevents
+ * fast-scroll from skipping past sections. `scroll-behavior: smooth`
+ * provides browser-native ease between snap points.
+ *
+ * Reduced-motion users opt out entirely.
+ * =================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+  [data-snap-section] {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-snap-type: none; scroll-behavior: auto; }
+}

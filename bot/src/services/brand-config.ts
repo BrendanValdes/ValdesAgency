@@ -19,10 +19,27 @@ const BannedStructureSchema = z.object({
   regex: z.string(),
 });
 
+const BannedScenarioSchema = z.object({
+  scenario_id: z.string().min(1),
+  description: z.string(),
+  regex_patterns: z.array(z.string()),
+  keyword_triggers: z.array(z.string()),
+  structural_checks: z.array(z.string()),
+  permanent: z.boolean(),
+  rationale: z.string(),
+});
+
 const VoiceAnchorSchema = z.object({
   path: z.string(),
   weight: z.number().min(0).max(1),
 });
+
+const FeatureFlagsSchema = z
+  .object({
+    scenario_3_client_proof_unlocked: z.boolean().optional().default(false),
+    scenario_8_we_fixed_this_unlocked: z.boolean().optional().default(false),
+  })
+  .optional();
 
 const LinkedinAccountSchema = z.object({
   composio_connection_id: z.string().min(1),
@@ -74,6 +91,7 @@ const BrandConfigSchema = z.object({
   voice: z.object({
     banned_words: z.array(BannedWordSchema),
     banned_structures: z.array(BannedStructureSchema),
+    banned_scenarios: z.array(BannedScenarioSchema).optional().default([]),
     max_sentence_words: z.number().int().positive(),
     reading_level_max: z.number().int().positive().optional(),
     required_per_post: z.array(z.string()),
@@ -158,6 +176,8 @@ const BrandConfigSchema = z.object({
     weekly_analysis_time: z.string(),
     metrics_per_post: z.array(z.string()),
   }),
+
+  feature_flags: FeatureFlagsSchema,
 });
 
 export type BrandConfig = z.infer<typeof BrandConfigSchema>;

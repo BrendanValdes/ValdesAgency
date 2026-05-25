@@ -18,8 +18,9 @@ positioning:
 voice:
   banned_words: []
   banned_structures: []
+  banned_scenarios: []
   max_sentence_words: 20
-  # reading_level_max is OPTIONAL — opt in by uncommenting and setting a grade cap.
+  # reading_level_max is OPTIONAL. Opt in by uncommenting and setting a grade cap.
   # reading_level_max: 6
   required_per_post: []
   dash_policy: none
@@ -83,3 +84,5 @@ performance:
   collection_delay_hours: 24
   weekly_analysis_time: ""
   metrics_per_post: []
+
+feature_flags: {}

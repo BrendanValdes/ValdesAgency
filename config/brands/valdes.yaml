@@ -94,11 +94,41 @@ voice:
       description: 'Closing summary: "The takeaway is..." / "Bottom line..."'
       regex: "(the takeaway is|bottom line[,:])"
 
+  banned_scenarios:
+    # Added Gate 3.1 (2026-05-22). Scenario 12 (first close milestone) permanent ban.
+    # Source of truth for the spec: memory/voice/valdes-tone-samples.md Scenario 12.
+    - scenario_id: "first_milestone"
+      description: "Auto-generated first-client/first-close milestone framing per Scenario 12 ban"
+      regex_patterns:
+        - "\\b(my )?first (client|customer|deal|close|sale|signed?)\\b"
+        - "\\bsigned (my|our) first\\b"
+        - "\\b(today is the day|this is the moment|big news)\\b"
+        - "\\bI('m| am) (officially|finally|legally) (an?|the) (agency owner|entrepreneur|founder)\\b"
+        - "\\b\\d+ (months?|weeks?|days?) in[,.]\\s+(zero|0|no) clients?\\b"
+        - "\\bstarted (the|my) agency\\b.{0,80}\\b(zero|nothing|0|no clients?)\\b"
+        - "\\b(milestone|breakthrough|first ever) (day|moment|deal|sale)\\b"
+      keyword_triggers:
+        - "first client"
+        - "first close"
+        - "first deal"
+        - "first sale"
+        - "first signed"
+        - "agency milestone"
+        - "breakthrough day"
+        - "ground-breaking day"
+        - "from zero to"
+        - "made it official"
+      structural_checks:
+        - "past_recap_present_win"
+        - "before_state_after_state_self_referential"
+      permanent: true
+      rationale: "Expert from the jump per user direction. Client wins go via Scenario 3 work-specifics framing once unlocked."
+
   max_sentence_words: 20
-  # reading_level_max removed (Gate 1 Fix 2) — voice quality enforced by
+  # reading_level_max removed (Gate 1 Fix 2). Voice quality enforced by
   # max_sentence_words + banned_words + banned_structures + manual review.
-  # Field is now optional in schema; SVFY/TNT can opt in later if desired.
-  # Note: opening_rhetorical_question regex removed (Gate 1 Fix 4) — regex
+  # Field is optional in schema; SVFY/TNT can opt in later if desired.
+  # Note: opening_rhetorical_question regex removed (Gate 1 Fix 4). Regex
   # can't reliably distinguish rhetorical from genuine question hooks.
   # Question-opening posts get manually reviewed during approval flow.
   required_per_post:
@@ -232,3 +262,21 @@ performance:
     - "saves"
     - "click_through"
     - "follow_conversions"
+
+# ============================================================
+# FEATURE FLAGS
+# ============================================================
+# Added Gate 3.1 (2026-05-22). Both default false. Flip to true when both unlock
+# criteria are met (see memory/voice/valdes-tone-samples.md Manual Review Notes).
+
+feature_flags:
+  # Scenario 3 (named-client social proof) unlock:
+  # Gate A: at least 1 ClientOutcome KG entity with all 8 required fields populated
+  #         AND verifiable: true AND shareable: true.
+  # Gate B: this flag = true.
+  scenario_3_client_proof_unlocked: false
+
+  # Scenario 8 "we fixed this" framing unlock:
+  # Same two-gate logic as Scenario 3.
+  # Alternate pattern (annotated public-site teardown) is active in v1 without unlock.
+  scenario_8_we_fixed_this_unlocked: false
