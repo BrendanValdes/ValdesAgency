@@ -1,153 +1,145 @@
 /**
- * Single source of truth for site copy. Sections 1 + footer are LOCKED
- * (carried over from holding page + minor additions). Sections 2-10 lock
- * after Gate A approval — initially populated with the ROCCO-picked drafts
- * from memory/website/copy-draft-v1.md.
+ * Single source of truth for site copy — "Growth Engine" build.
  *
- * Any change here must pass valdes.yaml banned_words + banned_structures.
- * The underlying CRM platform is never named in user-visible copy.
+ * Layout reference: create.video (alternating light/dark, bold type, clean
+ * feature cards). Every section is label / headline / body / tag pills / visual.
+ *
+ * Copy rules (enforced by hand here): no em-dashes anywhere; no banned
+ * buzzwords (leverage, unlock, game-changer, seamless, revolutionary). The
+ * underlying CRM platform is never named in user-visible copy.
  */
 
 export interface SectionCopy {
+  /** Small-caps eyebrow above the headline. */
+  label: string;
   headline: string;
   subhead?: string;
   body?: string;
-  bullets?: string[];
+  /** Pill chips under the body (replaces the old bullet list). */
+  tags?: string[];
   ctaLabel?: string;
 }
 
-export const CTA_LABEL = "Book a Free Strategy Call";
+/** Placeholders — swap real URLs when they exist. */
+export const VIDEO_EMBED_URL = ""; // e.g. "https://player.vimeo.com/video/XX…"
+export const CALENDLY_URL = "#"; // e.g. "https://calendly.com/valdesagency/20min"
 
-export const HERO = {
-  badge: "Las Vegas",
-  badgeRight: "MMXXVI",
-  wordmarkTop: "Valdes",
-  wordmarkBottom: "Agency",
-  positioning: "Marketing systems for service businesses.",
+export const CONTACT = {
   email: "hello@valdesagency.com",
   phone: "702.523.8826",
   phoneHref: "+17025238826",
-  appointmentText: "Strategy calls by appointment",
 } as const;
 
-export const SECTION_2_WHO: SectionCopy = {
-  headline: "Built for local service businesses.",
-  subhead: "We work with service operators who care how their business shows up online.",
-  body: "All local service businesses.",
-  ctaLabel: CTA_LABEL,
+/* ------------------------------------------------------------------ */
+/* Section 1 — Hero                                                    */
+/* ------------------------------------------------------------------ */
+
+export const HERO = {
+  pill: "For Home Service Businesses",
+  headline: "The Valdes Growth Engine",
+  subhead: "We build the system. You run the business.",
+  formCta: "See If You Qualify",
+  videoLabel: "Watch the 90-second walkthrough",
+  successHeadline: "You're in.",
+  successBody: "Brendan will reach out within 24 hours to see if it's a fit.",
+} as const;
+
+export const BUSINESS_TYPE_OPTIONS = [
+  "Pool",
+  "HVAC",
+  "Pest Control",
+  "Landscaping",
+  "Garage Door",
+  "Other",
+] as const;
+
+export const BUDGET_OPTIONS = [
+  "Under $500",
+  "$500-$1000",
+  "$1000-$2500",
+  "$2500+",
+] as const;
+
+/* ------------------------------------------------------------------ */
+/* Sections 2-8 — service blocks (label / headline / body / tags)      */
+/* ------------------------------------------------------------------ */
+
+export const SECTION_GET_FOUND: SectionCopy = {
+  label: "Get Found",
+  headline: "Show up when they search.",
+  body: "We build you a fast, professional website and optimize it so the right customers find you first.",
+  tags: ["Website Design", "Local SEO", "Google Business Profile"],
 };
 
-export const SECTION_3_WEBSITES: SectionCopy = {
-  headline: "Sites that book the call.",
-  subhead: "Not brochures. Conversion machines.",
-  body:
-    "Built fast, built mobile-first, built to push a visitor toward the phone or the booking widget on every scroll. Real conversion architecture, not a designer's portfolio piece. Loads under 2 seconds on a cracked Android.",
-  bullets: [
-    "Mobile-first, fast loading",
-    "Conversion-focused design from the first wireframe",
-    "Built around how your buyers actually behave",
-    "Connected to your Valdes Agency platform",
+export const SECTION_BE_EVERYWHERE: SectionCopy = {
+  label: "Be Everywhere",
+  headline: "Reach the right customers before your competitors do.",
+  body: "Targeted Google and Meta ads that put your business in front of homeowners actively looking for your service.",
+  tags: ["Google Ads", "Meta Ads"],
+};
+
+export const SECTION_NEVER_MISS: SectionCopy = {
+  label: "Never Miss a Lead",
+  headline: "Every lead answered in minutes. None slip through.",
+  body: "Ava, your AI receptionist, answers calls, texts back missed calls, qualifies leads, and books appointments 24/7.",
+  tags: ["AI Receptionist", "Missed Call Text Back", "24/7 Coverage"],
+};
+
+export const SECTION_LEAD_CAPTURE: SectionCopy = {
+  label: "Agentic System",
+  headline: "Every lead followed up. Every deal tracked.",
+  body: "Your CRM captures every inquiry, triggers follow-up sequences automatically, and keeps your pipeline moving without you lifting a finger.",
+  tags: ["CRM Pipeline", "Auto Follow-Up", "Lead Scoring"],
+};
+
+export const SECTION_CONTENT: SectionCopy = {
+  label: "Agentic System",
+  headline: "Stay visible without touching it.",
+  body: "The system turns your job photos into social posts, writes the captions, and publishes across your platforms automatically.",
+  tags: ["Auto-Posting", "Caption Writing", "Before and After Content"],
+};
+
+export const SECTION_COMMAND_CENTER: SectionCopy = {
+  label: "Command Center",
+  headline: "Every conversation. Every lead. One place.",
+  body: "All your calls, texts, emails, and bookings live in one dashboard. Nothing gets missed. Nothing falls through the cracks.",
+  tags: ["Unified Inbox", "Appointment Booking", "Full Visibility"],
+};
+
+export const SECTION_REPORTS: SectionCopy = {
+  label: "Visibility Layer",
+  headline: "You always know what is working.",
+  body: "Monthly reports show exactly where your leads come from and what they cost. Strategy calls turn the numbers into the next move.",
+  tags: ["Monthly Reports", "Strategy Calls", "ROI Tracking"],
+};
+
+/* ------------------------------------------------------------------ */
+/* Section 9 — Timeline                                                */
+/* ------------------------------------------------------------------ */
+
+export const TIMELINE = {
+  label: "What to Expect",
+  headline: "From zero to running in 30 days.",
+  phases: [
+    { when: "Week 1-2", title: "Build and Setup" },
+    { when: "Week 3", title: "Go Live" },
+    { when: "Week 4", title: "First Leads" },
+    { when: "Month 2+", title: "Optimize and Scale" },
   ],
-  ctaLabel: CTA_LABEL,
-};
+} as const;
 
-export const SECTION_4_SOCIAL: SectionCopy = {
-  headline: "Posts that build the brand while you work.",
-  subhead: "Content, calendar, comments. Handled.",
-  body:
-    "Three posts a day across the platforms your customers actually use. Written in your voice, planned a month out, published on the right time of day. You see the posts before they go live. We handle everything else.",
-  bullets: [
-    "Content, posting, engagement handled by your team",
-    "Consistent presence without you posting daily",
-    "Real engagement, not vanity metrics",
-    "Tied directly to lead generation",
-  ],
-  ctaLabel: CTA_LABEL,
-};
+/* ------------------------------------------------------------------ */
+/* Section 10 — Bottom CTA                                             */
+/* ------------------------------------------------------------------ */
 
-export const SECTION_5_FUNNEL: SectionCopy = {
-  headline: "Pages that turn ad clicks into booked jobs.",
-  subhead: "Landing pages, lead capture, nurture sequences.",
-  body:
-    "A clicked ad is a question. A funnel is the answer. We design pages that match the ad copy exactly so the visitor never wonders if they're in the right place. Then we follow up automatically until they book or unsubscribe.",
-  bullets: [
-    "Landing pages built for conversion",
-    "Lead capture that actually captures",
-    "Automated nurture sequences run on your platform",
-    "Track every step from click to close",
-  ],
-  ctaLabel: CTA_LABEL,
-};
-
-export const SECTION_6_CRM: SectionCopy = {
-  headline: "Automations that chase the leads you forget about.",
-  subhead: "Powered by your Valdes Agency platform.",
-  body:
-    "Every lead that hits your business gets a phone call attempt, a text, and an email within 5 minutes. Then a 7-day nurture sequence. Then a 30-day re-engagement. You set the rules once. The platform runs it forever.",
-  bullets: [
-    "Custom pipelines built around your business",
-    "Automated follow-up on every lead within 5 minutes",
-    "Workflows that handle the busywork",
-    "All running on your Valdes Agency platform",
-  ],
-  ctaLabel: CTA_LABEL,
-};
-
-export const SECTION_7_AI_TEAM: SectionCopy = {
-  headline: "AI that works your business while you sleep.",
-  subhead: "A team of AI agents trained on your business.",
-  body:
-    "They answer leads, qualify them, book the first call, send the reminders, and tell you what happened in the morning. The work humans used to do, done at machine speed, never asking for a raise.",
-  bullets: [
-    "Pulls leads in 24/7 without you watching",
-    "Follows up on every lead automatically",
-    "Books calls into your calendar without human intervention",
-    "Sends weekly reports and drafts content while you sleep",
-    "You wake up to results, not tasks",
-    "Your AI team feeds your Command Center",
-  ],
-  ctaLabel: CTA_LABEL,
-};
-
-export const SECTION_8_COMMAND_CENTER: SectionCopy = {
-  headline: "Your whole business. In your pocket.",
-  subhead: "One platform. One dashboard. One mobile app.",
-  body:
-    "Lead inbox. Calendar. Automations. Reports. AI assistant. All in one place, on your desktop and on your phone. Built on the Valdes Agency platform. Manage the business from a job site, from a truck, from anywhere. The end of switching between five apps to run one company.",
-  bullets: [
-    "Every lead, conversation, automation in one dashboard",
-    "Mobile app connected to your command center",
-    "Manage your entire business from your phone",
-    "Your team, your data, your control",
-  ],
-  ctaLabel: CTA_LABEL,
-};
-
-export const SECTION_9_REPORTS: SectionCopy = {
-  headline: "Senior strategy. On the calendar.",
-  subhead: "Plus a weekly report you'll actually read.",
-  body:
-    "Every Monday, a one-page report lands in your inbox. Numbers, what moved, what we're doing about it. Twice a month, a 30-minute strategy call. Direct line to the work. No account manager filtering the truth.",
-  bullets: [
-    "Weekly performance reports delivered to your platform",
-    "2 strategy calls per month with senior input",
-    "No black-box agency relationships",
-    "You always know what's happening",
-  ],
-  ctaLabel: CTA_LABEL,
-};
-
-export const SECTION_10_SYNERGY: SectionCopy = {
-  headline: "Every system feeds the others.",
-  subhead: "The whole thing. Connected.",
-  body:
-    "Your website pulls leads. Your AI team follows up. Your dashboard tells you what's working. Your strategy calls keep it sharp.",
-  ctaLabel: CTA_LABEL,
-};
+export const BOTTOM_CTA = {
+  headline: "Ready to stop guessing and start growing?",
+  subhead: "Book a free 20-minute call. No pitch. Just a plan.",
+  buttonLabel: "Book Your Call",
+} as const;
 
 export const FOOTER = {
   wordmark: "VALDES",
-  tagline: "Marketing systems for service businesses. Las Vegas.",
+  tagline: "Marketing systems for home service businesses. Las Vegas.",
   copyright: "© 2026 Valdes Agency",
-  year: "MMXXVI",
 } as const;

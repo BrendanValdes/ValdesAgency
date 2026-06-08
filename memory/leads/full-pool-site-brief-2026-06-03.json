@@ -1,0 +1,245 @@
+{
+  "_meta": {
+    "source_site": "https://fullpoolservices.com/",
+    "crawled": "2026-06-03",
+    "crawler": "firecrawl (map + scrape + branding)",
+    "purpose": "Structured brief of the existing Full Pool Services site for rebuilding it; facts pulled exactly from the live site.",
+    "caveats": [
+      "The /testimonials and /gallery pages are unfinished Lorem-ipsum placeholders with stock photos and fake out-of-state names (Maria Walton/Grand Rapids, Jose Hines/Washington, Karen Murphy/Miami) — NOT real reviews. The only real testimonials are the three in the Home page 'Google Reviews' section, captured below.",
+      "Price discrepancies exist between the homepage hero banner and the service cards: Acid Wash hero says $595, service card says $599; Tile Cleaning hero says $550, service card says $499; Monthly hero says $140, Weekly card says $150. Both values recorded per service.",
+      "Site markets '20+ years of Experience' but states 'since 2011' (company is ~14 yrs old); Yelp 'about' separately states ~8 yrs in business with technicians of 14+ yrs experience. The '20+ years' refers to combined/technician experience, not company age.",
+      "No email address is published anywhere on the site; contact is phone + web form only."
+    ]
+  },
+  "business": {
+    "name": "Full Pool Services",
+    "tagline": "Professional Pool Services in Las Vegas, Henderson & Summerlin",
+    "secondary_tagline": "We keep your pool looking good, so you can just relax & enjoy it",
+    "founding_year": 2011,
+    "years_experience": "20+ years (marketed; refers to combined/technician experience — company founded 2011)",
+    "ownership": "Family-owned and operated",
+    "service_area_cities": [
+      "Las Vegas", "Summerlin", "Henderson", "The Lakes", "Desert Shores", "Lake Las Vegas",
+      "Spring Valley", "Paradise", "Centennial Hills", "Skye Canyon", "Peccole Ranch",
+      "Queens Ridge", "Southern Highlands", "Spanish Trails", "Horizon Ridge", "Belvedere",
+      "Canyon Terrace", "Aventura", "Blue Diamond", "Sunrise Manor", "Sloan", "Lone Mountain",
+      "Aliante", "Green Valley", "Silverado Ranch", "Anthem", "Seven Hills", "McDonald Ranch",
+      "Mission Hills", "Inspirada", "Sun City Summerlin", "Enterprise", "Mountains Edge"
+    ],
+    "phone": "(702) 445-1590",
+    "email": null,
+    "hours": "Monday–Friday 6:00am–6:00pm (phone/office hours stated on Contact page)",
+    "google_maps_cid": "4236996536853297571",
+    "social_links": {
+      "facebook": "https://www.facebook.com/Poolserviceinlasvegas",
+      "x_twitter": "https://x.com/FullPoolService",
+      "instagram": "https://www.instagram.com/fullpoolservices/"
+    }
+  },
+  "services": [
+    {
+      "name": "Residential Pool Cleaning",
+      "page_url": "https://fullpoolservices.com/residential-pool-cleaning/",
+      "short_description": "Parent category for recurring and one-time residential pool cleaning; choose the option that fits, with easy online signup.",
+      "starting_price": null
+    },
+    {
+      "name": "Weekly Cleaning",
+      "page_url": "https://fullpoolservices.com/weekly-cleaning/",
+      "short_description": "Prompt, reliable weekly pool cleaning across most of the Las Vegas Valley; routine skimming, vacuuming, chemical balancing and equipment checks. Sign up online or call.",
+      "starting_price": "$150/month (service card; homepage hero banner lists 'Monthly Service Starting at $140')"
+    },
+    {
+      "name": "One Time Cleaning",
+      "page_url": "https://fullpoolservices.com/one-time-cleaning/",
+      "short_description": "One-time expert cleaning to get a neglected pool back on track.",
+      "starting_price": "$120/service"
+    },
+    {
+      "name": "Algae Treatment",
+      "page_url": "https://fullpoolservices.com/algae-treatment/",
+      "short_description": "Proven, advanced process to eliminate algae and restore clear water.",
+      "starting_price": "$180/treatment"
+    },
+    {
+      "name": "Acid Wash",
+      "page_url": "https://fullpoolservices.com/acid-wash/",
+      "short_description": "Drain-and-acid-wash recommended every 2–3 years to keep water chemistry properly balanced.",
+      "starting_price": "$599/treatment (service card; homepage hero banner lists 'Acid Wash Starting at $595')"
+    },
+    {
+      "name": "Pool Services",
+      "page_url": "https://fullpoolservices.com/pool-services/",
+      "short_description": "Parent category for repairs and maintenance — draining, filters, tile cleaning and repair; quick fixes or ongoing maintenance.",
+      "starting_price": null
+    },
+    {
+      "name": "Pool Draining",
+      "page_url": "https://fullpoolservices.com/pool-draining/",
+      "short_description": "Pool draining (paired with acid wash every 2–3 years) to reset water chemistry.",
+      "starting_price": "$195/service"
+    },
+    {
+      "name": "Filter Cleaning",
+      "page_url": "https://fullpoolservices.com/filter-cleaning/",
+      "short_description": "Regular filter cleaning to keep water balanced and equipment running efficiently.",
+      "starting_price": "$120/service"
+    },
+    {
+      "name": "Pool Tile Cleaning",
+      "page_url": "https://fullpoolservices.com/pool-tile-cleaning/",
+      "short_description": "Detailed tile cleaning to remove built-up grime and calcium deposits.",
+      "starting_price": "$499/treatment (service card; homepage hero banner lists 'Tile Cleaning Starting at $550')"
+    },
+    {
+      "name": "Pool Tile Repair",
+      "page_url": "https://fullpoolservices.com/pool-tile-repair-2/",
+      "short_description": "Re-install original tiles where they are missing or broken, restoring the pool's finish.",
+      "starting_price": "Inquire for pricing"
+    }
+  ],
+  "trust": {
+    "certifications": [
+      "Certified Pool Operators (CPO) — technicians certified through the leading verifiable pool & spa training credential",
+      "NSPF (National Swimming Pool Foundation) certified",
+      "Southern Nevada Health District (SNHD) — company certified"
+    ],
+    "accreditations": [
+      "BBB Accredited"
+    ],
+    "badges": [
+      "NSPF (https://fullpoolservices.com/wp-content/uploads/2025/08/NSPF.png)",
+      "SNHD (https://fullpoolservices.com/wp-content/uploads/2025/08/SNHD.jpg)",
+      "BBB (https://fullpoolservices.com/wp-content/uploads/2025/08/BBB.png)",
+      "Google Reviews (https://fullpoolservices.com/wp-content/uploads/2025/08/Full-Pool-Google-Logo-JPEG.jpeg)"
+    ],
+    "badge_placement_note": "Trust badges appear low on the homepage (review/footer band), not above the fold.",
+    "guarantees": []
+  },
+  "reviews": [
+    {
+      "reviewer_name": "Maureen McKinley",
+      "location": "Las Vegas, NV",
+      "full_text": "Efficient professional and reliable. My current pool maitenance man is John Jr. He has always paid special attention to keeping my dog safe and from not escaping. One of my and my dogs favorite people always a smile. That goes for the whole crew!!!!.",
+      "rating": null,
+      "source": "Homepage 'Google Reviews' section (star rating not displayed)"
+    },
+    {
+      "reviewer_name": "Victoria Reyes",
+      "location": "Las Vegas, NV",
+      "full_text": "Full Pool service is an amazing choice for maintaining your swimming pool clean and clear of algae, John Jr. is a young and charismatic Pool technician that clearly explains your pool equipment as well as maintains your pool running a peak performance. This company is always on stand by 24/7 for all questions and making payment/billing very easy through online invoices. Really glad I chose this company.",
+      "rating": null,
+      "source": "Homepage 'Google Reviews' section (star rating not displayed)"
+    },
+    {
+      "reviewer_name": "Timothy Woodward",
+      "location": "Las Vegas, NV",
+      "full_text": "Juan has been servicing our pool since last July and I can't be happier with the results. We had multiple other cleaners previously, and I was generally satisfied, but I just didn't know what I was missing. Full Pool Services is better than any of them! Our pool is always sparkling now! Communication has been great, price is competitive, and I would recommend Full Pool Services to anyone in need of service.",
+      "rating": null,
+      "source": "Homepage 'Google Reviews' section (star rating not displayed)"
+    }
+  ],
+  "brand_assets": {
+    "logo_url": "https://fullpoolservices.com/wp-content/uploads/2025/08/Full-Pool-Site-Logo.png",
+    "favicon_url": "https://fullpoolservices.com/wp-content/uploads/2025/08/cropped-Full-Pool-Site-Logo-32x32.png",
+    "og_image_url": "https://fullpoolservices.com/wp-content/uploads/2025/08/clean-pool-las-vegas.jpg",
+    "colors": {
+      "primary": "#F7E01E",
+      "secondary": "#21759B",
+      "accent": "#F7E01E",
+      "background": "#F4F4F4",
+      "text_primary": "#111111",
+      "link": "#FFD700",
+      "button_primary_bg": "#F7E01E",
+      "button_primary_text": "#111111"
+    },
+    "fonts": [
+      "Montserrat (headings; h1 50px, h2 32px)",
+      "Cabin (body/paragraph; 19px)"
+    ],
+    "platform": "WordPress (Google Site Kit detected); square buttons (0px radius), 3px base border-radius, light color scheme",
+    "images": [
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/Full-Pool-Site-Logo.png", "shows": "Company logo" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/clean-pool-las-vegas.jpg", "shows": "Hero / OG image — clean blue pool" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/clean-pool-las-vegas-1024x860.jpg", "shows": "Homepage section image — clean pool" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/weekly-pool-cleaning-henderson.jpg", "shows": "Weekly Cleaning service card" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/one-time-pool-cleaning-summerlin.jpg", "shows": "One Time Cleaning service card" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/pool-algae-las-vegas.jpeg", "shows": "Algae Treatment service card" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/acid-wash-las-vegas.jpg", "shows": "Acid Wash service card" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/draining-your-pool.jpg", "shows": "Pool Draining service card" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/pool-filter-cleaning-las-vegas.jpg", "shows": "Filter Cleaning service card" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/pool-tile-cleaning-henderson.jpg", "shows": "Tile Cleaning service card" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/pool-tile-repair-las-vegas.jpg", "shows": "Tile Repair service card" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/pool-vacumming-summerlin.jpg", "shows": "About page — 20+ years experience" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/09/full-pool-services-las-vegas-family-business.jpeg", "shows": "About page — family owned & operated" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/pool-maintenance-long-term.jpg", "shows": "About page — expert technicians" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/hot-tub-cleaning.jpg", "shows": "About page — fast/honest/reliable" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/Full-Pool-Google-Logo-JPEG.jpeg", "shows": "Google reviews badge" },
+      { "url": "https://fullpoolservices.com/wp-content/uploads/2025/08/NSPF.png", "shows": "NSPF certification badge" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/SNHD.jpg", "shows": "Southern Nevada Health District badge" },
+      { "url": "http://fullpoolservices.com/wp-content/uploads/2025/08/BBB.png", "shows": "BBB accreditation badge" }
+    ]
+  },
+  "copy_voice": "Warm, reassuring and homeowner-focused — the recurring promise is 'relax & enjoy your pool while we handle it.' Leans on family-owned trust, plus fast/honest/reliable service, affordable transparent pricing, and easy online signup/payment. Plain, approachable, low-hype language aimed at residential pool owners across the Las Vegas Valley.",
+  "ctas": [
+    { "text": "Contact us", "points_to": "https://fullpoolservices.com/contact/" },
+    { "text": "Call: (702) 445-1590", "points_to": "tel:+17024451590" },
+    { "text": "Learn More (per service)", "points_to": "individual service pages (weekly-cleaning, one-time-cleaning, etc.)" },
+    { "text": "Learn More (about)", "points_to": "https://fullpoolservices.com/about/" },
+    { "text": "Send A Message (contact form)", "points_to": "https://fullpoolservices.com/contact/ (Name + Email web form)" },
+    { "text": "One Time Cleaning Estimate Form", "points_to": "https://fullpoolservices.com/one-time-pool-cleaning-estimate-form/" },
+    { "text": "Write us a Google Review", "points_to": "Google Business reviews link (Place CID 4236996536853297571)" },
+    { "text": "ask a question", "points_to": "https://fullpoolservices.com/contact/" }
+  ],
+  "sitemap": {
+    "primary_nav": [
+      { "label": "Home", "url": "https://fullpoolservices.com/" },
+      { "label": "About", "url": "https://fullpoolservices.com/about/" },
+      {
+        "label": "Residential Pool Cleaning",
+        "url": "https://fullpoolservices.com/residential-pool-cleaning/",
+        "children": [
+          { "label": "Weekly Cleaning", "url": "https://fullpoolservices.com/weekly-cleaning/" },
+          { "label": "One Time Cleaning", "url": "https://fullpoolservices.com/one-time-cleaning/" },
+          { "label": "Algae Treatment", "url": "https://fullpoolservices.com/algae-treatment/" },
+          { "label": "Acid Wash", "url": "https://fullpoolservices.com/acid-wash/" }
+        ]
+      },
+      {
+        "label": "Pool Services",
+        "url": "https://fullpoolservices.com/pool-services/",
+        "children": [
+          { "label": "Pool Drain", "url": "https://fullpoolservices.com/pool-draining/" },
+          { "label": "Pool Filter Cleaning", "url": "https://fullpoolservices.com/filter-cleaning/" },
+          { "label": "Pool Tile Cleaning", "url": "https://fullpoolservices.com/pool-tile-cleaning/" },
+          { "label": "Pool Tile Repair", "url": "https://fullpoolservices.com/pool-tile-repair-2/" }
+        ]
+      },
+      { "label": "Advice", "url": "https://fullpoolservices.com/advice/" },
+      { "label": "Contact", "url": "https://fullpoolservices.com/contact/" }
+    ],
+    "footer_links": [
+      { "label": "Home", "url": "https://fullpoolservices.com/" },
+      { "label": "About", "url": "https://fullpoolservices.com/about/" },
+      { "label": "Residential Pool Cleaning", "url": "https://fullpoolservices.com/residential-pool-cleaning/" },
+      { "label": "Pool Services", "url": "https://fullpoolservices.com/pool-services/" },
+      { "label": "Advice", "url": "https://fullpoolservices.com/advice/" },
+      { "label": "Contact", "url": "https://fullpoolservices.com/contact/" },
+      { "label": "Privacy Policy", "url": "https://fullpoolservices.com/1486-2/" },
+      { "label": "Terms & Conditions", "url": "https://fullpoolservices.com/terms-conditions/" }
+    ],
+    "other_pages": [
+      { "label": "Gallery (PLACEHOLDER — Lorem ipsum/stock)", "url": "https://fullpoolservices.com/gallery/" },
+      { "label": "Testimonials (PLACEHOLDER — Lorem ipsum/fake names)", "url": "https://fullpoolservices.com/testimonials/" },
+      { "label": "One Time Pool Cleaning Estimate Form", "url": "https://fullpoolservices.com/one-time-pool-cleaning-estimate-form/" },
+      { "label": "Privacy Policy", "url": "https://fullpoolservices.com/1486-2/" },
+      { "label": "Terms & Conditions", "url": "https://fullpoolservices.com/terms-conditions/" }
+    ],
+    "blog_posts_advice": [
+      { "label": "The Importance of Getting an Acid Wash Before the Summer Comes in Las Vegas", "url": "https://fullpoolservices.com/the-importance-of-getting-an-acid-wash-before-the-summer-comes-in-las-vegas/" },
+      { "label": "Getting Your Pool Ready for the Holiday Season in Las Vegas with Full Pool Services", "url": "https://fullpoolservices.com/getting-your-pool-ready-for-the-holiday-season-in-las-vegas-with-full-pool-services/" },
+      { "label": "How Do I Find a Reliable Pool Cleaning Service in Las Vegas", "url": "https://fullpoolservices.com/how-do-i-find-a-reliable-pool-cleaning-service-in-las-vegas/" },
+      { "label": "Full Pool Services in Las Vegas Can Replace and Clean Your Filters to Get Your Pool Ready for Summer", "url": "https://fullpoolservices.com/full-pool-services-in-las-vegas-can-replace-and-clean-your-filters-to-get-your-pool-ready-for-summer/" }
+    ]
+  }
+}

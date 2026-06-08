@@ -3,13 +3,14 @@ import { env } from "../env.js";
 import { log } from "../logger.js";
 import { auditNow } from "./audit-now.js";
 import { briefNow } from "./brief-now.js";
+import { content } from "./content.js";
 import { leads } from "./leads.js";
 import { onboard } from "./onboard.js";
 import { ping } from "./ping.js";
 import { script } from "./script.js";
 import type { SlashCommand } from "./types.js";
 
-export const commands: SlashCommand[] = [ping, briefNow, auditNow, onboard, leads, script];
+export const commands: SlashCommand[] = [ping, briefNow, auditNow, onboard, leads, script, content];
 
 export const commandMap = new Map<string, SlashCommand>(
   commands.map((c) => [c.data.name, c]),

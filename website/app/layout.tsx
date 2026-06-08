@@ -39,12 +39,12 @@ const mondwestFallback = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://valdesagency.com"),
-  title: "Valdes Agency — Marketing systems for service businesses.",
+  title: "The Valdes Growth Engine",
   description:
-    "Websites, ads, automations, and an AI-powered platform built for pool, pest, HVAC, landscaping, and other local service businesses. Las Vegas.",
+    "We build the system. You run the business. Websites, ads, AI lead capture, CRM, and reporting for home service businesses in Las Vegas.",
   openGraph: {
-    title: "Valdes Agency",
-    description: "Marketing systems that book jobs. Built for service businesses.",
+    title: "The Valdes Growth Engine",
+    description: "We build the system. You run the business. For home service businesses.",
     url: "https://valdesagency.com",
     siteName: "Valdes Agency",
     type: "website",

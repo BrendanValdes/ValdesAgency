@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { env } from "../env.js";
@@ -185,10 +186,21 @@ export type BrandConfig = z.infer<typeof BrandConfigSchema>;
 const cache = new Map<string, BrandConfig>();
 let loaded = false;
 
+// Repo root, derived from this module's location — NOT process.cwd().
+// Compiled to bot/dist/services/brand-config.js and run from bot/src/services
+// under tsx; both sit three levels below the repo root. Resolving relative
+// config dirs against this means `config/brands` lands at the repo root no
+// matter which directory the bot is launched from.
+const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
+
+function resolveConfigDir(dir: string): string {
+  return isAbsolute(dir) ? dir : resolve(repoRoot, dir);
+}
+
 async function loadAll(): Promise<void> {
   if (loaded) return;
 
-  const dir = resolve(env.content.configDir);
+  const dir = resolveConfigDir(env.content.configDir);
   let files: string[];
   try {
     files = await readdir(dir);

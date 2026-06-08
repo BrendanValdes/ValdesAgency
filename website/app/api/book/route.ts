@@ -22,6 +22,8 @@ interface BookRequest {
   email?: string;
   phone?: string;
   business?: string;
+  businessType?: string;
+  budget?: string;
 }
 
 export async function POST(req: Request) {
@@ -32,9 +34,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { firstName, lastName, email, phone, business } = body;
+  const { firstName, lastName, email, phone, business, businessType, budget } = body;
 
-  if (!firstName || !lastName || !email || !phone) {
+  // lastName is optional (the hero qualify form collects first name only).
+  if (!firstName || !email || !phone) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -53,6 +56,8 @@ export async function POST(req: Request) {
   }
 
   const tags = ["website strategy call request", "hot"];
+  // Tag the niche so GHL routing/segmentation can pick it up (e.g. "pool").
+  if (businessType) tags.push(businessType.toLowerCase());
 
   try {
     const crmRes = await fetch(`${CRM_API_BASE}/contacts/upsert`, {
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         firstName,
-        lastName,
+        ...(lastName ? { lastName } : {}),
         email,
         phone,
         locationId,
@@ -90,10 +95,12 @@ export async function POST(req: Request) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: [
-            "**NEW STRATEGY CALL REQUEST — valdesagency.com**",
-            `Name: ${firstName} ${lastName}`,
+            "**NEW LEAD — valdesagency.com**",
+            `Name: ${firstName}${lastName ? ` ${lastName}` : ""}`,
             `Email: ${email}`,
             `Phone: ${phone}`,
+            businessType ? `Business Type: ${businessType}` : null,
+            budget ? `Budget: ${budget}` : null,
             business ? `Business: ${business}` : null,
           ]
             .filter(Boolean)

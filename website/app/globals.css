@@ -109,6 +109,31 @@ body {
 .font-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; }
 .font-mono-accent { font-family: var(--font-mono); letter-spacing: 0.02em; }
 
+/* Small-caps eyebrow label above each section headline */
+.eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--signal);
+}
+
+/* Pill chips under section bodies (replaces old bullet list) */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  line-height: 1;
+}
+
 /* ===================================================================
  * Section reveal — formerly had opacity:0 + translateX initial state
  * that made snap targets invisible at layout position. Removed for
@@ -117,25 +142,18 @@ body {
  * =================================================================== */
 
 /* ===================================================================
- * Page-flip snap scroll — CSS-native, all devices.
- * Browser owns the snap math. `scroll-snap-stop: always` prevents
- * fast-scroll from skipping past sections. `scroll-behavior: smooth`
- * provides browser-native ease between snap points.
+ * Smooth free scroll. The Growth Engine layout (tall hero + inline
+ * form, variable-height sections) is a create.video-style free scroll,
+ * NOT a page-flip snap site. Mandatory snap fought the tall hero, so it
+ * was removed. We keep browser-native smooth easing for anchor jumps.
  *
- * Reduced-motion users opt out entirely.
+ * Reduced-motion users get instant scroll.
  * =================================================================== */
 
 @media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-snap-type: y mandatory;
-    scroll-behavior: smooth;
-  }
-  [data-snap-section] {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-  }
+  html { scroll-behavior: smooth; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-snap-type: none; scroll-behavior: auto; }
+  html { scroll-behavior: auto; }
 }

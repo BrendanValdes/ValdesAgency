@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
 
 /**
- * Stacked report cards (fanning out) + a mini calendar with strategy
- * call dots. CSS/SVG, no 3D library.
+ * Section 8 (Reports and Strategy Calls) — dark-tone stacked report cards
+ * (fanning out) + a mini calendar with strategy call dots. Glass treatment
+ * so it reads on the ink background. CSS/SVG, no 3D library.
  */
 export default function ReportCalendar() {
   // Mock 5-week calendar with 2 strategy call days highlighted per month
@@ -20,7 +21,7 @@ export default function ReportCalendar() {
         {[0, 1, 2].map((i) => (
           <motion.div
             key={i}
-            className="glass-light absolute top-0 left-1/2 w-[78%] sm:w-[68%] aspect-[7/4] rounded-2xl p-5 flex flex-col justify-between"
+            className="glass absolute top-0 left-1/2 w-[78%] sm:w-[68%] aspect-[7/4] rounded-2xl p-5 flex flex-col justify-between"
             style={{
               transform: `translateX(calc(-50% + ${(i - 1) * 26}px)) rotate(${(i - 1) * 4}deg)`,
               zIndex: 3 - i,
@@ -32,11 +33,11 @@ export default function ReportCalendar() {
           >
             <div className="flex items-center gap-2">
               <FileText size={14} strokeWidth={1.8} className="text-signal" />
-              <span className="font-mono-accent text-[10px] uppercase tracking-[0.18em] text-ink/60">
+              <span className="font-mono-accent text-[10px] uppercase tracking-[0.18em] text-paper-dim">
                 Week {i + 1} report
               </span>
             </div>
-            <div className="text-xs sm:text-sm font-display uppercase text-ink leading-tight">
+            <div className="text-xs sm:text-sm font-display uppercase text-paper leading-tight">
               Spend $940
               <br />
               <span className="text-signal">11 booked</span>
@@ -46,16 +47,16 @@ export default function ReportCalendar() {
       </div>
 
       {/* Mini calendar */}
-      <div className="glass-light rounded-2xl p-4 sm:p-5 w-full max-w-[300px]">
+      <div className="glass rounded-2xl p-4 sm:p-5 w-full max-w-[300px]">
         <div className="flex items-center justify-between mb-3">
-          <span className="font-display uppercase text-xs text-ink">
+          <span className="font-display uppercase text-xs text-paper">
             This month
           </span>
-          <span className="font-mono-accent text-[10px] uppercase tracking-[0.18em] text-ink/50">
+          <span className="font-mono-accent text-[10px] uppercase tracking-[0.18em] text-paper-dim">
             2 strategy calls
           </span>
         </div>
-        <div className="grid grid-cols-7 gap-1.5 text-center text-[9px] font-mono-accent uppercase tracking-wide text-ink/40 mb-1.5">
+        <div className="grid grid-cols-7 gap-1.5 text-center text-[9px] font-mono-accent uppercase tracking-wide text-paper-dim mb-1.5">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
             <span key={i}>{d}</span>
           ))}
@@ -71,13 +72,7 @@ export default function ReportCalendar() {
               >
                 {valid && (
                   <>
-                    <span
-                      className={
-                        isCall
-                          ? "text-paper z-10"
-                          : "text-ink/70"
-                      }
-                    >
+                    <span className={isCall ? "text-paper z-10" : "text-paper/70"}>
                       {day}
                     </span>
                     {isCall && (

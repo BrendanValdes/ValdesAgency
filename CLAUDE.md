@@ -137,6 +137,11 @@ skills/email-sequences.md    → Full email body text for voicemail + Pool 5-ema
                                reference campaign content, building sequences for new
                                niches (use Pool/Pest structure as the template).
 
+skills/lead-sheet-format.md  → STANDARD lead-batch layout (dial list first, analysis appendix
+                               last; # · Company · Owner · Phone · Lead-with · Angle).
+                               USE WHEN: building or reformatting ANY lead batch (pool, pest,
+                               garage, future niches). Every batch .md ships in this format.
+
 [future] skills/ads.md       → Google Ads + Meta — learning phase, CPL framework, optimization
 [future] skills/seo.md       → Local SEO, GBP, NAP, schema, citations, llms.txt
 [future] skills/content.md   → Content pillars, hooks, platform timing

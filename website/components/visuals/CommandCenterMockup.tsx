@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 
 /**
- * Custom CSS dashboard mockup + iPhone frame to the side. Apple-glass
- * treatment on both. No third-party UI lib, no CRM branding visible.
+ * Section 7 (CRM and Command Center) — light-tone dashboard mockup + a dark
+ * iPhone frame to the side. Glass-light treatment so it reads on the paper
+ * background. No third-party UI lib, no CRM branding visible.
  */
 export default function CommandCenterMockup() {
   return (
@@ -23,14 +24,14 @@ export default function CommandCenterMockup() {
         className="absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(circle at 30% 50%, rgba(232,93,4,0.18) 0%, transparent 65%)",
+            "radial-gradient(circle at 30% 50%, rgba(232,93,4,0.14) 0%, transparent 65%)",
           filter: "blur(60px)",
         }}
       />
 
       {/* Dashboard panel */}
       <motion.div
-        className="glass rounded-2xl p-5 aspect-[16/10] flex flex-col gap-4"
+        className="glass-light rounded-2xl p-5 aspect-[16/10] flex flex-col gap-4"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
@@ -40,10 +41,10 @@ export default function CommandCenterMockup() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-signal" />
-            <div className="w-2 h-2 rounded-full bg-paper-dim/40" />
-            <div className="w-2 h-2 rounded-full bg-paper-dim/40" />
+            <div className="w-2 h-2 rounded-full bg-ink/20" />
+            <div className="w-2 h-2 rounded-full bg-ink/20" />
           </div>
-          <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-paper-dim">
+          <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-ink/50">
             Valdes Agency platform
           </span>
         </div>
@@ -60,7 +61,7 @@ export default function CommandCenterMockup() {
           ].map(({ Icon, label, count }, i) => (
             <motion.div
               key={label}
-              className="bg-ink-soft border border-white/5 rounded-lg p-2.5 flex flex-col justify-between"
+              className="bg-ink/[0.04] border border-ink/10 rounded-lg p-2.5 flex flex-col justify-between"
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
@@ -68,10 +69,10 @@ export default function CommandCenterMockup() {
             >
               <Icon size={14} strokeWidth={1.5} className="text-signal" />
               <div>
-                <div className="text-[10px] font-display uppercase text-paper">
+                <div className="text-[10px] font-display uppercase text-ink">
                   {label}
                 </div>
-                <div className="text-[8px] font-mono-accent text-paper-dim uppercase tracking-wider">
+                <div className="text-[8px] font-mono-accent text-ink/50 uppercase tracking-wider">
                   {count}
                 </div>
               </div>
@@ -80,8 +81,8 @@ export default function CommandCenterMockup() {
         </div>
 
         {/* Footer pulse */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-          <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-paper-dim">
+        <div className="flex items-center justify-between pt-2 border-t border-ink/10">
+          <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-ink/50">
             All systems
           </span>
           <span className="flex items-center gap-2">
@@ -90,7 +91,7 @@ export default function CommandCenterMockup() {
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-            <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-paper">
+            <span className="font-mono-accent text-[9px] uppercase tracking-[0.18em] text-ink">
               Online
             </span>
           </span>
@@ -110,8 +111,8 @@ export default function CommandCenterMockup() {
           rotate: { duration: 8, repeat: Infinity, ease: "easeInOut" },
         }}
       >
-        {/* iPhone body */}
-        <div className="relative w-full h-full rounded-[24px] bg-ink-soft border border-white/10 p-1.5 shadow-2xl">
+        {/* iPhone body (stays dark — it's a black phone) */}
+        <div className="relative w-full h-full rounded-[24px] bg-ink-soft border border-ink/10 p-1.5 shadow-2xl">
           {/* Notch */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-ink z-10" />
           {/* Screen */}
