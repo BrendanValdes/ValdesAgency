@@ -18,7 +18,12 @@ import { getBrand } from "../services/brand-config.js";
 import { loadPoolDiagnoses } from "../services/content-sources.js";
 import type { DiagnosisSeed } from "../services/content-sources.js";
 import { isBlockedByPatterns } from "../services/kg.js";
-import { stripDashes, validateDraft } from "../services/voice-check.js";
+import {
+  checkContentSanity,
+  stripDashes,
+  stripScaffolding,
+  validateDraft,
+} from "../services/voice-check.js";
 import { postToChannel } from "./daily-brief.js";
 
 const MAX_ATTEMPTS = 3; // 1 initial + 2 regens
@@ -270,6 +275,7 @@ async function generateOne(
   let passed = false;
   let leakBlocked = false;
   let hardFailures: Array<{ check: string; detail: string }> = [];
+  let softSanity: Array<{ check: string; detail: string }> = [];
   let feedback = "";
   let attemptsUsed = 0;
 
@@ -283,19 +289,31 @@ async function generateOne(
       maxTokens: spec.maxTokens,
     });
 
-    // Deterministic fix first: dashes are stripped, not regen'd. Regen only
-    // fires for failures a rewrite can't mechanically resolve.
+    // Deterministic fixes first: scaffolding chrome and dashes are stripped,
+    // not regen'd. Regen only fires for failures a rewrite can't mechanically
+    // resolve.
+    body = stripScaffolding(body);
     if (brand.voice.dash_policy === "none") {
       body = stripDashes(body);
     }
 
     const result = validateDraft({ voice: brand.voice }, body, { regenAttempt: a });
+    const sanity = checkContentSanity(body, new Date().getFullYear());
     leakBlocked = isBlockedByPatterns(body, brand.sources.kg_blocked_patterns);
-    hardFailures = result.hardFailures;
-    passed = result.passed && !leakBlocked;
+    hardFailures = [...result.hardFailures, ...sanity.hard];
+    softSanity = sanity.soft;
+    passed = result.passed && sanity.hard.length === 0 && !leakBlocked;
     if (passed) break;
 
-    feedback = [result.regenFeedback, leakBlocked ? LEAK_MSG : ""]
+    const sanityFeedback =
+      sanity.hard.length > 0
+        ? [
+            "Content sanity FAILED:",
+            ...sanity.hard.map((f) => `- [${f.check}] ${f.detail}`),
+            `Rewrite the full post fixing these. Never cite a study, report, or statistic that is not in the raw material. Any "this year" reference uses ${new Date().getFullYear()}.`,
+          ].join("\n")
+        : "";
+    feedback = [result.regenFeedback, sanityFeedback, leakBlocked ? LEAK_MSG : ""]
       .filter(Boolean)
       .join("\n\n");
   }
@@ -305,6 +323,9 @@ async function generateOne(
     ...(leakBlocked
       ? [{ check: "kg_leak_guard", detail: "matched kg_blocked_patterns (personal/founder leak)" }]
       : []),
+    // Soft sanity flags (e.g. a deliberate old-year reference) ride along for
+    // manual review; they never fail the draft.
+    ...softSanity,
   ];
 
   log.info("content_draft_generated", {
@@ -334,8 +355,9 @@ function renderDraft(n: number, total: number, d: Draft): string {
     `Voice: ${status}`,
     `Source: pool lead diagnoses (${d.cities.join(", ")})`,
   ];
-  if (!d.passed && d.failures.length > 0) {
-    lines.push(`Failures: ${d.failures.map((f) => `${f.check} — ${f.detail}`).join("; ")}`);
+  if (d.failures.length > 0) {
+    const label = d.passed ? "Review flags" : "Failures";
+    lines.push(`${label}: ${d.failures.map((f) => `${f.check} — ${f.detail}`).join("; ")}`);
   }
   lines.push("", d.body, "", "— manual post for now. Approval + scheduling = Gate 5.");
   return lines.join("\n");

@@ -188,6 +188,111 @@ export function stripDashes(text: string): string {
 }
 
 // ============================================================================
+// Scaffolding strip (deterministic, runs before voice-check)
+// ============================================================================
+// Removes chat-assistant chrome the model wraps around the deliverable:
+// leading preamble lines ("Here's the post:"), markdown divider fences, and a
+// trailing "Next move:" block addressed at the operator instead of the reader.
+// Found in the wild 2026-06-11: an S7 draft shipped with all three.
+export function stripScaffolding(text: string): string {
+  let lines = text.split("\n");
+
+  const fence = /^\s*[-_*]{3,}\s*$/;
+  const preamble = /^(here'?s (the|your|a|an) .{0,40}[:.]?|sure[.!,]?|got it[.!,]?)$/i;
+
+  // Leading preamble: drop blanks, fences, and intro lines until content.
+  let start = 0;
+  while (start < lines.length) {
+    const l = (lines[start] ?? "").trim();
+    if (l === "" || fence.test(l) || preamble.test(l)) {
+      start++;
+      continue;
+    }
+    break;
+  }
+  lines = lines.slice(start);
+
+  // Trailing "Next move:" block: ROCCO's answer-format habit leaking into the
+  // post body. Only strip when the marker sits in the tail (last 12 lines) so
+  // a legitimate mid-post line never gets cut.
+  const nextMove = /^(\*\*)?\s*next move\s*:?/i;
+  const tailStart = Math.max(0, lines.length - 12);
+  for (let i = lines.length - 1; i >= tailStart; i--) {
+    if (nextMove.test((lines[i] ?? "").trim())) {
+      lines = lines.slice(0, i);
+      break;
+    }
+  }
+
+  // Any divider fence left in the body is chrome, not post content.
+  lines = lines.filter((l) => !fence.test(l));
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// ============================================================================
+// Content sanity: date check + unverifiable-citation guard
+// ============================================================================
+// - A year within ±1 of the current year that isn't the current year is almost
+//   always a stale-training-data error ("in 2025" written during 2026) → HARD,
+//   regen fixes it. Older years can be deliberate rhetoric ("reads like 1998")
+//   → SOFT flag for manual review.
+// - Citation language pointing readers at studies/reports/data we can't
+//   verify exists → HARD. Claims must come from our own source sheets.
+export type SanityCheckResult = {
+  hard: ValidationFailure[];
+  soft: ValidationFailure[];
+};
+
+const CITATION_PATTERNS: Array<[RegExp, string]> = [
+  [
+    /\b(stud(?:y|ies)|report|survey|research)\s+(?:show|shows|showed|found|says|say|suggests?|proves?|confirms?)\b/i,
+    "cites a study/report",
+  ],
+  [
+    /\baccording to (?:a |the |one |recent )?(?:stud(?:y|ies)|reports?|surveys?|research|data|statistics)\b/i,
+    "according-to citation",
+  ],
+  [
+    /\bgoogle\s+["'“][^"'”]{3,}["'”]\s+and\b/i,
+    "points readers at a search to find data",
+  ],
+  [/\b(?:the )?data (?:backs|shows|proves|confirms)\b/i, "vague data claim"],
+];
+
+export function checkContentSanity(
+  text: string,
+  currentYear: number,
+): SanityCheckResult {
+  const hard: ValidationFailure[] = [];
+  const soft: ValidationFailure[] = [];
+
+  const years = text.match(/\b(?:19|20)\d{2}\b/g) ?? [];
+  for (const y of new Set(years)) {
+    const n = Number(y);
+    if (n === currentYear) continue;
+    const failure = {
+      check: "date_sanity",
+      detail: `year ${y} referenced (current year is ${currentYear})`,
+    };
+    if (Math.abs(n - currentYear) <= 1) hard.push(failure);
+    else soft.push(failure);
+  }
+
+  for (const [re, label] of CITATION_PATTERNS) {
+    const m = text.match(re);
+    if (m) {
+      hard.push({
+        check: "unverifiable_citation",
+        detail: `${label}: "${m[0].slice(0, 60)}" — only claims from our own source sheets`,
+      });
+    }
+  }
+
+  return { hard, soft };
+}
+
+// ============================================================================
 // Individual check classes
 // ============================================================================
 

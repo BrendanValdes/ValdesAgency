@@ -41,8 +41,8 @@ for (const d of drafts) {
   const tag = d.format === "video" ? " [VIDEO SCRIPT]" : "";
   console.log(`DRAFT ${n}/${drafts.length} — S${d.scenarioId} ${spec.name} — ${spec.platform}${tag}`);
   console.log(`Voice-check: ${status}`);
-  if (!d.passed && d.failures.length > 0) {
-    for (const f of d.failures) console.log(`  ✗ ${f.check}: ${f.detail}`);
+  for (const f of d.failures) {
+    console.log(`  ${d.passed ? "⚠" : "✗"} ${f.check}: ${f.detail}`);
   }
   console.log("-".repeat(72));
   console.log(d.body);
