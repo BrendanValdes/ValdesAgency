@@ -1,16 +1,29 @@
 // Headless content batch — generates drafts and prints them to stdout
 // instead of posting to Discord. Review-in-terminal path for Gate 3.
-// Run: npx tsx scripts/content-batch-cli.ts [scenarioId ...]
+// Run: npx tsx scripts/content-batch-cli.ts [scenarioId ...] [--offset N]
+// --offset N skips the first N seeds per city, pulling a fresh cluster.
 import { generateDrafts, getSpec } from "../src/features/content.js";
 
-const scenarios = process.argv
-  .slice(2)
+const args = process.argv.slice(2);
+let seedOffset = 0;
+const offsetIdx = args.indexOf("--offset");
+if (offsetIdx !== -1) {
+  seedOffset = Number.parseInt(args[offsetIdx + 1] ?? "", 10);
+  if (!Number.isInteger(seedOffset) || seedOffset < 0) {
+    console.error("--offset requires a non-negative integer");
+    process.exit(1);
+  }
+  args.splice(offsetIdx, 2);
+}
+
+const scenarios = args
   .map((a) => Number.parseInt(a, 10))
   .filter((n) => Number.isInteger(n));
 
-const { brand, cluster, drafts } = await generateDrafts(
-  scenarios.length > 0 ? { scenarios } : {},
-);
+const { brand, cluster, drafts } = await generateDrafts({
+  ...(scenarios.length > 0 ? { scenarios } : {}),
+  seedOffset,
+});
 
 const line = "=".repeat(72);
 console.log(line);
@@ -25,7 +38,8 @@ for (const d of drafts) {
   const spec = getSpec(d.scenarioId);
   const status = d.passed ? "PASS" : `FLAGGED after ${d.attempts} attempt(s)`;
   console.log(line);
-  console.log(`DRAFT ${n}/${drafts.length} — S${d.scenarioId} ${spec.name} — ${spec.platform}`);
+  const tag = d.format === "video" ? " [VIDEO SCRIPT]" : "";
+  console.log(`DRAFT ${n}/${drafts.length} — S${d.scenarioId} ${spec.name} — ${spec.platform}${tag}`);
   console.log(`Voice-check: ${status}`);
   if (!d.passed && d.failures.length > 0) {
     for (const f of d.failures) console.log(`  ✗ ${f.check}: ${f.detail}`);

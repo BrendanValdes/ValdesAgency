@@ -73,8 +73,13 @@ voice:
 
   banned_structures:
     - pattern_id: "most_people_think"
-      description: 'Format: "Most people think X. But really Y."'
-      regex: "most people think .+\\.\\s+but really"
+      # Generalized 2026-06-11: original regex only caught the literal example
+      # ("most people think ... but really"). "Most pool owners think X. It
+      # doesn't Y." sailed through in the first real batch. Now matches the
+      # STRUCTURE: most/everyone + [group] + think/believe/assume claim,
+      # followed by a contradiction pivot sentence.
+      description: 'Format: "Most [group] think/believe/assume X. [contradiction] Y."'
+      regex: "\\b(?:most\\s+(?:\\w+\\s+){0,3}|every(?:one|body)\\s+)(?:thinks?|believes?|assumes?)\\b[^.!?\\n]{0,140}[.!?]\\s+(?:but\\b|really\\b|actually\\b|in reality\\b|the (?:truth|reality)\\b|that'?s not\\b|it'?s not\\b|it (?:doesn'?t|isn'?t|won'?t|never)\\b|they'?re wrong\\b|wrong\\b)"
     - pattern_id: "heres_the_thing"
       description: "Opener: 'Here''s the thing.'"
       regex: "\\bhere'?s the thing\\b"

@@ -19,6 +19,11 @@ const leadsSrc = join(repoRoot, "memory", "leads");
 const leadsDst = join(dataDir, "memory", "leads");
 const brandsSrc = join(repoRoot, "config", "brands");
 const brandsDst = join(dataDir, "config", "brands");
+// Tone-sample voice anchors bundle to data/memory/voice so the deployed bot
+// loads the real anchor instead of the valdes.yaml fallback (anthropic.ts
+// getTonePath resolves memory/voice/<brand>-tone-samples.md via resolveDataDir).
+const voiceSrc = join(repoRoot, "memory", "voice");
+const voiceDst = join(dataDir, "memory", "voice");
 
 async function exists(p) {
   try {
@@ -84,10 +89,28 @@ async function copyBrands() {
   return count;
 }
 
+async function copyVoice() {
+  if (!(await exists(voiceSrc))) {
+    console.warn(`[bundle-data] memory/voice source not found at ${voiceSrc} — skipping`);
+    return 0;
+  }
+  await rm(voiceDst, { recursive: true, force: true });
+  await mkdir(voiceDst, { recursive: true });
+  const entries = await readdir(voiceSrc);
+  let count = 0;
+  for (const f of entries) {
+    if (!f.endsWith("-tone-samples.md")) continue;
+    await cp(join(voiceSrc, f), join(voiceDst, f));
+    count += 1;
+  }
+  return count;
+}
+
 const skillCount = await copySkills();
 const leadsCount = await copyLeads();
 const brandCount = await copyBrands();
+const voiceCount = await copyVoice();
 
 console.log(
-  `[bundle-data] bundled ${skillCount} skill files + ${leadsCount} POOL dial sheets + ${brandCount} brand configs into ${dataDir}`,
+  `[bundle-data] bundled ${skillCount} skill files + ${leadsCount} POOL dial sheets + ${brandCount} brand configs + ${voiceCount} tone-sample files into ${dataDir}`,
 );

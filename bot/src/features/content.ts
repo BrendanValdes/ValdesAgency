@@ -28,13 +28,38 @@ type ScenarioSpec = {
   platform: string;
   maxTokens: number;
   instruction: string;
+  /** "video" outputs are shooting scripts, tagged so they separate from text posts. */
+  type: "text" | "video";
+  /** Tone-samples section to embed. Video scenarios S9-S14 deliberately OMIT this:
+   *  their IDs collide with the tone-samples POST scenario numbering (tone S9/S11
+   *  are grind-aesthetic overrides, tone S12 is the permanently BANNED first-
+   *  milestone pattern). Video structure lives entirely in `instruction`; the
+   *  core voice sections (fingerprint, meta-pattern, guardrails) still load. */
+  toneScenarioId?: number;
 };
+
+// Shared rules for every video scenario (S6, S9-S14). Viral templates supply
+// STRUCTURE ONLY — shot format, on-screen text mechanics, pacing. All copy
+// still runs through the ROCCO voice prior, dash strip, and voice-check.
+const VIDEO_SCRIPT_RULES = [
+  "Output a SHOOTING SCRIPT, not a finished video. Label every line:",
+  "[HOOK] spoken opening line (first 1.5 seconds)",
+  "[ON-SCREEN] an on-screen text element, exactly as it should appear",
+  "[SPOKEN] a spoken line",
+  "[CAPTION] post caption at the end, 1-3 sentences",
+  "Interleave [ON-SCREEN] and [SPOKEN] in shoot order.",
+  "The template is STRUCTURE ONLY. Voice stays owner-to-owner: short sentences, no influencer cadence, no hype inflection.",
+  "No engagement bait anywhere, including the caption: never 'comment X', 'follow for more', 'link in bio', 'wait for it', 'you won't believe'.",
+  "The CTA is ONE direct line a pool company owner can act on himself.",
+].join("\n");
 
 const SCENARIOS: Record<number, ScenarioSpec> = {
   1: {
     name: "Educational mistake",
     platform: "LinkedIn/X",
     maxTokens: 500,
+    type: "text",
+    toneScenarioId: 1,
     instruction:
       "Pick ONE problem from the list. Open with the mistake. Say why it costs the owner booked jobs. Give the fix in 1-2 lines. Owner-to-owner, never salesy. About 120-180 words.",
   },
@@ -42,6 +67,8 @@ const SCENARIOS: Record<number, ScenarioSpec> = {
     name: "LinkedIn long-form",
     platform: "LinkedIn",
     maxTokens: 900,
+    type: "text",
+    toneScenarioId: 7,
     instruction:
       "Use the cluster as evidence. Find the PATTERN across these problems. Make one argument a pool owner has not heard before. Thought-leadership, about 350-500 words, still punchy.",
   },
@@ -49,8 +76,92 @@ const SCENARIOS: Record<number, ScenarioSpec> = {
     name: "Short-video hook",
     platform: "Reel/IG",
     maxTokens: 500,
+    type: "video",
+    toneScenarioId: 6,
     instruction:
       "Reformat into a vertical short-video script. Line 1 is a 1.5-second scroll-stopping hook. Then 3-5 fast beats, one idea each. End on a single CTA line. Label lines [HOOK], [BEAT], [CTA].",
+  },
+  9: {
+    name: "Two Sides Debate",
+    platform: "Reel/TikTok",
+    maxTokens: 700,
+    type: "video",
+    instruction: [
+      "Two Sides Debate: one person plays both sides of an argument, cut side by side as two characters disagreeing.",
+      "Side A is the owner's current thinking, voiced as a REAL objection heard on dials (e.g. 'my Yelp reviews are enough', 'I get all my work from referrals').",
+      "Side B is the reality. Side B wins with ONE specific fact drawn from the raw material, scrubbed of any identity.",
+      "3-5 exchanges. Label speakers [SPOKEN A] and [SPOKEN B] instead of plain [SPOKEN]. Side B gets the last word.",
+      "30-45 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
+  },
+  10: {
+    name: "Numbered Countdown List",
+    platform: "Reel/TikTok",
+    maxTokens: 900,
+    type: "video",
+    instruction: [
+      "Numbered Countdown List: speaker on camera, a numbered list appears beside them, each number fills in as it is spoken.",
+      "Topic shape: 'N things on a pool company website that send customers to a competitor.'",
+      "EVERY item must be a real finding pattern from the raw material, generalized. NO filler items to hit a round number: if only 5 real ones exist in the material, the list is 5.",
+      "Per item: one [ON-SCREEN] short list label (3-6 words), then 1-2 [SPOKEN] sentences.",
+      "45-60 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
+  },
+  11: {
+    name: "Bad Good Excellent Grade",
+    platform: "Reel/TikTok",
+    maxTokens: 700,
+    type: "video",
+    instruction: [
+      "Bad Good Excellent Grade: three-tier verbal grading shown as colored labels on screen, speaker grades ONE business element across the three tiers.",
+      "Pick ONE element from the raw material (e.g. contact email: Bad = yahoo/aol address, Good = gmail, Excellent = yourcompany.com with Google Workspace).",
+      "[ON-SCREEN] labels BAD / GOOD / EXCELLENT as each tier is ruled, each followed by its [SPOKEN] grading.",
+      "Always END with what Excellent costs. Numbers only if they appear in the raw material or are public list prices. Never invent a stat.",
+      "30-45 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
+  },
+  12: {
+    name: "Direct Count On Fingers",
+    platform: "Reel/TikTok",
+    maxTokens: 500,
+    type: "video",
+    instruction: [
+      "Direct Count On Fingers: straight to camera, NO graphics except one [ON-SCREEN] title card at the start. Speaker counts points on fingers. Lowest production weight.",
+      "Compressed punchy version of a list topic from the raw material. MAX 3 points, one short [SPOKEN] block each.",
+      "20-30 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
+  },
+  13: {
+    name: "Tier List Ranking",
+    platform: "Reel/TikTok",
+    maxTokens: 900,
+    type: "video",
+    instruction: [
+      "Tier List Ranking: classic S/A/B/C/D tier board on screen, items placed into tiers one at a time as the speaker rules on each.",
+      "Rank the ways pool companies get leads: referrals, Google Business Profile, Yelp, Thumbtack, door hangers, paid ads.",
+      "Per placement: one [ON-SCREEN] line ('Thumbtack -> C tier') and exactly ONE [SPOKEN] sentence of reasoning.",
+      "Reasoning must come from cost/ROI evidence in the raw material (real per-lead prices, real review-platform behavior). No vibes rankings. If the material has no evidence for a channel, reason from owner economics without inventing numbers.",
+      "45-60 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
+  },
+  14: {
+    name: "1 to 10 Scale Rating",
+    platform: "Reel/TikTok",
+    maxTokens: 500,
+    type: "video",
+    instruction: [
+      "1 to 10 Scale Rating: a 1-10 colored scale on screen, speaker rates ONE thing and the number lights up.",
+      "Rate one common pool-company business decision drawn from the raw material (e.g. 'paying $50 a lead on Thumbtack with no website of your own').",
+      "ONE rating per video. The WHY is the content: 3-5 [SPOKEN] lines justifying the number, anchored in the raw material.",
+      "[ON-SCREEN] shows the decision being rated, then the number on the scale.",
+      "20-30 seconds of total speech.",
+      VIDEO_SCRIPT_RULES,
+    ].join("\n"),
   },
 };
 
@@ -75,6 +186,8 @@ export function getSpec(scenarioId: number): ScenarioSpec {
 
 export type Draft = {
   scenarioId: number;
+  /** "video" = shooting script (S6, S9-S14), "text" = post copy (S1, S7). */
+  format: "text" | "video";
   body: string;
   passed: boolean;
   attempts: number;
@@ -82,14 +195,16 @@ export type Draft = {
   cities: string[];
 };
 
-/** Round-robin across cities so the cluster is not all one file / one neighborhood. */
-function pickCluster(seeds: DiagnosisSeed[], n: number): DiagnosisSeed[] {
+/** Round-robin across cities so the cluster is not all one file / one neighborhood.
+ *  skipPerCity drops the first k seeds of every city queue, so reruns can pull a
+ *  fresh cluster instead of the same deterministic heads. */
+function pickCluster(seeds: DiagnosisSeed[], n: number, skipPerCity = 0): DiagnosisSeed[] {
   const byCity = new Map<string, DiagnosisSeed[]>();
   for (const s of seeds) {
     if (!byCity.has(s.city)) byCity.set(s.city, []);
     byCity.get(s.city)?.push(s);
   }
-  const queues = [...byCity.values()];
+  const queues = [...byCity.values()].map((q) => q.slice(skipPerCity));
   const out: DiagnosisSeed[] = [];
   let i = 0;
   while (out.length < n && queues.some((q) => q.length > 0)) {
@@ -141,7 +256,12 @@ async function generateOne(
   cluster: DiagnosisSeed[],
 ): Promise<Draft> {
   const spec = getSpec(scenarioId);
-  const sys = await buildContentSystemPrompt(brandKey, { scenarioId });
+  // Video scenarios pass no toneScenarioId: their IDs collide with the
+  // tone-samples POST scenario numbering (see ScenarioSpec.toneScenarioId).
+  const sys = await buildContentSystemPrompt(
+    brandKey,
+    spec.toneScenarioId !== undefined ? { scenarioId: spec.toneScenarioId } : {},
+  );
   if (sys.warnings.length > 0) {
     log.warn("content_prompt_warnings", { scenarioId, warnings: sys.warnings });
   }
@@ -196,6 +316,7 @@ async function generateOne(
 
   return {
     scenarioId,
+    format: spec.type,
     body,
     passed,
     attempts: attemptsUsed,
@@ -207,8 +328,9 @@ async function generateOne(
 function renderDraft(n: number, total: number, d: Draft): string {
   const spec = getSpec(d.scenarioId);
   const status = d.passed ? "✅ PASS" : `🚩 FLAGGED after ${d.attempts} attempts`;
+  const formatTag = d.format === "video" ? " 🎬 VIDEO SCRIPT" : "";
   const lines = [
-    `**Draft ${n}/${total} — S${d.scenarioId} ${spec.name} — ${spec.platform}**`,
+    `**Draft ${n}/${total} — S${d.scenarioId} ${spec.name} — ${spec.platform}${formatTag}**`,
     `Voice: ${status}`,
     `Source: pool lead diagnoses (${d.cities.join(", ")})`,
   ];
@@ -231,7 +353,7 @@ export type DraftBatch = {
 /** Headless generation core: load brand, source seeds, draft + voice-check.
  *  No Discord dependency — used by runContentBatch and CLI/Gate-5 callers. */
 export async function generateDrafts(
-  opts: { brandKey?: string; scenarios?: number[] } = {},
+  opts: { brandKey?: string; scenarios?: number[]; seedOffset?: number } = {},
 ): Promise<DraftBatch> {
   const brandKey = opts.brandKey ?? env.content.defaultBrand;
   const scenarios =
@@ -254,7 +376,7 @@ export async function generateDrafts(
     );
   }
 
-  const cluster = pickCluster(seeds, 5);
+  const cluster = pickCluster(seeds, 5, opts.seedOffset ?? 0);
 
   const drafts: Draft[] = [];
   for (const scenarioId of scenarios) {

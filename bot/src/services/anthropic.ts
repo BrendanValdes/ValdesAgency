@@ -1,9 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
 import { env } from "../env.js";
 import { log } from "../logger.js";
-import { getBrand } from "./brand-config.js";
+import { getBrand, resolveDataDir } from "./brand-config.js";
 
 const client = new Anthropic({ apiKey: env.anthropic.apiKey });
 
@@ -92,10 +91,12 @@ let toneCache: ToneCache | null = null;
 
 function getTonePath(brandKey: string): string {
   // valdes brand uses the default path; other brands swap "valdes" for their key.
+  // Resolved via the shared marker walk-up (brand-config.resolveDataDir), NOT
+  // cwd-relative: running from bot/ resolved to bot/memory/voice/... and the
+  // 0.45-weight voice anchor silently fell back to YAML-only on every draft.
   const configured = process.env.TONE_SAMPLES_PATH;
-  if (configured) return resolve(process.cwd(), configured);
-  const path = TONE_SAMPLES_PATH_DEFAULT.replace("valdes", brandKey);
-  return resolve(process.cwd(), path);
+  const path = configured ?? TONE_SAMPLES_PATH_DEFAULT.replace("valdes", brandKey);
+  return resolveDataDir(path);
 }
 
 // Parse markdown into H2-keyed sections. Section content starts after the H2
