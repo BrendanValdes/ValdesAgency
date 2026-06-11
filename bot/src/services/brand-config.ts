@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -186,15 +187,40 @@ export type BrandConfig = z.infer<typeof BrandConfigSchema>;
 const cache = new Map<string, BrandConfig>();
 let loaded = false;
 
-// Repo root, derived from this module's location — NOT process.cwd().
-// Compiled to bot/dist/services/brand-config.js and run from bot/src/services
-// under tsx; both sit three levels below the repo root. Resolving relative
-// config dirs against this means `config/brands` lands at the repo root no
-// matter which directory the bot is launched from.
-const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
+function ancestorsOf(start: string): string[] {
+  const out: string[] = [];
+  let dir = start;
+  for (;;) {
+    out.push(dir);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return out;
+}
+
+// Resolve a relative config dir by searching upward from this module's
+// location, then from cwd — no fixed-depth assumption about where the
+// compiled file sits. Pass 1 finds the live repo checkout (`config/brands`
+// at the repo root). Pass 2 finds the bundled copy (`data/config/brands`,
+// produced by scripts/bundle-data.mjs) for Railway images built with bot/
+// as the root, where no repo root exists above the app.
 function resolveConfigDir(dir: string): string {
-  return isAbsolute(dir) ? dir : resolve(repoRoot, dir);
+  if (isAbsolute(dir)) return dir;
+  const roots = [...ancestorsOf(moduleDir), ...ancestorsOf(process.cwd())];
+  for (const root of roots) {
+    const candidate = resolve(root, dir);
+    if (existsSync(candidate)) return candidate;
+  }
+  for (const root of roots) {
+    const candidate = resolve(root, "data", dir);
+    if (existsSync(candidate)) return candidate;
+  }
+  // Nothing found — return a concrete path so the dir-missing warn log
+  // tells the operator exactly where the loader looked last.
+  return resolve(process.cwd(), dir);
 }
 
 async function loadAll(): Promise<void> {

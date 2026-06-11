@@ -15,6 +15,8 @@ const skillsSrc = join(repoRoot, "skills");
 const skillsDst = join(dataDir, "skills");
 const leadsSrc = join(repoRoot, "memory", "leads", "vegas-pool-leads.md");
 const leadsDst = join(dataDir, "leads", "vegas-pool-leads.md");
+const brandsSrc = join(repoRoot, "config", "brands");
+const brandsDst = join(dataDir, "config", "brands");
 
 async function exists(p) {
   try {
@@ -52,9 +54,27 @@ async function copyLeads() {
   return true;
 }
 
+async function copyBrands() {
+  if (!(await exists(brandsSrc))) {
+    console.warn(`[bundle-data] config/brands source not found at ${brandsSrc} — skipping`);
+    return 0;
+  }
+  await rm(brandsDst, { recursive: true, force: true });
+  await mkdir(brandsDst, { recursive: true });
+  const entries = await readdir(brandsSrc);
+  let count = 0;
+  for (const f of entries) {
+    if (!f.endsWith(".yaml")) continue;
+    await cp(join(brandsSrc, f), join(brandsDst, f));
+    count += 1;
+  }
+  return count;
+}
+
 const skillCount = await copySkills();
 const leadsCopied = await copyLeads();
+const brandCount = await copyBrands();
 
 console.log(
-  `[bundle-data] bundled ${skillCount} skill files + leads=${leadsCopied} into ${dataDir}`,
+  `[bundle-data] bundled ${skillCount} skill files + leads=${leadsCopied} + ${brandCount} brand configs into ${dataDir}`,
 );

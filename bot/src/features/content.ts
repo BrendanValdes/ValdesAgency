@@ -67,13 +67,13 @@ const VOICE_REMINDER =
 const LEAK_MSG =
   "LEAK: the draft matched a blocked personal/founder pattern. Remove any personal financial state, dial counts, 'just started', or founder-milestone language.";
 
-function getSpec(scenarioId: number): ScenarioSpec {
+export function getSpec(scenarioId: number): ScenarioSpec {
   const spec = SCENARIOS[scenarioId];
   if (!spec) throw new Error(`Unsupported scenario ${scenarioId}`);
   return spec;
 }
 
-type Draft = {
+export type Draft = {
   scenarioId: number;
   body: string;
   passed: boolean;
@@ -215,25 +215,26 @@ function renderDraft(n: number, total: number, d: Draft): string {
 
 export type ContentBatchResult = { posted: number; clean: number; flagged: number };
 
-export async function runContentBatch(
-  client: Client,
+export type DraftBatch = {
+  brandKey: string;
+  brand: BrandConfig;
+  cluster: DiagnosisSeed[];
+  drafts: Draft[];
+};
+
+/** Headless generation core: load brand, source seeds, draft + voice-check.
+ *  No Discord dependency — used by runContentBatch and CLI/Gate-5 callers. */
+export async function generateDrafts(
   opts: { brandKey?: string; scenarios?: number[] } = {},
-): Promise<ContentBatchResult> {
+): Promise<DraftBatch> {
   const brandKey = opts.brandKey ?? env.content.defaultBrand;
   const scenarios =
     opts.scenarios && opts.scenarios.length > 0 ? opts.scenarios : [1, 7, 6];
 
-  const channelId = env.channels.contentValdes;
-  if (!channelId) {
-    throw new Error(
-      "CHANNEL_CONTENT_VALDES is not set — can't post the content batch. Set it (and mirror to Railway) first.",
-    );
-  }
-
   const brand = await getBrand(brandKey);
   if (!brand) {
     throw new Error(
-      `Unknown brand: ${brandKey}. Confirm config/brands/${brandKey}.yaml resolves (run the bot from the repo root).`,
+      `Unknown brand: ${brandKey}. Confirm config/brands/${brandKey}.yaml exists at the repo root (or bundled under bot/data/config/brands on Railway).`,
     );
   }
   if (brand.status !== "active") {
@@ -263,6 +264,22 @@ export async function runContentBatch(
       `No valid scenarios in [${scenarios.join(", ")}]. Supported: ${Object.keys(SCENARIOS).join(", ")}.`,
     );
   }
+
+  return { brandKey, brand, cluster, drafts };
+}
+
+export async function runContentBatch(
+  client: Client,
+  opts: { brandKey?: string; scenarios?: number[] } = {},
+): Promise<ContentBatchResult> {
+  const channelId = env.channels.contentValdes;
+  if (!channelId) {
+    throw new Error(
+      "CHANNEL_CONTENT_VALDES is not set — can't post the content batch. Set it (and mirror to Railway) first.",
+    );
+  }
+
+  const { brandKey, brand, cluster, drafts } = await generateDrafts(opts);
 
   const today = new Date().toLocaleDateString("en-US", {
     month: "short",
