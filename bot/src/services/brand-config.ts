@@ -201,13 +201,15 @@ function ancestorsOf(start: string): string[] {
   return out;
 }
 
-// Resolve a relative config dir by searching upward from this module's
+// Resolve a relative data dir by searching upward from this module's
 // location, then from cwd — no fixed-depth assumption about where the
-// compiled file sits. Pass 1 finds the live repo checkout (`config/brands`
-// at the repo root). Pass 2 finds the bundled copy (`data/config/brands`,
-// produced by scripts/bundle-data.mjs) for Railway images built with bot/
-// as the root, where no repo root exists above the app.
-function resolveConfigDir(dir: string): string {
+// compiled file sits. Pass 1 finds the live repo checkout (e.g.
+// `config/brands` or `memory/leads` at the repo root). Pass 2 finds the
+// bundled copy (`data/<dir>`, produced by scripts/bundle-data.mjs) for
+// Railway images built with bot/ as the root, where no repo root exists
+// above the app. Shared by every content-system loader — nothing in the
+// content system may resolve paths cwd-relative.
+export function resolveDataDir(dir: string): string {
   if (isAbsolute(dir)) return dir;
   const roots = [...ancestorsOf(moduleDir), ...ancestorsOf(process.cwd())];
   for (const root of roots) {
@@ -226,7 +228,7 @@ function resolveConfigDir(dir: string): string {
 async function loadAll(): Promise<void> {
   if (loaded) return;
 
-  const dir = resolveConfigDir(env.content.configDir);
+  const dir = resolveDataDir(env.content.configDir);
   let files: string[];
   try {
     files = await readdir(dir);

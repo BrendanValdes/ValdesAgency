@@ -13,8 +13,10 @@ const repoRoot = resolve(botRoot, "..");
 const dataDir = join(botRoot, "data");
 const skillsSrc = join(repoRoot, "skills");
 const skillsDst = join(dataDir, "skills");
-const leadsSrc = join(repoRoot, "memory", "leads", "vegas-pool-leads.md");
-const leadsDst = join(dataDir, "leads", "vegas-pool-leads.md");
+// Dial sheets bundle to data/memory/leads so resolveDataDir's `data/<dir>`
+// fallback finds them under the same relative path as the live repo.
+const leadsSrc = join(repoRoot, "memory", "leads");
+const leadsDst = join(dataDir, "memory", "leads");
 const brandsSrc = join(repoRoot, "config", "brands");
 const brandsDst = join(dataDir, "config", "brands");
 
@@ -46,12 +48,23 @@ async function copySkills() {
 
 async function copyLeads() {
   if (!(await exists(leadsSrc))) {
-    console.warn(`[bundle-data] leads file not found at ${leadsSrc} — skipping`);
-    return false;
+    console.warn(`[bundle-data] leads dir not found at ${leadsSrc} — skipping`);
+    return 0;
   }
-  await mkdir(dirname(leadsDst), { recursive: true });
-  await cp(leadsSrc, leadsDst);
-  return true;
+  // Drop the pre-rename bundle location (data/leads/vegas-pool-leads.md).
+  await rm(join(dataDir, "leads"), { recursive: true, force: true });
+  await rm(leadsDst, { recursive: true, force: true });
+  await mkdir(leadsDst, { recursive: true });
+  const entries = await readdir(leadsSrc);
+  let count = 0;
+  for (const f of entries) {
+    // Same filter as content-sources.ts loadPoolDiagnoses — only the POOL
+    // dial sheets feed the content system; CSVs and other niches stay out.
+    if (!(f.startsWith("POOL ") && f.endsWith(".md"))) continue;
+    await cp(join(leadsSrc, f), join(leadsDst, f));
+    count += 1;
+  }
+  return count;
 }
 
 async function copyBrands() {
@@ -72,9 +85,9 @@ async function copyBrands() {
 }
 
 const skillCount = await copySkills();
-const leadsCopied = await copyLeads();
+const leadsCount = await copyLeads();
 const brandCount = await copyBrands();
 
 console.log(
-  `[bundle-data] bundled ${skillCount} skill files + leads=${leadsCopied} + ${brandCount} brand configs into ${dataDir}`,
+  `[bundle-data] bundled ${skillCount} skill files + ${leadsCount} POOL dial sheets + ${brandCount} brand configs into ${dataDir}`,
 );

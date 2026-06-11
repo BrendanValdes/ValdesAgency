@@ -18,7 +18,7 @@ import { getBrand } from "../services/brand-config.js";
 import { loadPoolDiagnoses } from "../services/content-sources.js";
 import type { DiagnosisSeed } from "../services/content-sources.js";
 import { isBlockedByPatterns } from "../services/kg.js";
-import { validateDraft } from "../services/voice-check.js";
+import { stripDashes, validateDraft } from "../services/voice-check.js";
 import { postToChannel } from "./daily-brief.js";
 
 const MAX_ATTEMPTS = 3; // 1 initial + 2 regens
@@ -163,6 +163,12 @@ async function generateOne(
       maxTokens: spec.maxTokens,
     });
 
+    // Deterministic fix first: dashes are stripped, not regen'd. Regen only
+    // fires for failures a rewrite can't mechanically resolve.
+    if (brand.voice.dash_policy === "none") {
+      body = stripDashes(body);
+    }
+
     const result = validateDraft({ voice: brand.voice }, body, { regenAttempt: a });
     leakBlocked = isBlockedByPatterns(body, brand.sources.kg_blocked_patterns);
     hardFailures = result.hardFailures;
@@ -244,7 +250,7 @@ export async function generateDrafts(
   const seeds = await loadPoolDiagnoses(brand);
   if (seeds.length === 0) {
     throw new Error(
-      `No pool diagnoses found under ${brand.sources.lead_scrapes}. Are POOL *.md dial sheets present and cwd = repo root?`,
+      `No pool diagnoses found under ${brand.sources.lead_scrapes}. Are POOL *.md dial sheets present in the repo (or bundled under bot/data/memory/leads on Railway)?`,
     );
   }
 

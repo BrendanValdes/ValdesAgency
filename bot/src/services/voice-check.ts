@@ -157,6 +157,37 @@ function hasSpecificity(text: string): boolean {
 }
 
 // ============================================================================
+// Deterministic dash strip
+// ============================================================================
+// Rewrites every em-dash, en-dash, and mid-sentence spaced hyphen BEFORE
+// validation runs, so dash_policy violations never burn a regen attempt.
+// Hyphenated compounds ("follow-up") and numeric ranges ("2-3") are legal
+// under dash_policy and are preserved. Callers apply this only when the
+// brand's dash_policy is "none".
+export function stripDashes(text: string): string {
+  return (
+    text
+      // numeric ranges keep a plain hyphen: "2–3" / "20 — 30" → "2-3"
+      .replace(/(\d)[ \t]*[—–][ \t]*(\d)/g, "$1-$2")
+      .replace(/(\d)[ \t]+-[ \t]+(\d)/g, "$1-$2")
+      // line-leading dash bullets become hyphen bullets
+      .replace(/^([ \t]*)[—–][ \t]*/gm, "$1- ")
+      // dash after sentence-ending punctuation: drop it, capitalize next word
+      .replace(/([.!?])[ \t]*[—–][ \t]*([a-z])/g, (_m, p: string, c: string) => `${p} ${c.toUpperCase()}`)
+      .replace(/([.!?])[ \t]+-[ \t]+([a-z])/g, (_m, p: string, c: string) => `${p} ${c.toUpperCase()}`)
+      // dash after mid-sentence punctuation: drop it, keep one space
+      .replace(/([.!?,:;])[ \t]*[—–][ \t]*/g, "$1 ")
+      .replace(/([.!?,:;])[ \t]+-[ \t]+/g, "$1 ")
+      // mid-sentence dash before a word: hard sentence break (brand voice)
+      .replace(/[ \t]*[—–][ \t]*([a-zA-Z])/g, (_m, c: string) => `. ${c.toUpperCase()}`)
+      .replace(/(\S)[ \t]+-[ \t]+([a-zA-Z])/g, (_m, p: string, c: string) => `${p}. ${c.toUpperCase()}`)
+      // anything left (trailing dash, dash before $ or a digit-adjacent symbol)
+      .replace(/[ \t]*[—–][ \t]*/g, ", ")
+      .replace(/[ \t]{2,}/g, " ")
+  );
+}
+
+// ============================================================================
 // Individual check classes
 // ============================================================================
 

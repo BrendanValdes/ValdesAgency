@@ -10,16 +10,16 @@
 // scrubbed before the text ever reaches the LLM. Layers 2 (generation prompt)
 // and 3 (kg.ts isBlockedByPatterns on the final draft) live in features/content.ts.
 //
-// NOTE on the stale scanner: bot/scripts/build-source-inventory.mjs matches
-// `^vegas-pool-leads.*\.md$` — current files are named `POOL LV 3.md`. This
-// loader reads the current naming + table format instead. Paths resolve
-// cwd-relative, identical to brand-config.ts (run the bot from the repo root).
+// Paths resolve through brand-config's resolveDataDir (marker walk-up from
+// module dir + cwd, bundled `data/` fallback) — never cwd-relative. Works
+// from any cwd locally and from the Railway image.
 // ============================================================================
 
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { log } from "../logger.js";
 import type { BrandConfig } from "./brand-config.js";
+import { resolveDataDir } from "./brand-config.js";
 
 export type DiagnosisSeed = {
   city: string;
@@ -98,7 +98,7 @@ function parseLeadsTable(md: string): Array<Record<string, string>> {
  * Returns City + Tier + scrubbed diagnosis only. Never returns company/owner/phone.
  */
 export async function loadPoolDiagnoses(brand: BrandConfig): Promise<DiagnosisSeed[]> {
-  const dir = resolve(brand.sources.lead_scrapes);
+  const dir = resolveDataDir(brand.sources.lead_scrapes);
 
   let files: string[];
   try {
