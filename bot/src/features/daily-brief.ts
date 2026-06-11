@@ -1,4 +1,4 @@
-import type { Client, TextBasedChannel } from "discord.js";
+import type { Client, Message, TextBasedChannel } from "discord.js";
 import { ChannelType } from "discord.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
@@ -81,12 +81,24 @@ export async function postToChannel(
   channelId: string,
   text: string,
 ): Promise<void> {
+  await postToChannelTracked(client, channelId, text);
+}
+
+/** Like postToChannel but returns the sent Messages — Gate 5 needs message
+ *  IDs to map emoji reactions back to drafts. */
+export async function postToChannelTracked(
+  client: Client,
+  channelId: string,
+  text: string,
+): Promise<Message[]> {
   const ch = await client.channels.fetch(channelId);
   if (!ch || ch.type !== ChannelType.GuildText) {
     throw new Error(`Channel ${channelId} not text-based`);
   }
-  const sender = ch as TextBasedChannel & { send: (s: string) => Promise<unknown> };
+  const sender = ch as TextBasedChannel & { send: (s: string) => Promise<Message> };
+  const sent: Message[] = [];
   for (const chunk of chunkForDiscord(text)) {
-    await sender.send(chunk);
+    sent.push(await sender.send(chunk));
   }
+  return sent;
 }

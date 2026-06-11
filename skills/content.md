@@ -77,6 +77,14 @@ This is the ONLY content cadence that scales without burning the writer.
 
 ## §2 — THE DAILY CONTENT PIPELINE (AUTONOMOUS WORKFLOW)
 
+> ⚠️ **SUPERSEDED (2026-06-11, Gate 5 build):** the Notion + Buffer + Make.com
+> stack described in §2 and §8 was never built and is replaced by the shipped
+> Gate 5 implementation: Discord emoji approval in #content-valdes
+> (👍 approve / 👎 kill / 🔄 one rewrite with reply notes), a persistent
+> posting queue on the Railway volume, and Composio direct posting (LinkedIn
+> v1). Source of truth: `bot/src/features/approval.ts`, `scheduler.ts`,
+> `bot/src/services/state.ts`, `composio.ts`. Read §2/§8 as design history.
+
 The 4-stage flow. Designed for Brendan to spend <10 min/day on review.
 
 ```

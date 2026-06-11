@@ -132,6 +132,14 @@ const BrandConfigSchema = z.object({
       z.enum(["linkedin", "instagram", "facebook", "x", "tiktok"]),
     ),
     exploration_ratio: z.number().min(0).max(1),
+    // Gate 5 posting slots per platform, "HH:MM" LA wall-clock. Optional so
+    // schema_version stays 1.0; platforms absent here never auto-post.
+    slot_times: z
+      .record(
+        z.string(),
+        z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)),
+      )
+      .optional(),
     weekly_pattern: z.object({
       monday: z.string(),
       tuesday: z.string(),

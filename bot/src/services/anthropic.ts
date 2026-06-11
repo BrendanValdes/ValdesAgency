@@ -296,6 +296,13 @@ export async function buildContentSystemPrompt(
   return { prompt, tokensEstimated: tokens, sectionsIncluded: included, truncated, warnings };
 }
 
+/** Gate 5 self-check: how many tone-sample sections loaded (0 = file missing,
+ *  voice prior is running on the YAML fallback). */
+export async function getToneSectionCount(brandKey: string): Promise<number> {
+  const sections = await loadToneSamples(brandKey);
+  return sections.size;
+}
+
 // Test-only cache reset
 export function _resetToneCache(): void {
   toneCache = null;

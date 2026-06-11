@@ -31,6 +31,8 @@ export const env = {
     token: read("DISCORD_BOT_TOKEN"),
     clientId: read("DISCORD_CLIENT_ID"),
     guildId: read("DISCORD_GUILD_ID"),
+    // Gate 5 approver. Empty = fall back to the guild owner at runtime.
+    approverUserId: optional("APPROVER_USER_ID", ""),
   },
   anthropic: {
     apiKey: read("ANTHROPIC_API_KEY"),
@@ -67,6 +69,9 @@ export const env = {
   paths: {
     skillsDir: optional("SKILLS_DIR", "data/skills"),
     leadsFile: optional("LEADS_FILE", "data/leads/vegas-pool-leads.md"),
+    // Gate 5 persistent state. Railway: STATE_DIR=/data (volume mount).
+    // Local default "state" resolves against cwd — see resolveStateDir().
+    stateDir: optional("STATE_DIR", "state"),
   },
   timezone: "America/Los_Angeles",
 } as const;

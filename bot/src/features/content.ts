@@ -198,6 +198,9 @@ export type Draft = {
   attempts: number;
   failures: Array<{ check: string; detail: string }>;
   cities: string[];
+  /** The seed cluster this draft was generated from — Gate 5 persists it so
+   *  an emoji-triggered rewrite reuses the same raw material. */
+  seeds: DiagnosisSeed[];
 };
 
 /** Round-robin across cities so the cluster is not all one file / one neighborhood.
@@ -225,7 +228,7 @@ function renderSeeds(cluster: DiagnosisSeed[]): string {
   return cluster.map((s, i) => `${i + 1}. (${s.city}) ${s.diagnosis}`).join("\n");
 }
 
-function buildUserPrompt(
+export function buildUserPrompt(
   scenarioId: number,
   cluster: DiagnosisSeed[],
   regenFeedback?: string,
@@ -259,6 +262,7 @@ async function generateOne(
   brand: BrandConfig,
   scenarioId: number,
   cluster: DiagnosisSeed[],
+  initialFeedback?: string,
 ): Promise<Draft> {
   const spec = getSpec(scenarioId);
   // Video scenarios pass no toneScenarioId: their IDs collide with the
@@ -281,7 +285,7 @@ async function generateOne(
 
   for (let a = 0; a < MAX_ATTEMPTS; a++) {
     attemptsUsed = a + 1;
-    const userPrompt = buildUserPrompt(scenarioId, cluster, a > 0 ? feedback : undefined);
+    const userPrompt = buildUserPrompt(scenarioId, cluster, a > 0 ? feedback : initialFeedback);
     body = await chat({
       model: env.models.content,
       systemContext: sys.prompt,
@@ -343,6 +347,7 @@ async function generateOne(
     attempts: attemptsUsed,
     failures,
     cities: [...new Set(cluster.map((c) => c.city))],
+    seeds: cluster,
   };
 }
 
@@ -416,6 +421,30 @@ export async function generateDrafts(
   }
 
   return { brandKey, brand, cluster, drafts };
+}
+
+/** Gate 5 emoji-triggered rewrite: ONE regen per draft, Brendan's review notes
+ *  fed into the same 3-attempt voice pipeline against the SAME seed cluster. */
+export async function regenerateDraft(opts: {
+  brandKey: string;
+  scenarioId: number;
+  seeds: DiagnosisSeed[];
+  previousBody: string;
+  feedback: string;
+}): Promise<Draft> {
+  const brand = await getBrand(opts.brandKey);
+  if (!brand) throw new Error(`Unknown brand: ${opts.brandKey}`);
+  if (brand.status !== "active") {
+    throw new Error(`Brand ${opts.brandKey} is ${brand.status}, not consumable for content.`);
+  }
+  const initialFeedback = [
+    "Brendan reviewed your previous draft and wants ONE rewrite. His notes:",
+    opts.feedback,
+    "",
+    "Previous draft (rewrite it, don't patch it):",
+    opts.previousBody,
+  ].join("\n");
+  return generateOne(opts.brandKey, brand, opts.scenarioId, opts.seeds, initialFeedback);
 }
 
 export async function runContentBatch(
