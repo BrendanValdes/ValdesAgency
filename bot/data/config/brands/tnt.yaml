@@ -1,0 +1,88 @@
+# Trade N Travel — Brand Config (PLACEHOLDER, v3)
+# ============================================================
+# DO NOT CONSUME IN V1.
+# Status set to "placeholder" — loader skips placeholders entirely.
+# When v3 begins, change status to "active" and fill the remaining fields.
+# ============================================================
+
+schema_version: "1.0"
+brand_key: "tnt"
+display_name: "Trade N Travel"
+status: placeholder
+default_brand: false
+
+positioning:
+  one_liner: "[TBD in v3] Affiliate travel."
+  voice_anchors: []
+
+voice:
+  banned_words: []
+  banned_structures: []
+  banned_scenarios: []
+  max_sentence_words: 20
+  # reading_level_max is OPTIONAL. Opt in by uncommenting and setting a grade cap.
+  # reading_level_max: 6
+  required_per_post: []
+  dash_policy: none
+
+visual:
+  palette:
+    primary: "#FFFFFF"
+    secondary: "#TBD"
+    accent: "#TBD"
+    neutral_dark: "#1A1A1A"
+    neutral_soft: "#F5F2EB"
+  fonts:
+    display: "TBD"
+    body: "TBD"
+  logo:
+    main: "memory/brand/tnt/logo.svg"
+    watermark: "memory/brand/tnt/logo-watermark.png"
+    watermark_position: "bottom-right"
+    watermark_opacity: 0.6
+
+cadence:
+  posts_per_platform_per_day: 0
+  platforms: []
+  exploration_ratio: 0.33
+  weekly_pattern:
+    monday: ""
+    tuesday: ""
+    wednesday: ""
+    thursday: ""
+    friday: ""
+    saturday: ""
+    sunday: ""
+
+approval:
+  channel_env_var: "CHANNEL_CONTENT_TNT"   # set in v3
+  weekly_plan_time: ""
+  daily_preview_time: ""
+  daily_publish_pass_time: ""
+  approval_lapse_hours: 48
+
+accounts: {}
+
+sources:
+  evergreen_dir: "memory/content/evergreen/tnt/"
+  lead_scrapes: ""
+  exa_queries: []
+  kg_filter: []
+  kg_blocked_patterns: []
+
+grind_aesthetic:
+  max_per_week: 0
+  must_be_generic: true
+
+face_content:
+  pct_of_visuals: 0.0
+  ai_generation: never
+  photo_dir: "memory/brand/tnt/photos/"
+  video_dir: "memory/brand/tnt/videos/"
+
+performance:
+  collection_delay_hours: 24
+  weekly_analysis_time: ""
+  metrics_per_post: []
+
+feature_flags: {}

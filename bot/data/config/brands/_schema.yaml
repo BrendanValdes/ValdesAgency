@@ -1,0 +1,144 @@
+# Brand Config Schema — Reference Doc (NOT consumed at runtime)
+# ============================================================
+# This file documents the structure every brand YAML must satisfy.
+# Runtime enforcement lives in bot/src/services/brand-config.ts via zod.
+# To bump schema, increment schema_version in all brand files + supported list in loader.
+#
+# Supported schema versions: ["1.0"]
+# ============================================================
+
+schema_version: "1.0"               # string. required. version of this schema spec.
+brand_key: "string"                 # required. canonical key. must match filename (valdes.yaml → "valdes").
+display_name: "string"              # required. human label.
+status: "active | placeholder"      # required. placeholders skip the pipeline entirely.
+default_brand: "boolean"            # required. exactly one active brand may set true.
+
+positioning:
+  one_liner: "string"
+  voice_anchors:                    # files used as voice samples for content gen
+    - path: "string"                # repo-relative path
+      weight: "number (0-1)"        # relative weight in the sample stack
+
+voice:
+  banned_words:                     # list of structured banned-term objects
+    - term: "string"                # the actual word/phrase
+      pos: "verb | noun | any"      # optional. limits match by part of speech (any = match all)
+      context_exception: "string"   # optional. context where this word is allowed (e.g. "paid ads")
+  banned_structures:                # list of structured banned-pattern objects
+    - pattern_id: "string"          # short identifier
+      description: "string"         # human-readable
+      regex: "string"               # JS regex (case-insensitive)
+  banned_scenarios:                 # OPTIONAL list of banned scenario patterns (Gate 3.1)
+    - scenario_id: "string"         # short identifier, e.g. "first_milestone"
+      description: "string"         # human-readable
+      regex_patterns: ["string"]    # Prong 1: hard-block JS regex patterns
+      keyword_triggers: ["string"]  # Prong 2: case-insensitive keyword auto-flag
+      structural_checks: ["string"] # Prong 3: structural rule names (manual review)
+      permanent: "boolean"          # true = no unlock path
+      rationale: "string"           # why this scenario is banned
+  max_sentence_words: "integer"     # avg sentence length cap before regen trigger
+  reading_level_max: "integer"      # OPTIONAL. Flesch-Kincaid grade cap. Omit to skip the check.
+  required_per_post:                # soft requirements (warn if missing)
+    - "string"
+  dash_policy: "none | allow"       # "none" blocks —, –, and inter-clause hyphens
+
+visual:
+  palette:
+    primary: "hex"
+    secondary: "hex"
+    accent: "hex"
+    neutral_dark: "hex"
+    neutral_soft: "hex"
+  fonts:
+    display: "string"
+    body: "string"
+    accent: "string (optional)"
+  logo:
+    main: "string (repo-relative path)"
+    watermark: "string (repo-relative path)"
+    watermark_position: "bottom-right | bottom-left | top-right | top-left"
+    watermark_opacity: "number (0-1)"
+
+cadence:
+  posts_per_platform_per_day: "integer"
+  platforms:                        # list of platform keys. tiktok deferred to v1.1.
+    - "linkedin | instagram | facebook | x | tiktok"
+  exploration_ratio: "number (0-1)" # share of daily posts reserved for new-angle tests
+  weekly_pattern:                   # one theme tag per weekday
+    monday: "string"
+    tuesday: "string"
+    wednesday: "string"
+    thursday: "string"
+    friday: "string"
+    saturday: "string"
+    sunday: "string"
+
+approval:
+  channel_env_var: "string"         # name of env var holding Discord channel ID.
+                                    # NEVER store the literal channel ID here.
+  weekly_plan_time: "string (cron-friendly with TZ)"
+  daily_preview_time: "string"
+  daily_publish_pass_time: "string"
+  approval_lapse_hours: "integer"   # auto-pause threshold
+
+accounts:                           # per-platform connection refs. connection_id is a Composio ID, NOT a secret.
+  linkedin:
+    composio_connection_id: "string"
+    handle: "string"
+  instagram:
+    composio_connection_id: "string"
+    handle: "string"
+  facebook:
+    composio_connection_id: "string"
+    page_id: "string"
+  x:
+    composio_connection_id: "string"
+    handle: "string"
+    analytics_mode: "full | blind"
+  # tiktok: deferred to v1.1. Field reserved for future use:
+  # tiktok:
+  #   publer_account_id: "string"
+  #   handle: "string"
+
+sources:
+  evergreen_dir: "string (repo-relative)"
+  lead_scrapes: "string (repo-relative)"
+  exa_queries:
+    - "string"
+  kg_filter:                        # KG patterns to include as content source
+    - "string"
+  kg_blocked_patterns:              # KG patterns explicitly excluded (personal-detail leak protection)
+    - "string"
+
+grind_aesthetic:
+  max_per_week: "integer"
+  must_be_generic: "boolean"        # if true, no real numbers/situations
+
+face_content:
+  pct_of_visuals: "number (0-1)"
+  ai_generation: "never | allow"
+  photo_dir: "string (repo-relative)"
+  video_dir: "string (repo-relative)"
+
+performance:
+  collection_delay_hours: "integer"
+  weekly_analysis_time: "string"
+  metrics_per_post:
+    - "string"
+
+feature_flags:                      # OPTIONAL top-level block (Gate 3.1)
+  scenario_3_client_proof_unlocked: "boolean"  # default false. Gate B for Scenario 3 unlock.
+  scenario_8_we_fixed_this_unlocked: "boolean" # default false. Gate B for Scenario 8 unlock.
+
+# ============================================================
+# CHANGE LOG
+# ============================================================
+# 1.0 — Initial schema. Active brands: valdes. Placeholders: sonoview, tnt.
+#       TikTok field present but unused in v1; deferred to v1.1.
+#       Gate 1 Fixes (2026-05-21):
+#       - reading_level_max made OPTIONAL (Fix 2). Removed from valdes/sonoview/tnt.
+#       - opening_rhetorical_question banned_structure removed (Fix 4). See valdes.yaml.
+#       - accounts schema tightened from z.record(unknown) to per-platform typed (Arch Gap 2).
+#       Gate 3.1 (2026-05-22):
+#       - voice.banned_scenarios array added (Scenario 12 first-milestone ban ported in).
+#       - feature_flags top-level block added (scenario_3 + scenario_8 unlock flags, both default false).
