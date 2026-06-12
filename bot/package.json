@@ -16,8 +16,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@resvg/resvg-js": "^2.6.2",
     "discord.js": "^14.16.3",
+    "jpeg-js": "^0.4.4",
     "node-cron": "^3.0.3",
+    "satori": "^0.26.0",
     "undici": "^6.21.0",
     "yaml": "^2.6.1",
     "zod": "^3.23.8"

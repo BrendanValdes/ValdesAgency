@@ -18,6 +18,21 @@ const TIMEOUT_MS = 30_000;
 export const LINKEDIN_POST_TOOL = "LINKEDIN_CREATE_LINKED_IN_POST";
 export const LINKEDIN_ME_TOOL = "LINKEDIN_GET_MY_INFO";
 
+// Gate 6 — Instagram publishes in two calls (container → publish), Facebook
+// in one. Verified against the live API 2026-06-12.
+export const IG_CONTAINER_TOOL = "INSTAGRAM_CREATE_MEDIA_CONTAINER";
+export const IG_PUBLISH_TOOL = "INSTAGRAM_CREATE_POST";
+export const IG_ME_TOOL = "INSTAGRAM_GET_USER_INFO";
+export const FB_PHOTO_POST_TOOL = "FACEBOOK_CREATE_PHOTO_POST";
+export const FB_PAGES_TOOL = "FACEBOOK_GET_USER_PAGES";
+
+/** Tool slugs the self-check verifies per platform present in slot_times. */
+export const REQUIRED_TOOLS: Record<"linkedin" | "instagram" | "facebook", string[]> = {
+  linkedin: [LINKEDIN_POST_TOOL],
+  instagram: [IG_CONTAINER_TOOL, IG_PUBLISH_TOOL, IG_ME_TOOL],
+  facebook: [FB_PHOTO_POST_TOOL, FB_PAGES_TOOL],
+};
+
 function apiKey(): string {
   const key = env.content.composioKey;
   if (!key) throw new Error("COMPOSIO_API_KEY is not set");

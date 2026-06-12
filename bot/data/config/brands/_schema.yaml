@@ -64,6 +64,9 @@ cadence:
   platforms:                        # list of platform keys. tiktok deferred to v1.1.
     - "linkedin | instagram | facebook | x | tiktok"
   exploration_ratio: "number (0-1)" # share of daily posts reserved for new-angle tests
+  cycle_weeks: "integer (1-4), optional, default 1"  # Gate 6 weekly-cycle length; 2 = biweekly planning
+  slot_times:                       # optional. Posting gate: platforms absent here never auto-post.
+    linkedin: ["HH:MM", "..."]      # LA wall-clock slot times per platform
   weekly_pattern:                   # one theme tag per weekday
     monday: "string"
     tuesday: "string"
@@ -76,6 +79,7 @@ cadence:
 approval:
   channel_env_var: "string"         # name of env var holding Discord channel ID.
                                     # NEVER store the literal channel ID here.
+  mode: "daily | weekly, optional, default daily"  # weekly = Gate 6 cycle cron, daily auto-batch off
   weekly_plan_time: "string (cron-friendly with TZ)"
   daily_preview_time: "string"
   daily_publish_pass_time: "string"

@@ -39,11 +39,13 @@ export type PendingDraft = {
   regenPromptMessageId?: string;
 };
 
+export type PostPlatform = "linkedin" | "instagram" | "facebook";
+
 export type QueueEntry = {
-  id: string; // carried from PendingDraft.id
+  id: string; // carried from PendingDraft.id (Gate 5) or WeekPost.id (Gate 6)
   scenarioId: number;
   body: string;
-  platform: "linkedin"; // v1: LinkedIn only
+  platform: PostPlatform;
   slotAt: string; // ISO instant of the assigned slot
   status: "queued" | "held" | "posted" | "failed";
   attempts: number;
@@ -51,6 +53,11 @@ export type QueueEntry = {
   postedAt?: string;
   postUrl?: string;
   approvedAt: string;
+  imageFile?: string; // token filename under STATE_DIR/images (IG/FB posts)
+  // IG publishes in two calls (container → publish). The container id is
+  // persisted here so a publish-side failure retries publish-only instead of
+  // re-creating the container.
+  igCreationId?: string;
 };
 
 export type ShootItem = {
@@ -67,6 +74,8 @@ export type Gate5State = {
   queue: QueueEntry[];
   shootList: ShootItem[];
   linkedinAuthorUrn?: string; // cached from LINKEDIN_GET_MY_INFO at first post
+  igUserId?: string; // cached from INSTAGRAM_GET_USER_INFO at first post
+  fbPageId?: string; // cached from FACEBOOK_GET_USER_PAGES at first post
   lastBatchDate: string | null; // "YYYY-MM-DD" LA-date — generation idempotency
 };
 

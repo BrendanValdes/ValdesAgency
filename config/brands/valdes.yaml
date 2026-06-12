@@ -174,10 +174,14 @@ cadence:
     - "x"
     # tiktok deferred to v1.1 — Publer Business signup required first
   exploration_ratio: 0.33     # 1 of 3 daily posts is a new-angle test
-  # Gate 5 posting slots, LA wall-clock. Only platforms listed here get
-  # auto-posting; v1 = LinkedIn only (IG needs visuals, X/FB not connected).
+  # Gate 6 cycle length: 1 = plan one week per cycle, 2 = two weeks.
+  # Flipping this is a config change, not a rebuild.
+  cycle_weeks: 1
+  # Posting slots, LA wall-clock. Only platforms listed here get
+  # auto-posting. IG/FB enable at Gate 6 Phase D (after a supervised live
+  # test post per platform) — do NOT add them before that test passes.
   slot_times:
-    linkedin: ["09:00", "13:00"]
+    linkedin: ["09:00", "13:00"]   # weekly cycle uses 09:00; 13:00 stays for ad-hoc /content
   weekly_pattern:
     monday: "framework"
     tuesday: "tip_or_observation"
@@ -193,10 +197,14 @@ cadence:
 
 approval:
   channel_env_var: "CHANNEL_CONTENT_VALDES"   # env var NAME, NEVER the literal channel ID
+  # Gate 6: "weekly" runs the week cycle from weekly_plan_time and disables
+  # the Gate 5 daily auto-batch. /content stays available for ad-hoc batches.
+  # Flips to "weekly" at Phase F deploy; inert until the cron gating ships.
+  mode: "daily"
   weekly_plan_time: "0 20 * * 0 America/Los_Angeles"      # Sun 8pm Vegas time
   daily_preview_time: "0 7 * * * America/Los_Angeles"     # 7am Vegas time
   daily_publish_pass_time: "0 9 * * * America/Los_Angeles" # 9am Vegas time
-  approval_lapse_hours: 48
+  approval_lapse_hours: 48    # Gate 5 per-draft lapse; Gate 6 uses 72h per-phase deadlines
 
 # ============================================================
 # ACCOUNTS (Composio connections — set during Phase 0)

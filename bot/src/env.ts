@@ -65,6 +65,11 @@ export const env = {
   },
   http: {
     port: Number.parseInt(optional("PORT", "3000"), 10),
+    // Railway public domain (https://...), no trailing slash. Required at
+    // runtime only when IG/FB are in cadence.slot_times — IG's media
+    // container must fetch the card image from a public URL. Enforced by
+    // self-check, not assertEnv, so local dev boots without it.
+    publicBaseUrl: optional("PUBLIC_BASE_URL", "").replace(/\/+$/, ""),
   },
   paths: {
     skillsDir: optional("SKILLS_DIR", "data/skills"),

@@ -132,6 +132,10 @@ const BrandConfigSchema = z.object({
       z.enum(["linkedin", "instagram", "facebook", "x", "tiktok"]),
     ),
     exploration_ratio: z.number().min(0).max(1),
+    // Gate 6 weekly cycle length. 1 = plan one week per cycle, 2 = two weeks.
+    // Flipping this is a config change, not a rebuild. Optional with default
+    // so schema_version stays 1.0 and other brand yamls keep parsing.
+    cycle_weeks: z.number().int().min(1).max(4).optional().default(1),
     // Gate 5 posting slots per platform, "HH:MM" LA wall-clock. Optional so
     // schema_version stays 1.0; platforms absent here never auto-post.
     slot_times: z
@@ -157,6 +161,10 @@ const BrandConfigSchema = z.object({
     daily_preview_time: z.string(),
     daily_publish_pass_time: z.string(),
     approval_lapse_hours: z.number().int().positive(),
+    // Gate 6: "weekly" runs the week-cycle cron (weekly_plan_time) and
+    // disables the Gate 5 daily auto-batch; "daily" is the Gate 5 behavior.
+    // /content stays available as a manual ad-hoc batch in both modes.
+    mode: z.enum(["daily", "weekly"]).optional().default("daily"),
   }),
 
   accounts: AccountsSchema,
