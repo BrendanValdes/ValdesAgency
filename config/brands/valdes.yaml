@@ -203,14 +203,22 @@ approval:
 # ============================================================
 
 accounts:
+  # Linked 2026-06-12 via auth configs linkedin-valdes (ac_7988zT5xMQaj),
+  # instagram-valdes (ac_AzGt_SQF8NYF), facebook-valdes (ac_OZ1cgiHqjSCz).
+  # These ca_ IDs are the CONNECTED ACCOUNTS under those configs — the bot
+  # needs ca_, never ac_. ONLY linkedin is an enabled posting channel:
+  # cadence.slot_times is the posting gate and lists linkedin alone. The
+  # scheduler never assigns slots to platforms absent from slot_times.
   linkedin:
-    composio_connection_id: "[set after connect]"
+    composio_connection_id: "ca_Lwl0iJyzVVJ4"
     handle: "@valdesagency"
   instagram:
-    composio_connection_id: "[set after connect]"
+    # DISABLED until image pipeline exists. Do NOT add to slot_times.
+    composio_connection_id: "ca_reSC5_QzcHOR"
     handle: "@valdesagency"
   facebook:
-    composio_connection_id: "[set after connect]"
+    # DISABLED until image pipeline exists. Do NOT add to slot_times.
+    composio_connection_id: "ca_GgY0k9ZKdsgf"
     page_id: "[set after connect]"
   x:
     composio_connection_id: "[set after connect]"
