@@ -63,8 +63,27 @@ export async function listToolSlugs(toolkit: string): Promise<string[]> {
 export async function getConnectedAccount(id: string): Promise<{ status: string }> {
   const data = (await composioGet(`/connected_accounts/${encodeURIComponent(id)}`)) as {
     status?: string;
+    user_id?: string;
   };
+  // Cache the entity_id (user_id) so executeTool can include it without an extra round-trip.
+  if (data.user_id) entityIdCache.set(id, data.user_id);
   return { status: data.status ?? "UNKNOWN" };
+}
+
+// entity_id (Composio "user_id") is required by some toolkits (IG, FB) at execute time.
+// Fetched once per connection per process, then cached. Self-check populates this cache
+// before any actual posting happens via the getConnectedAccount call above.
+const entityIdCache = new Map<string, string>();
+
+async function resolveEntityId(connectionId: string): Promise<string> {
+  if (entityIdCache.has(connectionId)) return entityIdCache.get(connectionId)!;
+  const data = (await composioGet(
+    `/connected_accounts/${encodeURIComponent(connectionId)}`,
+  )) as { user_id?: string };
+  const id = data.user_id ?? "default";
+  entityIdCache.set(connectionId, id);
+  log.info("composio_entity_id_resolved", { connectionId, entityId: id });
+  return id;
 }
 
 export type ToolExecResult = {
@@ -78,10 +97,11 @@ export async function executeTool(
   connectedAccountId: string,
   args: Record<string, unknown>,
 ): Promise<ToolExecResult> {
+  const entityId = await resolveEntityId(connectedAccountId);
   const res = await request(`${BASE}/tools/execute/${encodeURIComponent(slug)}`, {
     method: "POST",
     headers: { "x-api-key": apiKey(), "content-type": "application/json" },
-    body: JSON.stringify({ connected_account_id: connectedAccountId, arguments: args }),
+    body: JSON.stringify({ connected_account_id: connectedAccountId, entity_id: entityId, arguments: args }),
     headersTimeout: TIMEOUT_MS,
     bodyTimeout: TIMEOUT_MS,
   });
@@ -262,7 +282,7 @@ async function getFbPageId(
   if (!pages.successful) {
     throw new Error(`Facebook get-user-pages failed: ${pages.error ?? "unknown error"}`);
   }
-  const d = (pages.data.response_dict ?? pages.data) as Record<string, unknown>;
+  const d = (pages.data.response_dict ?? pages.data.response_data ?? pages.data) as Record<string, unknown>;
   const list = (Array.isArray(d.data) ? d.data : []) as Array<{ id?: string; name?: string }>;
   const first = list[0];
   if (!first?.id) {

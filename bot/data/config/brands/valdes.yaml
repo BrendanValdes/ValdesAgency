@@ -182,6 +182,8 @@ cadence:
   # test post per platform) — do NOT add them before that test passes.
   slot_times:
     linkedin: ["09:00", "13:00"]   # weekly cycle uses 09:00; 13:00 stays for ad-hoc /content
+    instagram: ["11:00"]           # enabled 2026-06-12 after Phase D live test (ig-container PASS)
+    facebook: ["12:00"]            # enabled 2026-06-12 after Phase D live test (page_id confirmed)
   weekly_pattern:
     monday: "framework"
     tuesday: "tip_or_observation"
@@ -220,13 +222,13 @@ accounts:
     composio_connection_id: "ca_Lwl0iJyzVVJ4"
     handle: "@valdesagency"
   instagram:
-    # DISABLED until image pipeline exists. Do NOT add to slot_times.
     composio_connection_id: "ca_reSC5_QzcHOR"
     handle: "@valdesagency"
   facebook:
-    # DISABLED until image pipeline exists. Do NOT add to slot_times.
     composio_connection_id: "ca_GgY0k9ZKdsgf"
-    page_id: "[set after connect]"
+    # Valdes Agency page — confirmed 2026-06-12 via FACEBOOK_GET_USER_PAGES.
+    # Must be explicit: index 0 on this connection is SonoView For You (client page).
+    page_id: "1001734776354015"
   x:
     composio_connection_id: "[set after connect]"
     handle: "@valdesagency"
