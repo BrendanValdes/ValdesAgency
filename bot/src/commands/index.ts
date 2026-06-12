@@ -8,9 +8,10 @@ import { leads } from "./leads.js";
 import { onboard } from "./onboard.js";
 import { ping } from "./ping.js";
 import { script } from "./script.js";
+import { week } from "./week.js";
 import type { SlashCommand } from "./types.js";
 
-export const commands: SlashCommand[] = [ping, briefNow, auditNow, onboard, leads, script, content];
+export const commands: SlashCommand[] = [ping, briefNow, auditNow, onboard, leads, script, content, week];
 
 export const commandMap = new Map<string, SlashCommand>(
   commands.map((c) => [c.data.name, c]),

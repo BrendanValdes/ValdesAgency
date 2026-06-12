@@ -174,8 +174,121 @@ async function phaseB(): Promise<void> {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Phase D — dispatch helpers: isIgMediaNotReady, publicImageUrl, assignSlot
+// ---------------------------------------------------------------------------
+
+async function phaseD(): Promise<void> {
+  const { isIgMediaNotReady } = await import("../src/services/composio.js");
+  const { publicImageUrl } = await import("../src/services/image-cards.js");
+  const { assignSlot, laInstant } = await import("../src/features/scheduler.js");
+
+  await check("D1 isIgMediaNotReady — true for known IG processing error patterns", () => {
+    assert.equal(isIgMediaNotReady(new Error("media not available yet")), true);
+    assert.equal(isIgMediaNotReady(new Error("media not ready")), true);
+    assert.equal(isIgMediaNotReady(new Error("media not finished")), true);
+    assert.equal(isIgMediaNotReady(new Error("error code: 2207027")), true);
+    assert.equal(isIgMediaNotReady(new Error("media is still processing")), true);
+  });
+
+  await check("D2 isIgMediaNotReady — false for unrelated errors", () => {
+    assert.equal(isIgMediaNotReady(new Error("Invalid container ID")), false);
+    assert.equal(isIgMediaNotReady(new Error("rate limit exceeded")), false);
+    assert.equal(isIgMediaNotReady(new Error("unknown error")), false);
+    assert.equal(isIgMediaNotReady(null), false);
+    assert.equal(isIgMediaNotReady("plain string error"), false);
+  });
+
+  await check("D3 publicImageUrl — correct shape (no double slash, /i/ path)", () => {
+    assert.equal(
+      publicImageUrl("https://bot.railway.app", "abc123.jpg"),
+      "https://bot.railway.app/i/abc123.jpg",
+    );
+    // trailing slash in base should not produce double slash
+    assert.equal(
+      publicImageUrl("https://bot.railway.app/", "abc123.jpg"),
+      "https://bot.railway.app/i/abc123.jpg",
+    );
+  });
+
+  await check("D4 assignSlot — skips Sundays when skipSundays=true", () => {
+    // Build a 'now' that is a Saturday 23:59 LA time (UTC+8=Sunday morning in UTC,
+    // but LA is UTC-7/8 so a Sun 08:00 UTC is still Sat 00:00–01:00 LA).
+    // Simplest: use a Monday so d=0 is Mon, d=6 would be Sun. We assert slot d=6 is skipped.
+    // Use a known Monday noon LA (Mon 12:00 PDT = Mon 19:00 UTC):
+    const monNoon = laInstant("2026-06-15", "12:00"); // 2026-06-15 is a Monday
+    const result = assignSlot({
+      platform: "instagram",
+      slotTimes: ["11:00"],
+      takenSlots: [],
+      now: monNoon,
+      skipSundays: true,
+    });
+    // Expect Mon–Sat slots only (6 days then Sat, then skip Sun, then Mon).
+    // First 6 days from Mon are Mon(today—past 11am)→Tue→Wed→Thu→Fri→Sat.
+    // Mon 11am is before 12pm now, so first valid slot = Tue 11am.
+    const slotDay = new Date(result).toLocaleDateString("en-US", {
+      timeZone: "America/Los_Angeles",
+      weekday: "short",
+    });
+    // Tue is expected; if the Sunday skip logic were broken the algo could pick Sun.
+    // Walk through 7 slots and confirm none is Sunday.
+    const takenSoFar: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const s = assignSlot({
+        platform: "instagram",
+        slotTimes: ["11:00"],
+        takenSlots: takenSoFar,
+        now: monNoon,
+        skipSundays: true,
+      });
+      const wd = new Date(s).toLocaleDateString("en-US", {
+        timeZone: "America/Los_Angeles",
+        weekday: "short",
+      });
+      assert.notEqual(wd, "Sun", `slot ${i} fell on Sunday: ${s}`);
+      takenSoFar.push(s);
+    }
+  });
+
+  await check("D5 assignSlot — skips taken slots", () => {
+    const base = laInstant("2026-06-15", "08:00"); // Mon 08:00 LA — before all slots
+    const firstSlot = assignSlot({
+      platform: "linkedin",
+      slotTimes: ["09:00", "13:00"],
+      takenSlots: [],
+      now: base,
+      skipSundays: true,
+    });
+    // First slot should be 09:00 that day.
+    const hm = new Date(firstSlot).toLocaleTimeString("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    assert.equal(hm, "09:00");
+    // Take it — next slot should be 13:00 same day.
+    const second = assignSlot({
+      platform: "linkedin",
+      slotTimes: ["09:00", "13:00"],
+      takenSlots: [firstSlot],
+      now: base,
+      skipSundays: true,
+    });
+    const hm2 = new Date(second).toLocaleTimeString("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    assert.equal(hm2, "13:00");
+  });
+}
+
 await phaseA();
 await phaseB();
+await phaseD();
 
 console.log(`\n${passed}/${passed + failed} checks passed`);
 if (failed > 0) process.exit(1);

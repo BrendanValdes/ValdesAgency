@@ -156,3 +156,151 @@ export async function postToLinkedIn(
   const shareUrn = extractShareUrn(result.data);
   return { postUrl: shareUrn ? `https://www.linkedin.com/feed/update/${shareUrn}/` : null };
 }
+
+// ---------------------------------------------------------------------------
+// Instagram posting (Gate 6) — two calls: media container → publish.
+// The container id is returned so the scheduler can persist it and retry
+// publish-only when IG's CDN hasn't finished processing the image.
+// ---------------------------------------------------------------------------
+
+/** Tolerant numeric-id extraction — Graph responses nest under response_dict
+ *  or data depending on toolkit version. */
+function extractGraphId(data: Record<string, unknown>): string | null {
+  const d = (data.response_dict ?? data.data ?? data) as Record<string, unknown>;
+  const id = d.id ?? d.creation_id ?? d.user_id;
+  if (typeof id === "string" && /^\d+$/.test(id)) return id;
+  if (typeof id === "number") return String(id);
+  const m = JSON.stringify(data).match(/"(?:id|creation_id)"\s*:\s*"?(\d{5,})"?/);
+  return m?.[1] ?? null;
+}
+
+/** True for IG's "media not ready yet" class of publish errors — the
+ *  scheduler holds WITHOUT counting an attempt and retries next tick. */
+export function isIgMediaNotReady(err: unknown): boolean {
+  return /not (?:available|ready|finished)|2207027|media.{0,20}process/i.test(String(err));
+}
+
+async function getIgUserId(connectedAccountId: string): Promise<string> {
+  const cached = getState().igUserId;
+  if (cached) return cached;
+  const me = await executeTool(IG_ME_TOOL, connectedAccountId, {});
+  if (!me.successful) {
+    throw new Error(`Instagram get-user-info failed: ${me.error ?? "unknown error"}`);
+  }
+  const id = extractGraphId(me.data);
+  if (!id) {
+    throw new Error(
+      `Could not extract ig_user_id from get-user-info response: ${JSON.stringify(me.data).slice(0, 200)}`,
+    );
+  }
+  await mutateState((s) => {
+    s.igUserId = id;
+  });
+  log.info("ig_user_id_cached", { id });
+  return id;
+}
+
+export async function postToInstagram(opts: {
+  caption: string;
+  imageUrl: string;
+  connectedAccountId: string;
+  /** Persisted container id from a prior attempt — skips container creation. */
+  existingCreationId?: string;
+}): Promise<{ postUrl: string | null; creationId: string }> {
+  const igUserId = await getIgUserId(opts.connectedAccountId);
+
+  let creationId = opts.existingCreationId;
+  if (!creationId) {
+    const container = await executeTool(IG_CONTAINER_TOOL, opts.connectedAccountId, {
+      ig_user_id: igUserId,
+      image_url: opts.imageUrl,
+      caption: opts.caption,
+      content_type: "photo",
+    });
+    if (!container.successful) {
+      throw new Error(`Instagram media container failed: ${container.error ?? "unknown error"}`);
+    }
+    const extracted = extractGraphId(container.data);
+    if (!extracted) {
+      throw new Error(
+        `Could not extract creation_id from container response: ${JSON.stringify(container.data).slice(0, 200)}`,
+      );
+    }
+    creationId = extracted;
+  }
+
+  const publish = await executeTool(IG_PUBLISH_TOOL, opts.connectedAccountId, {
+    ig_user_id: igUserId,
+    creation_id: creationId,
+  });
+  if (!publish.successful) {
+    const err = new Error(`Instagram publish failed: ${publish.error ?? "unknown error"}`);
+    // Attach the container id so the caller can persist it before rethrowing.
+    (err as Error & { creationId?: string }).creationId = creationId;
+    throw err;
+  }
+
+  const mediaId = extractGraphId(publish.data);
+  return {
+    postUrl: mediaId ? `https://www.instagram.com/p/${mediaId}/` : null,
+    creationId,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Facebook page posting (Gate 6) — single photo-post call.
+// ---------------------------------------------------------------------------
+
+async function getFbPageId(
+  connectedAccountId: string,
+  configuredPageId: string | undefined,
+): Promise<string> {
+  if (configuredPageId && configuredPageId !== "[set after connect]") return configuredPageId;
+  const cached = getState().fbPageId;
+  if (cached) return cached;
+  const pages = await executeTool(FB_PAGES_TOOL, connectedAccountId, {});
+  if (!pages.successful) {
+    throw new Error(`Facebook get-user-pages failed: ${pages.error ?? "unknown error"}`);
+  }
+  const d = (pages.data.response_dict ?? pages.data) as Record<string, unknown>;
+  const list = (Array.isArray(d.data) ? d.data : []) as Array<{ id?: string; name?: string }>;
+  const first = list[0];
+  if (!first?.id) {
+    throw new Error(
+      `No Facebook pages on this connection — check page permissions in the Composio connect. Response: ${JSON.stringify(pages.data).slice(0, 200)}`,
+    );
+  }
+  if (list.length > 1) {
+    log.warn("fb_multiple_pages", {
+      picked: first.id,
+      names: list.map((p) => p.name ?? p.id),
+      hint: "set accounts.facebook.page_id in valdes.yaml to override",
+    });
+  }
+  await mutateState((s) => {
+    s.fbPageId = first.id;
+  });
+  log.info("fb_page_id_cached", { id: first.id, name: first.name });
+  return first.id;
+}
+
+export async function postToFacebook(opts: {
+  message: string;
+  imageUrl: string;
+  connectedAccountId: string;
+  configuredPageId?: string;
+}): Promise<{ postUrl: string | null }> {
+  const pageId = await getFbPageId(opts.connectedAccountId, opts.configuredPageId);
+  const result = await executeTool(FB_PHOTO_POST_TOOL, opts.connectedAccountId, {
+    page_id: pageId,
+    url: opts.imageUrl,
+    message: opts.message,
+    published: true,
+  });
+  if (!result.successful) {
+    throw new Error(`Facebook photo post failed: ${result.error ?? "unknown error"}`);
+  }
+  const d = (result.data.response_dict ?? result.data) as Record<string, unknown>;
+  const postId = (d.post_id ?? d.id) as string | undefined;
+  return { postUrl: postId ? `https://www.facebook.com/${postId}` : null };
+}

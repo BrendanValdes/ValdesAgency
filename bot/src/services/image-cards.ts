@@ -284,5 +284,5 @@ export async function renderCardToVolume(opts: RenderCardOpts): Promise<string> 
 
 /** Public URL for a stored card — requires PUBLIC_BASE_URL (checked by self-check). */
 export function publicImageUrl(baseUrl: string, filename: string): string {
-  return `${baseUrl}/i/${filename}`;
+  return `${baseUrl.replace(/\/+$/, "")}/i/${filename}`;
 }

@@ -199,8 +199,7 @@ approval:
   channel_env_var: "CHANNEL_CONTENT_VALDES"   # env var NAME, NEVER the literal channel ID
   # Gate 6: "weekly" runs the week cycle from weekly_plan_time and disables
   # the Gate 5 daily auto-batch. /content stays available for ad-hoc batches.
-  # Flips to "weekly" at Phase F deploy; inert until the cron gating ships.
-  mode: "daily"
+  mode: "weekly"
   weekly_plan_time: "0 20 * * 0 America/Los_Angeles"      # Sun 8pm Vegas time
   daily_preview_time: "0 7 * * * America/Los_Angeles"     # 7am Vegas time
   daily_publish_pass_time: "0 9 * * * America/Los_Angeles" # 9am Vegas time

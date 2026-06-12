@@ -5,11 +5,13 @@ import { assertEnv, env } from "./env.js";
 import { bindClient, installGlobalHandlers, reportError, withErrorBoundary } from "./errors.js";
 import { attachApprovalListeners } from "./features/approval.js";
 import { attachOutreachListener } from "./features/outreach-chat.js";
+import { attachWeekReviewListeners } from "./features/week-review.js";
 import { handleOnboardingSubmit, isOnboardingModal } from "./features/onboarding.js";
 import { runGate5SelfCheck } from "./features/self-check.js";
 import { markDiscordReady, startHealthServer } from "./health.js";
 import { log } from "./logger.js";
 import { initStateStore } from "./services/state.js";
+import { initWeekStateStore } from "./services/week-state.js";
 
 async function main(): Promise<void> {
   assertEnv();
@@ -18,6 +20,8 @@ async function main(): Promise<void> {
 
   // Gate 5 persistence — fail startup loudly if STATE_DIR is unwritable.
   await initStateStore();
+  // Gate 6 persistence — separate file, same directory.
+  await initWeekStateStore();
 
   const client = new Client({
     intents: [
@@ -58,6 +62,7 @@ async function main(): Promise<void> {
 
   attachOutreachListener(client);
   attachApprovalListeners(client);
+  attachWeekReviewListeners(client);
 
   await registerGuildCommands();
   await client.login(env.discord.token);

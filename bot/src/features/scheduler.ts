@@ -11,7 +11,13 @@ import type { Client } from "discord.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
 import { getBrand } from "../services/brand-config.js";
-import { postToLinkedIn } from "../services/composio.js";
+import {
+  isIgMediaNotReady,
+  postToFacebook,
+  postToInstagram,
+  postToLinkedIn,
+} from "../services/composio.js";
+import { publicImageUrl } from "../services/image-cards.js";
 import { getState, mutateState } from "../services/state.js";
 import { sweepLapsed } from "./approval.js";
 import { postToChannel } from "./daily-brief.js";
@@ -125,32 +131,73 @@ export async function runSchedulerTick(client: Client): Promise<void> {
 
   const channelId = env.channels.contentValdes;
   const brand = await getBrand(env.content.defaultBrand);
-  const connectionId = brand?.accounts.linkedin?.composio_connection_id ?? "";
-  const connectionReady =
-    connectionId !== "" && connectionId !== CONNECTION_PLACEHOLDER;
 
   for (const entry of due) {
-    if (!connectionReady) {
-      // Hold with an explicit flag — never throw the whole tick, never drop.
+    const platform = entry.platform;
+    const connectionId = brand?.accounts[platform]?.composio_connection_id ?? "";
+    const connectionReady = connectionId !== "" && connectionId !== CONNECTION_PLACEHOLDER;
+
+    // Hold with an explicit flag — never throw the whole tick, never drop.
+    const hold = async (reason: string) => {
       await mutateState((s) => {
         const q = s.queue.find((x) => x.id === entry.id);
         if (q) {
           q.status = "held";
-          q.lastError = "LinkedIn Composio connection not configured";
+          q.lastError = reason;
         }
       });
       if (channelId) {
-        await postToChannel(
-          client,
-          channelId,
-          `⚠️ Post S${entry.scenarioId} is due but the LinkedIn Composio connection isn't configured (valdes.yaml accounts.linkedin.composio_connection_id). Held in queue.`,
-        );
+        await postToChannel(client, channelId, `⚠️ ${platform} post \`${entry.id}\` is due but held: ${reason}`);
       }
+    };
+
+    if (!connectionReady) {
+      await hold(`${platform} Composio connection not configured (valdes.yaml accounts.${platform}.composio_connection_id)`);
       continue;
     }
 
+    // IG/FB are image posts — both need the public card URL.
+    let imageUrl = "";
+    if (platform === "instagram" || platform === "facebook") {
+      if (!entry.imageFile) {
+        await hold("entry has no imageFile — image posts cannot ship without one");
+        continue;
+      }
+      if (!env.http.publicBaseUrl) {
+        await hold("PUBLIC_BASE_URL not set — IG/FB need a public image URL");
+        continue;
+      }
+      imageUrl = publicImageUrl(env.http.publicBaseUrl, entry.imageFile);
+    }
+
     try {
-      const { postUrl } = await postToLinkedIn(entry.body, connectionId);
+      let postUrl: string | null = null;
+      switch (platform) {
+        case "linkedin": {
+          ({ postUrl } = await postToLinkedIn(entry.body, connectionId));
+          break;
+        }
+        case "instagram": {
+          const result = await postToInstagram({
+            caption: entry.body,
+            imageUrl,
+            connectedAccountId: connectionId,
+            existingCreationId: entry.igCreationId,
+          });
+          postUrl = result.postUrl;
+          break;
+        }
+        case "facebook": {
+          ({ postUrl } = await postToFacebook({
+            message: entry.body,
+            imageUrl,
+            connectedAccountId: connectionId,
+            configuredPageId: brand?.accounts.facebook?.page_id,
+          }));
+          break;
+        }
+      }
+
       await mutateState((s) => {
         const q = s.queue.find((x) => x.id === entry.id);
         if (q) {
@@ -159,15 +206,31 @@ export async function runSchedulerTick(client: Client): Promise<void> {
           q.postUrl = postUrl ?? undefined;
         }
       });
-      log.info("gate5_posted", { id: entry.id, postUrl });
+      log.info("gate6_posted", { id: entry.id, platform, postUrl });
       if (channelId) {
         await postToChannel(
           client,
           channelId,
-          `✅ Posted to LinkedIn (S${entry.scenarioId}): ${postUrl ?? "(no URL returned by the API — check the profile)"}`,
+          `✅ Posted to ${platform} (\`${entry.id}\`): ${postUrl ?? "(no URL returned by the API — check the profile)"}`,
         );
       }
     } catch (err) {
+      // IG "media not ready": persist the container id and hold WITHOUT
+      // counting an attempt — the next tick retries publish-only.
+      const creationId = (err as Error & { creationId?: string }).creationId;
+      if (platform === "instagram" && creationId && isIgMediaNotReady(err)) {
+        await mutateState((s) => {
+          const q = s.queue.find((x) => x.id === entry.id);
+          if (q) {
+            q.status = "held";
+            q.igCreationId = creationId;
+            q.lastError = `IG media processing — publish retries next tick (${String(err).slice(0, 150)})`;
+          }
+        });
+        log.info("gate6_ig_media_pending", { id: entry.id, creationId });
+        continue;
+      }
+
       const attempts = entry.attempts + 1;
       const final = attempts >= MAX_POST_ATTEMPTS;
       await mutateState((s) => {
@@ -176,16 +239,21 @@ export async function runSchedulerTick(client: Client): Promise<void> {
           q.attempts = attempts;
           q.lastError = String(err).slice(0, 300);
           q.status = final ? "failed" : "held";
+          // A stored container id that errored as invalid/expired must not
+          // poison retries — drop it so the next attempt recreates it.
+          if (platform === "instagram" && !isIgMediaNotReady(err)) {
+            q.igCreationId = undefined;
+          }
         }
       });
-      log.error("gate5_post_failed", { id: entry.id, attempts, err: String(err) });
+      log.error("gate6_post_failed", { id: entry.id, platform, attempts, err: String(err) });
       if (channelId) {
         await postToChannel(
           client,
           channelId,
           final
-            ? `🛑 LinkedIn post FAILED permanently (S${entry.scenarioId}, ${attempts}/${MAX_POST_ATTEMPTS} attempts): ${String(err).slice(0, 200)}\nDraft stays in state — repost manually or fix the connection and reset its status.`
-            : `⚠️ LinkedIn post failed (S${entry.scenarioId}, attempt ${attempts}/${MAX_POST_ATTEMPTS}): ${String(err).slice(0, 200)}\nHeld in queue — retrying next tick.`,
+            ? `🛑 ${platform} post FAILED permanently (\`${entry.id}\`, ${attempts}/${MAX_POST_ATTEMPTS} attempts): ${String(err).slice(0, 200)}\nDraft stays in state — repost manually or fix the connection and reset its status.`
+            : `⚠️ ${platform} post failed (\`${entry.id}\`, attempt ${attempts}/${MAX_POST_ATTEMPTS}): ${String(err).slice(0, 200)}\nHeld in queue — retrying next tick.`,
         );
       }
     }
