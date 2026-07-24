@@ -15,6 +15,8 @@ import { NextResponse } from "next/server";
 const CRM_API_BASE =
   process.env.VALDES_CRM_API_BASE ?? "https://services.leadconnectorhq.com";
 const CRM_API_VERSION = process.env.VALDES_CRM_API_VERSION ?? "2021-07-28";
+const BOOKING_EXTERNAL_WRITES_ENABLED =
+  process.env.BOOKING_EXTERNAL_WRITES_ENABLED === "true";
 
 interface BookRequest {
   firstName?: string;
@@ -27,6 +29,13 @@ interface BookRequest {
 }
 
 export async function POST(req: Request) {
+  if (!BOOKING_EXTERNAL_WRITES_ENABLED) {
+    return NextResponse.json(
+      { error: "Online booking submissions are temporarily unavailable." },
+      { status: 503 }
+    );
+  }
+
   let body: BookRequest;
   try {
     body = (await req.json()) as BookRequest;
