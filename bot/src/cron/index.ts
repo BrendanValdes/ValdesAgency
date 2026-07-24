@@ -123,11 +123,16 @@ export function startCron(client: Client): void {
   cron.schedule(
     "*/5 * * * *",
     () => {
-      void withErrorBoundary("cron:gate5-tick", () => runSchedulerTick(client));
+      if (env.content.socialPublishingEnabled) {
+        void withErrorBoundary("cron:gate5-tick", () => runSchedulerTick(client));
+      }
       void withErrorBoundary("cron:gate6-lapse", () => sweepWeekLapsed(client));
     },
     { timezone: env.timezone },
   );
+  if (!env.content.socialPublishingEnabled) {
+    log.info("cron_gate5_tick_disabled", { reason: "SOCIAL_PUBLISHING_ENABLED is not true" });
+  }
 
   // Gate 6: daily image cleanup (3am LA — offpeak, before any morning posts).
   cron.schedule(

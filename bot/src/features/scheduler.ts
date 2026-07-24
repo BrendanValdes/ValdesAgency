@@ -118,6 +118,11 @@ export function formatSlotForHumans(iso: string): string {
 // ---------------------------------------------------------------------------
 
 export async function runSchedulerTick(client: Client): Promise<void> {
+  if (!env.content.socialPublishingEnabled) {
+    log.info("gate6_publishing_disabled");
+    return;
+  }
+
   await sweepLapsed(client);
 
   const now = Date.now();
@@ -172,6 +177,10 @@ export async function runSchedulerTick(client: Client): Promise<void> {
 
     try {
       let postUrl: string | null = null;
+      if (!env.content.socialPublishingEnabled) {
+        log.warn("gate6_publishing_disabled_at_provider_boundary", { id: entry.id, platform });
+        return;
+      }
       switch (platform) {
         case "linkedin": {
           ({ postUrl } = await postToLinkedIn(entry.body, connectionId));

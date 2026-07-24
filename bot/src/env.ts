@@ -60,6 +60,7 @@ export const env = {
     composioKey: optional("COMPOSIO_API_KEY", ""),
     exaKey: optional("EXA_API_KEY", ""),
     higgsfieldKey: optional("HIGGSFIELD_API_KEY", ""),
+    socialPublishingEnabled: process.env.SOCIAL_PUBLISHING_ENABLED === "true",
     defaultBrand: optional("BRAND_DEFAULT", "valdes"),
     configDir: optional("BRAND_CONFIG_DIR", "config/brands"),
   },
