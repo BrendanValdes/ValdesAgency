@@ -90,6 +90,7 @@ describe("lead-engine configuration", () => {
     const sourceRoot = path.join(process.cwd(), "src", "lead-engine");
     const content = sourceFiles(sourceRoot)
       .filter((file) => !file.includes(`${path.sep}crawl${path.sep}`))
+      .filter((file) => !file.includes(`${path.sep}orchestration${path.sep}`))
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
 

@@ -8,10 +8,10 @@ import { createTestDatabase, syntheticBusiness } from "./fixtures/synthetic.js";
 const timestamp = "2026-01-15T12:00:00.000Z";
 
 describe("migration 004 website assessment persistence", () => {
-  it("applies 001 through 004 in order and remains idempotent", () => {
+  it("applies the complete migration chain in order and remains idempotent", () => {
     const fixture = createTestDatabase();
     try {
-      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5]);
+      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6]);
       expect(migrateDatabase(fixture.database)).toEqual(getMigrationHistory(fixture.database));
     } finally {
       fixture.cleanup();
