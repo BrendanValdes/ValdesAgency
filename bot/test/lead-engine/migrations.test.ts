@@ -37,8 +37,14 @@ const expectedTables = [
   "merge_decisions",
   "migration_history",
   "niche_configuration_versions",
+  "offline_execution_attempts",
+  "offline_manual_interventions",
   "offline_orchestration_events",
   "offline_orchestration_runs",
+  "offline_recovery_events",
+  "offline_run_state_transitions",
+  "offline_stage_checkpoints",
+  "offline_worker_leases",
   "person_evidence_candidates",
   "provider_calls",
   "provider_result_identifiers",
@@ -56,7 +62,7 @@ const expectedTables = [
 ];
 
 describe("forward-only migrations", () => {
-  it("creates the complete Phase 1 through Phase 3D1 foundation on a fresh database", () => {
+  it("creates the complete Phase 1 through Phase 3D2 foundation on a fresh database", () => {
     const fixture = createTestDatabase();
     try {
       const tables = fixture.database
@@ -74,7 +80,7 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
@@ -82,6 +88,7 @@ describe("forward-only migrations", () => {
         "004_website_assessment.sql",
         "005_provenance_verification_identity.sql",
         "006_offline_orchestration.sql",
+        "007_offline_reliability.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {

@@ -24,6 +24,10 @@ import {
   type OfflineLeadPipelineInput,
   type OfflinePipelineEvent,
 } from "../../../src/lead-engine/orchestration/types.js";
+import type {
+  OfflineDurableStage,
+  OfflineReliabilityControl,
+} from "../../../src/lead-engine/orchestration/reliability/types.js";
 import { FixtureDiscoveryProvider } from "../../../src/lead-engine/providers/adapters/fixture.js";
 import type { NormalizedDiscoveryResult } from "../../../src/lead-engine/providers/contracts.js";
 import { ProviderRegistry } from "../../../src/lead-engine/providers/registry.js";
@@ -63,6 +67,13 @@ export interface OfflinePipelineFixtureOptions {
   readonly html?: string;
   readonly onEvent?: (event: OfflinePipelineEvent) => void;
   readonly onFetch?: (url: string) => void;
+  readonly startedAt?: string;
+  readonly workerId?: string;
+  readonly leaseDurationMs?: number;
+  readonly retryPolicy?: OfflineReliabilityControl["retryPolicy"];
+  readonly afterRunCreated?: () => void;
+  readonly afterStageCommitted?: (stage: OfflineDurableStage) => void;
+  readonly afterResultPersisted?: () => void;
 }
 
 export function createOfflinePipelineFixture(
@@ -75,6 +86,15 @@ export function createOfflinePipelineFixture(
     records: options.records ?? [offlineDiscoveryRecord],
   }));
   const events: OfflinePipelineEvent[] = [];
+  let nowMs = Date.parse(options.startedAt ?? SYNTHETIC_TIMESTAMP);
+  let leaseSequence = 0;
+  const clock = {
+    now: () => new Date(nowMs).toISOString(),
+    advance(ms: number) {
+      nowMs += ms;
+      return this.now();
+    },
+  };
   const websiteSource = options.html ?? fixtureHtml;
   const fixtureFetcher = {
     sourceClass: "synthetic_fixture" as const,
@@ -96,7 +116,7 @@ export function createOfflinePipelineFixture(
           retryable: false,
           attempts: 0,
           redirectHistory: [],
-          fetchedAt: SYNTHETIC_TIMESTAMP,
+          fetchedAt: clock.now(),
           httpStatus: null,
         };
       }
@@ -109,7 +129,7 @@ export function createOfflinePipelineFixture(
           retryable: false,
           attempts: 0,
           redirectHistory: [],
-          fetchedAt: SYNTHETIC_TIMESTAMP,
+          fetchedAt: clock.now(),
           httpStatus: null,
         };
       }
@@ -129,7 +149,7 @@ export function createOfflinePipelineFixture(
         etag: null,
         lastModified: null,
         redirectHistory: [],
-        fetchedAt: SYNTHETIC_TIMESTAMP,
+        fetchedAt: clock.now(),
         attempts: 1,
       };
     },
@@ -160,12 +180,23 @@ export function createOfflinePipelineFixture(
       extractServiceEvidence,
       extractConversionSignals,
     },
-    clock: { now: () => SYNTHETIC_TIMESTAMP },
+    clock,
     ids: { id: stableId, hash: stableHash },
     events: {
       emit(event) {
         events.push(event);
         options.onEvent?.(event);
+      },
+    },
+    reliability: {
+      workerId: options.workerId ?? "offline-worker-001",
+      leaseDurationMs: options.leaseDurationMs ?? 30_000,
+      leaseToken: () => `offline-lease-token-${++leaseSequence}`,
+      retryPolicy: options.retryPolicy,
+      hooks: {
+        afterRunCreated: options.afterRunCreated,
+        afterStageCommitted: options.afterStageCommitted,
+        afterResultPersisted: options.afterResultPersisted,
       },
     },
   };
@@ -208,6 +239,7 @@ export function createOfflinePipelineFixture(
     ...databaseFixture,
     dependencies,
     events,
+    clock,
     makeInput,
   };
 }

@@ -24,8 +24,9 @@ import type {
 import type { FixtureScenario, ProviderEnvelope } from "../providers/contracts.js";
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { FeatureAssessmentStatus } from "../validation/website-assessment.js";
+import type { OfflineReliabilityControl } from "./reliability/types.js";
 
-export const OFFLINE_ORCHESTRATION_VERSION = "offline-orchestration-1.0.0";
+export const OFFLINE_ORCHESTRATION_VERSION = "offline-orchestration-2.0.0";
 
 export interface OfflineRunBudget {
   readonly maxProviderCalls: number;
@@ -37,12 +38,14 @@ export interface OfflineRunBudget {
 }
 
 export interface OfflineBudgetUsage {
+  readonly [key: string]: number;
   readonly providerCalls: number;
   readonly websiteRequests: number;
   readonly pages: number;
   readonly compressedBytes: number;
   readonly decompressedBytes: number;
   readonly elapsedCrawlMs: number;
+  readonly retryAttempts: number;
   readonly costMicroUsd: 0;
 }
 
@@ -94,7 +97,8 @@ export type OfflinePipelineStage =
   | "identity"
   | "website_assessment"
   | "persistence"
-  | "finalization";
+  | "finalization"
+  | import("./reliability/types.js").OfflineDurableStage;
 
 export interface OfflinePipelineEvent {
   readonly runId: string;
@@ -179,6 +183,7 @@ export interface OfflineLeadPipelineDependencies {
     hash(value: unknown): string;
   };
   readonly events: { emit(event: OfflinePipelineEvent): void };
+  readonly reliability: OfflineReliabilityControl;
 }
 
 export interface OfflineWebsiteAssessmentResult {

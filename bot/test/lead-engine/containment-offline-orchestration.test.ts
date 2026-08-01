@@ -19,7 +19,7 @@ function existingFiles(directories: ReadonlyArray<string>): string[] {
   });
 }
 
-describe("Phase 3D1 offline orchestration containment", () => {
+describe("Phase 3D2 offline orchestration containment", () => {
   it("is not imported or invoked by startup, Discord, CRM, Retell, cron, commands, or services", () => {
     const root = process.cwd();
     const productionFiles = existingFiles([
@@ -52,13 +52,14 @@ describe("Phase 3D1 offline orchestration containment", () => {
   });
 
   it("imports no public networking capability, live provider, or external integration", () => {
-    const source = readFileSync(
-      path.join(process.cwd(), "src/lead-engine/orchestration/offline-lead-pipeline.ts"),
-      "utf8",
-    );
+    const source = files(path.join(process.cwd(), "src/lead-engine/orchestration"))
+      .filter((file) => /\.ts$/.test(file))
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
     expect(source).not.toMatch(/network-capability|direct-http|overture-local/);
     expect(source).not.toMatch(/issuePublicWebCapability|createDirectHttpFetcher/);
     expect(source).not.toMatch(/discord|retell|crm|composio|(?:from\s+["'][^"']*exports?|booking.*adapter)/i);
     expect(source).not.toMatch(/process\.env|globalThis\.fetch|await\s+fetch\s*\(/);
+    expect(source).not.toMatch(/setInterval\s*\(|node-cron|cron\.schedule|production_worker/i);
   });
 });
