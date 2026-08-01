@@ -91,6 +91,7 @@ describe("lead-engine configuration", () => {
     const content = sourceFiles(sourceRoot)
       .filter((file) => !file.includes(`${path.sep}crawl${path.sep}`))
       .filter((file) => !file.includes(`${path.sep}orchestration${path.sep}`))
+      .filter((file) => !file.includes(`${path.sep}providers${path.sep}overture${path.sep}`))
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
 

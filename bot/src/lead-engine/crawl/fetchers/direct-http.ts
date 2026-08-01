@@ -496,6 +496,7 @@ export function createDirectHttpFetcher(
     providerId: string;
     runId: string;
     assessmentId: string;
+    operation?: "discovery" | "website_assessment";
     limits?: CrawlLimits;
     resolver?: DnsResolver;
     now?: () => string;
@@ -508,6 +509,7 @@ export function createDirectHttpFetcher(
     providerId: options.providerId,
     runId: options.runId,
     assessmentId: options.assessmentId,
+    operation: options.operation,
   };
   const capabilityLimits = {
     maxBytesPerRequest: limits.maxCompressedBytes,

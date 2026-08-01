@@ -98,7 +98,10 @@ const providerDefinitionSchema = z
         ttl_seconds: finiteBudget,
       })
       .strict(),
-    access: z.literal("explicitly_configured_absolute_local_fixture_only").optional(),
+    access: z.enum([
+      "explicitly_configured_absolute_local_fixture_only",
+      "official_overture_https_only",
+    ]).optional(),
     pinned_release_required: z.literal(true).optional(),
     sha256_required: z.literal(true).optional(),
   })
@@ -130,6 +133,12 @@ export interface RuntimeProviderPolicy {
     enabled: boolean;
     ttlSeconds: number;
   }>;
+  readonly access:
+    | "explicitly_configured_absolute_local_fixture_only"
+    | "official_overture_https_only"
+    | null;
+  readonly pinnedReleaseRequired: boolean;
+  readonly sha256Required: boolean;
 }
 
 export interface RuntimeLeadPolicy {
@@ -219,8 +228,10 @@ function assertProviderConsistency(
 ): void {
   for (const [providerId, provider] of Object.entries(providers)) {
     const pathPrefix = `providers.${providerId}`;
+    const remotePublicDataset = provider.source_class === "local_public_dataset" &&
+      provider.access === "official_overture_https_only";
     const networkClass = provider.source_class === "public_web" ||
-      provider.source_class === "external_verification_provider";
+      provider.source_class === "external_verification_provider" || remotePublicDataset;
     if (provider.requires_network !== networkClass) {
       throw policyError("provider_network_class_conflict", pathPrefix);
     }
@@ -260,8 +271,15 @@ function assertProviderConsistency(
       provider.access || provider.pinned_release_required || provider.sha256_required,
     );
     if (provider.source_class === "local_public_dataset") {
-      if (!provider.access || !provider.pinned_release_required || !provider.sha256_required) {
+      if (!provider.access || !provider.pinned_release_required) {
         throw policyError("local_dataset_pin_policy_missing", pathPrefix);
+      }
+      if (provider.access === "explicitly_configured_absolute_local_fixture_only" &&
+        !provider.sha256_required) {
+        throw policyError("local_dataset_checksum_policy_missing", pathPrefix);
+      }
+      if (provider.access === "official_overture_https_only" && provider.sha256_required) {
+        throw policyError("remote_dataset_checksum_policy_conflict", pathPrefix);
       }
     } else if (hasLocalDatasetPinPolicy) {
       throw policyError("local_dataset_pin_policy_not_applicable", pathPrefix);
@@ -346,6 +364,9 @@ function runtimeProvider(id: string, provider: ProviderDefinitionFile): RuntimeP
       enabled: provider.cache_policy.enabled,
       ttlSeconds: provider.cache_policy.ttl_seconds,
     },
+    access: provider.access ?? null,
+    pinnedReleaseRequired: provider.pinned_release_required ?? false,
+    sha256Required: provider.sha256_required ?? false,
   };
 }
 

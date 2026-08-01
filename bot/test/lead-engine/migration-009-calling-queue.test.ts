@@ -10,7 +10,7 @@ describe("migration 009 internal calling queue", () => {
   it("creates all constrained queue tables on a fresh database", () => {
     const fixture = createRankingFixture();
     try {
-      expect(getMigrationHistory(fixture.database).map((item) => item.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(getMigrationHistory(fixture.database).map((item) => item.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       const tables = fixture.database.prepare(`
         SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'lead_queue_%' ORDER BY name
       `).all() as Array<{ name: string }>;

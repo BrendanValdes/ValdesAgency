@@ -1,6 +1,7 @@
 import {
   assertRuntimeLeadPolicy,
   requireProviderPolicy,
+  type ProviderPolicyOperation,
   type RuntimeLeadPolicy,
 } from "./lead-policy.js";
 
@@ -9,6 +10,7 @@ export interface PublicWebCapability {
   readonly providerId: string;
   readonly runId: string;
   readonly assessmentId: string;
+  readonly operation: Extract<ProviderPolicyOperation, "discovery" | "website_assessment">;
   readonly networkClass: "public_web";
   readonly expiresAt: string;
   readonly limits: Readonly<{
@@ -24,12 +26,14 @@ export interface PublicWebCapabilityBinding {
   readonly providerId: string;
   readonly runId: string;
   readonly assessmentId: string;
+  readonly operation?: Extract<ProviderPolicyOperation, "discovery" | "website_assessment">;
 }
 
 interface CapabilityState {
   readonly providerId: string;
   readonly runId: string;
   readonly assessmentId: string;
+  readonly operation: Extract<ProviderPolicyOperation, "discovery" | "website_assessment">;
   readonly expiresAtMs: number;
   readonly now: () => number;
   readonly maxBytesPerRequest: number;
@@ -91,6 +95,9 @@ function stateFor(
   if (state.providerId !== binding.providerId) reject("capability_provider_mismatch");
   if (state.runId !== binding.runId) reject("capability_run_mismatch");
   if (state.assessmentId !== binding.assessmentId) reject("capability_assessment_mismatch");
+  if (state.operation !== (binding.operation ?? "website_assessment")) {
+    reject("capability_operation_mismatch");
+  }
   return state;
 }
 
@@ -125,6 +132,7 @@ export class NetworkPolicyAuthorizer {
     providerId: string;
     runId: string;
     assessmentId: string;
+    operation?: Extract<ProviderPolicyOperation, "discovery" | "website_assessment">;
     maxRequests: number;
     maxBytes: number;
     maxBytesPerRequest: number;
@@ -135,12 +143,13 @@ export class NetworkPolicyAuthorizer {
     const providerId = nonemptyScope(input.providerId, "provider_id_invalid");
     const runId = nonemptyScope(input.runId, "run_id_invalid");
     const assessmentId = nonemptyScope(input.assessmentId, "assessment_id_invalid");
+    const operation = input.operation ?? "website_assessment";
     const provider = requireProviderPolicy(this.#policy, providerId);
     if (!provider.enabled) reject("provider_disabled");
-    if (provider.sourceClass !== "public_web" || !provider.requiresNetwork) {
+    if (!provider.requiresNetwork || !["public_web", "local_public_dataset"].includes(provider.sourceClass)) {
       reject("provider_not_public_web");
     }
-    if (!provider.operations.includes("website_assessment")) {
+    if (!provider.operations.includes(operation)) {
       reject("provider_operation_blocked");
     }
     if (this.#policy.networkMode !== "public_web") reject("network_disabled");
@@ -199,6 +208,7 @@ export class NetworkPolicyAuthorizer {
       providerId,
       runId,
       assessmentId,
+      operation,
       networkClass: "public_web",
       expiresAt: new Date(expiresAtMs).toISOString(),
       limits: Object.freeze({
@@ -213,6 +223,7 @@ export class NetworkPolicyAuthorizer {
       providerId,
       runId,
       assessmentId,
+      operation,
       expiresAtMs,
       now: this.#now,
       maxBytesPerRequest,

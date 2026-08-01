@@ -55,8 +55,40 @@ export const normalizedDiscoveryResultSchema = z
       .strict(),
     domains: z.array(z.string().trim().min(1)),
     phones: z.array(z.string().trim().min(1)),
+    emails: z.array(z.string().trim().min(1)).optional(),
     brandName: z.string().trim().min(1).nullable(),
     groupHint: z.string().trim().min(1).nullable(),
+    providerObservation: z
+      .object({
+        releaseId: z.string().trim().min(1),
+        featureVersion: z.number().int().nonnegative(),
+        schemaVersion: z.string().trim().min(1),
+        taxonomyMappingVersion: z.string().trim().min(1),
+        basicCategory: z.string().trim().min(1).nullable(),
+        taxonomyPrimary: z.string().trim().min(1).nullable(),
+        taxonomyHierarchy: z.array(z.string().trim().min(1)),
+        taxonomyAlternates: z.array(z.string().trim().min(1)),
+        categoryDisposition: z.enum(["strong", "supporting", "review"]),
+        providerConfidence: z.number().min(0).max(1).nullable(),
+        operatingStatus: z.enum([
+          "open",
+          "temporarily_closed",
+          "permanently_closed",
+          "unknown",
+        ]),
+        sourceMetadata: z.array(z.object({
+          property: z.string().nullable(),
+          dataset: z.string().nullable(),
+          recordId: z.string().nullable(),
+          updateTime: z.string().datetime().nullable(),
+          confidence: z.number().min(0).max(1).nullable(),
+        }).strict()),
+        coverageKey: z.string().trim().min(1),
+        queryFingerprint: z.string().trim().min(1),
+        assetIds: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

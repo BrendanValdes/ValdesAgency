@@ -24,7 +24,7 @@ describe("migration 006 offline orchestration metadata", () => {
     const fixture = createTestDatabase();
     try {
       expect(getMigrationHistory(fixture.database).map(({ version }) => version))
-        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       const tables = fixture.database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all() as Array<{ name: string }>;
