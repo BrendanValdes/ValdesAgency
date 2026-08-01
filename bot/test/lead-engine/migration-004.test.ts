@@ -11,7 +11,7 @@ describe("migration 004 website assessment persistence", () => {
   it("applies the complete migration chain in order and remains idempotent", () => {
     const fixture = createTestDatabase();
     try {
-      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(migrateDatabase(fixture.database)).toEqual(getMigrationHistory(fixture.database));
     } finally {
       fixture.cleanup();
