@@ -89,6 +89,7 @@ describe("lead-engine configuration", () => {
   it("contains no network-capable imports or fetch calls in the Phase 1 namespace", () => {
     const sourceRoot = path.join(process.cwd(), "src", "lead-engine");
     const content = sourceFiles(sourceRoot)
+      .filter((file) => !file.includes(`${path.sep}crawl${path.sep}`))
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
 

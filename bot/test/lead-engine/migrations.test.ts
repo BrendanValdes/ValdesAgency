@@ -19,8 +19,11 @@ const expectedTables = [
   "business_locations",
   "businesses",
   "contacts",
+  "conversion_feature_observations",
   "coverage_cells",
   "coverage_manifests",
+  "crawl_cache_entries",
+  "crawl_failures",
   "discovery_observations",
   "discovery_queries",
   "evidence",
@@ -32,14 +35,24 @@ const expectedTables = [
   "merge_decisions",
   "migration_history",
   "niche_configuration_versions",
+  "person_evidence_candidates",
   "provider_calls",
   "provider_result_identifiers",
+  "robots_decisions",
   "run_stages",
+  "service_evidence",
   "stage_tasks",
+  "structured_data_observations",
+  "website_assessments",
+  "website_contact_observations",
+  "website_fetches",
+  "website_identity_conflicts",
+  "website_links",
+  "website_pages",
 ];
 
 describe("forward-only migrations", () => {
-  it("creates the complete Phase 1 and Phase 2 foundation on a fresh database", () => {
+  it("creates the complete Phase 1 through Phase 3 foundation on a fresh database", () => {
     const fixture = createTestDatabase();
     try {
       const tables = fixture.database
@@ -57,11 +70,12 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2, 3]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
         "003_discovery_identity.sql",
+        "004_website_assessment.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {
@@ -89,6 +103,10 @@ describe("forward-only migrations", () => {
       copyFileSync(
         path.join(DEFAULT_MIGRATIONS_DIRECTORY, "003_discovery_identity.sql"),
         path.join(changedRoot, "003_discovery_identity.sql"),
+      );
+      copyFileSync(
+        path.join(DEFAULT_MIGRATIONS_DIRECTORY, "004_website_assessment.sql"),
+        path.join(changedRoot, "004_website_assessment.sql"),
       );
       writeFileSync(
         path.join(changedRoot, "002_evidence_tasks_provider_calls.sql"),
