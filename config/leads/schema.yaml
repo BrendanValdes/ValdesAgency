@@ -1,0 +1,24 @@
+schema_version: "1.0.0"
+fixture_kind: synthetic
+required_niche_fields:
+  - id
+  - display_name
+  - enabled
+  - search_terms
+  - service_synonyms
+  - required_indicators
+  - negative_keywords
+  - excluded_adjacent_industries
+  - relevant_categories
+  - chain_franchise_exclusions
+  - geography_strategy
+  - icp_placeholders
+  - pain_signal_placeholders
+  - required_evidence_policy
+  - owner_titles_to_seek
+  - export_tags
+  - configuration_version
+default_niche: pool_service
+enabled_niches:
+  - pool_service
+

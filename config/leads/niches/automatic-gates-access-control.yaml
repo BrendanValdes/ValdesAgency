@@ -1,0 +1,18 @@
+id: automatic_gates_access_control
+display_name: Automatic Gates and Access Control
+enabled: false
+search_terms: [automatic gate repair, access control service]
+service_synonyms: [gate operator service, entry system installation]
+required_indicators: [automatic gate or access control service]
+negative_keywords: [fencing only, locksmith only]
+excluded_adjacent_industries: [fence contractors, security guards]
+relevant_categories: [gate_supplier, access_control_service]
+chain_franchise_exclusions: [national home security chain]
+geography_strategy: {mode: nationwide, density: adaptive, result_cap: 1000, max_depth: 5}
+icp_placeholders: [company_size_future]
+pain_signal_placeholders: [lead_response_future]
+required_evidence_policy: {candidate_identity: provider_observation, qualification: future_phase}
+owner_titles_to_seek: [Owner, Founder, President, Operations Manager]
+export_tags: [niche:automatic_gates_access_control, engine:v2]
+configuration_version: "1.0.0"
+

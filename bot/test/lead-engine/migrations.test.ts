@@ -12,21 +12,34 @@ import { createTestDatabase } from "./fixtures/synthetic.js";
 
 const expectedTables = [
   "artifact_references",
+  "business_aliases",
+  "business_group_locations",
+  "business_groups",
   "business_identifiers",
   "business_locations",
   "businesses",
   "contacts",
+  "coverage_cells",
+  "coverage_manifests",
+  "discovery_observations",
+  "discovery_queries",
   "evidence",
   "evidence_conflicts",
+  "identity_candidates",
+  "identity_conflicts",
+  "identity_matches",
   "lead_runs",
+  "merge_decisions",
   "migration_history",
+  "niche_configuration_versions",
   "provider_calls",
+  "provider_result_identifiers",
   "run_stages",
   "stage_tasks",
 ];
 
 describe("forward-only migrations", () => {
-  it("creates the complete Phase 1 foundation on a fresh database", () => {
+  it("creates the complete Phase 1 and Phase 2 foundation on a fresh database", () => {
     const fixture = createTestDatabase();
     try {
       const tables = fixture.database
@@ -44,10 +57,11 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
+        "003_discovery_identity.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {
@@ -71,6 +85,10 @@ describe("forward-only migrations", () => {
       copyFileSync(
         path.join(DEFAULT_MIGRATIONS_DIRECTORY, "002_evidence_tasks_provider_calls.sql"),
         path.join(changedRoot, "002_evidence_tasks_provider_calls.sql"),
+      );
+      copyFileSync(
+        path.join(DEFAULT_MIGRATIONS_DIRECTORY, "003_discovery_identity.sql"),
+        path.join(changedRoot, "003_discovery_identity.sql"),
       );
       writeFileSync(
         path.join(changedRoot, "002_evidence_tasks_provider_calls.sql"),

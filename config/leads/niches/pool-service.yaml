@@ -1,0 +1,18 @@
+id: pool_service
+display_name: Pool Service
+enabled: true
+search_terms: [pool service, pool maintenance, pool cleaning]
+service_synonyms: [swimming pool service, pool repair, pool technician]
+required_indicators: [recurring pool maintenance, pool equipment service]
+negative_keywords: [supply only, wholesale, manufacturer]
+excluded_adjacent_industries: [pool builders, pool supply stores, public pools]
+relevant_categories: [pool_service, swimming_pool_repair_service]
+chain_franchise_exclusions: [national pool retail chain]
+geography_strategy: {mode: nationwide, density: adaptive, result_cap: 1000, max_depth: 5}
+icp_placeholders: [company_size_future, service_area_future]
+pain_signal_placeholders: [manual_followup_future, missed_calls_future]
+required_evidence_policy: {candidate_identity: provider_observation, qualification: future_phase}
+owner_titles_to_seek: [Owner, Founder, President, General Manager]
+export_tags: [niche:pool_service, engine:v2]
+configuration_version: "1.0.0"
+

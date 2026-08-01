@@ -1,0 +1,18 @@
+id: septic_pumping_repair
+display_name: Septic Pumping and Repair
+enabled: false
+search_terms: [septic pumping, septic repair]
+service_synonyms: [septic tank service, septic system maintenance]
+required_indicators: [septic pumping or repair]
+negative_keywords: [portable toilets, municipal sewer]
+excluded_adjacent_industries: [plumbing only, excavation only]
+relevant_categories: [septic_system_service, wastewater_service]
+chain_franchise_exclusions: [national sanitation chain]
+geography_strategy: {mode: nationwide, density: rural, result_cap: 1000, max_depth: 5}
+icp_placeholders: [company_size_future]
+pain_signal_placeholders: [dispatch_future]
+required_evidence_policy: {candidate_identity: provider_observation, qualification: future_phase}
+owner_titles_to_seek: [Owner, Founder, President, General Manager]
+export_tags: [niche:septic_pumping_repair, engine:v2]
+configuration_version: "1.0.0"
+

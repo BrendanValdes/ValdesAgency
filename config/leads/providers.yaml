@@ -1,0 +1,20 @@
+configuration_version: "1.0.0"
+fixture_kind: synthetic
+network_mode: disabled
+providers:
+  fixture:
+    enabled: true
+    operations: [discovery]
+    billable: false
+  overture_local:
+    enabled: true
+    operations: [discovery]
+    billable: false
+    access: explicitly_configured_absolute_local_fixture_only
+    pinned_release_required: true
+    sha256_required: true
+  overture_live:
+    enabled: false
+  search:
+    enabled: false
+

@@ -531,6 +531,20 @@ function inspectText(filePath, text, violations) {
   }
 }
 
+function isClearlySyntheticParquetFixture(filePath, buffer) {
+  const normalizedPath = slashPath(filePath).toLowerCase();
+  return (
+    /(?:^|\/)test\/lead-engine\/fixtures\/.+\/synthetic[^/]*\.parquet$/.test(
+      normalizedPath,
+    ) &&
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "PAR1" &&
+    buffer.subarray(-4).toString("ascii") === "PAR1" &&
+    buffer.includes(Buffer.from('"synthetic_fixture":true', "utf8")) &&
+    buffer.includes(Buffer.from('"release_id":"synthetic-', "utf8"))
+  );
+}
+
 function inspectFile(repositoryRoot, filePath) {
   const label = displayPath(repositoryRoot, filePath);
   const violations = [];
@@ -557,7 +571,10 @@ function inspectFile(repositoryRoot, filePath) {
   }
 
   if (buffer.includes(0)) {
-    if (LEAD_ARTIFACT_PATH_PATTERN.test(normalizedPath)) {
+    if (
+      LEAD_ARTIFACT_PATH_PATTERN.test(normalizedPath) &&
+      !isClearlySyntheticParquetFixture(normalizedPath, buffer)
+    ) {
       violations.push("binary lead artifact");
     }
     return { label, violations };

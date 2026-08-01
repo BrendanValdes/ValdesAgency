@@ -1,0 +1,18 @@
+id: commercial_refrigeration_ice_machines
+display_name: Commercial Refrigeration and Ice Machines
+enabled: false
+search_terms: [commercial refrigeration repair, commercial ice machine service]
+service_synonyms: [walk in cooler repair, ice maker maintenance]
+required_indicators: [commercial refrigeration or ice machine service]
+negative_keywords: [residential appliance only, equipment sales only]
+excluded_adjacent_industries: [residential appliance repair, restaurant supply]
+relevant_categories: [commercial_refrigeration, ice_machine_repair]
+chain_franchise_exclusions: [national appliance retail chain]
+geography_strategy: {mode: nationwide, density: dense, result_cap: 1000, max_depth: 5}
+icp_placeholders: [company_size_future]
+pain_signal_placeholders: [emergency_dispatch_future]
+required_evidence_policy: {candidate_identity: provider_observation, qualification: future_phase}
+owner_titles_to_seek: [Owner, Founder, President, Service Manager]
+export_tags: [niche:commercial_refrigeration_ice_machines, engine:v2]
+configuration_version: "1.0.0"
+
