@@ -1,19 +1,44 @@
-export const IDENTITY_POLICY_VERSION = "identity-1.0.0";
+import type {
+  ClaimState,
+  ExternalVerificationState,
+  ProvenanceSourceClass,
+  VerificationDimension,
+  VerificationMethod,
+  VerificationResult,
+} from "../domain/provenance.js";
+
+export const IDENTITY_POLICY_VERSION = "identity-2.0.0";
+
+export interface IdentitySignalEvidence {
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
+  externalVerificationState: ExternalVerificationState;
+  verificationDimension: VerificationDimension | null;
+  verifierId: string | null;
+  verificationMethod: VerificationMethod | null;
+  verificationResult: VerificationResult | null;
+  verifiedAt: string | null;
+  expiresAt: string | null;
+  normalizedValue: string | null;
+  evidenceReference: string | null;
+}
 
 export interface ProviderIdentity {
   providerId: string;
   value: string;
+  trusted: boolean;
+  evidence: IdentitySignalEvidence;
 }
 
 export interface DomainIdentity {
   value: string;
-  verified: boolean;
+  evidence: IdentitySignalEvidence;
 }
 
 export interface PhoneIdentity {
   value: string;
   e164: string | null;
-  verified: boolean;
+  evidence: IdentitySignalEvidence;
   shared: boolean;
   tollFree: boolean;
   callCenter: boolean;
@@ -28,12 +53,13 @@ export interface AddressIdentity {
   region: string;
   postalCode: string;
   countryCode: string;
+  evidence: IdentitySignalEvidence;
 }
 
 export interface ChainAffiliation {
   brandName: string;
   franchise: boolean;
-  verified: boolean;
+  evidence: IdentitySignalEvidence;
 }
 
 export interface BusinessIdentityRecord {
@@ -43,6 +69,7 @@ export interface BusinessIdentityRecord {
   displayName: string;
   dbaNames: ReadonlyArray<string>;
   legalName?: string | null;
+  nameEvidence: IdentitySignalEvidence;
   providerIdentifiers: ReadonlyArray<ProviderIdentity>;
   domains: ReadonlyArray<DomainIdentity>;
   phones: ReadonlyArray<PhoneIdentity>;
@@ -52,11 +79,11 @@ export interface BusinessIdentityRecord {
 
 export type IdentityMatchReason =
   | "stable_provider_identifier"
-  | "verified_domain"
+  | "verified_canonical_domain"
   | "verified_domain_group"
-  | "verified_e164_phone"
-  | "exact_normalized_address"
-  | "strong_multi_field"
+  | "verified_phone_with_address"
+  | "verified_phone_requires_corroboration"
+  | "exact_address_review"
   | "fuzzy_candidate"
   | "conflicting_identifiers"
   | "insufficient_evidence";
@@ -68,8 +95,13 @@ export interface IdentityMatchDecision {
   action: "auto_merge" | "group_link" | "human_review" | "no_match";
   reason: IdentityMatchReason;
   matchScore: number;
+  confidenceBasisPoints: number;
   policyVersion: string;
   conflicts: ReadonlyArray<string>;
+  supportingSignals: ReadonlyArray<string>;
+  conflictingSignals: ReadonlyArray<string>;
+  verificationDimensions: ReadonlyArray<VerificationDimension>;
+  reviewReason: string | null;
 }
 
 export interface BusinessGroup {
@@ -80,4 +112,3 @@ export interface BusinessGroup {
   locationIds: ReadonlyArray<string>;
   aliases: ReadonlyArray<{ name: string; kind: "dba" | "display" | "legal" }>;
 }
-

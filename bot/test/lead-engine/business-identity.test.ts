@@ -5,7 +5,7 @@ import { extractHtml } from "../../src/lead-engine/extraction/html.js";
 import { extractJsonLd } from "../../src/lead-engine/extraction/json-ld.js";
 
 function extract(source: string) {
-  const context = { pageUrl: "https://clearwater.example/", observedAt: "2026-01-15T12:00:00.000Z", fetchedAt: "2026-01-15T12:00:01.000Z", contentChecksum: createHash("sha256").update(source).digest("hex") };
+  const context = { pageUrl: "https://clearwater.example/", observedAt: "2026-01-15T12:00:00.000Z", fetchedAt: "2026-01-15T12:00:01.000Z", contentChecksum: createHash("sha256").update(source).digest("hex"), sourceClass: "public_business_website" as const };
   return extractBusinessIdentity({ html: extractHtml(source, context), jsonLd: extractJsonLd(source, context) });
 }
 
@@ -13,6 +13,7 @@ describe("website business identity evidence", () => {
   it("detects parked, placeholder, closed, and moved statements as evidence signals", () => {
     const result = extract("<html><head><title>Domain for sale</title></head><body>Buy this domain. Coming soon. We have moved. We are permanently closed.</body></html>");
     expect(result).toMatchObject({ parked: true, placeholderOnly: true, explicitlyClosed: true, explicitlyMoved: true });
+    expect(result).toMatchObject({ sourceClass: "public_business_website", claimState: "observed" });
   });
 
   it("distinguishes agreement from conflicting business identity", () => {

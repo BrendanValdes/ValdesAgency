@@ -1,7 +1,21 @@
 import path from "node:path";
 import { assertEvidenceSemantics } from "../domain/evidence.js";
 import { microUsd } from "../domain/money.js";
-import { assertContactIdentityPolicy } from "../domain/policies.js";
+import {
+  assertContactClaimSemantics,
+  assertContactIdentityPolicy,
+} from "../domain/policies.js";
+import type {
+  ClaimState,
+  ExternalVerificationState,
+  HumanReviewState,
+  ProvenanceSourceClass,
+  SourceConfirmationState,
+  VerificationDimension,
+  VerificationMethod,
+  VerificationResult,
+} from "../domain/provenance.js";
+import { evaluateEvidencePromotion } from "../domain/verification-policy.js";
 import type { ReasonCode } from "../domain/reason-codes.js";
 import type {
   ConflictStatus,
@@ -28,6 +42,7 @@ import type {
   StageTask,
 } from "../domain/types.js";
 import { isPathInside } from "../config/loader.js";
+import type { IdentityMatchDecision, IdentityMatchReason } from "../identity/hierarchy.js";
 import type { SqliteDatabase } from "./database.js";
 import type { LeadEngineRepositories } from "./repositories.js";
 import { withTransaction } from "./transaction.js";
@@ -81,6 +96,8 @@ type IdentifierRow = {
   scheme: string;
   value: string;
   source: string;
+  source_class: ProvenanceSourceClass;
+  claim_state: ClaimState;
   evidence_state: EvidenceState;
   created_at: string;
 };
@@ -94,6 +111,8 @@ type LocationRow = {
   postal_code: string | null;
   country_code: string;
   evidence_state: EvidenceState;
+  source_class: ProvenanceSourceClass;
+  claim_state: ClaimState;
   created_at: string;
   updated_at: string;
 };
@@ -102,12 +121,15 @@ type ContactRow = {
   id: string;
   business_id: string;
   entity_type: "person";
-  person_name: string;
+  person_name: string | null;
   title: string | null;
   role: Contact["role"];
   evidence_state: EvidenceState;
   verification_state: VerificationState;
   decision_state: DecisionState;
+  source_class: ProvenanceSourceClass;
+  claim_state: ClaimState;
+  relationship_evidence_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -119,6 +141,7 @@ type EvidenceRow = {
   field_name: string;
   claimed_value: string | null;
   source: string;
+  source_class: ProvenanceSourceClass;
   source_url: string | null;
   observed_at: string;
   fetched_at: string;
@@ -130,8 +153,20 @@ type EvidenceRow = {
   evidence_state: EvidenceState;
   verification_state: VerificationState;
   decision_state: DecisionState;
-  verification_method: string | null;
+  claim_state: ClaimState;
+  source_confirmation_state: SourceConfirmationState;
+  external_verification_state: ExternalVerificationState;
+  human_review_state: HumanReviewState;
+  verification_dimension: VerificationDimension | null;
+  verifier_id: string | null;
+  verification_method: VerificationMethod | null;
+  verification_result: VerificationResult | null;
   verified_at: string | null;
+  expires_at: string | null;
+  normalized_value: string | null;
+  evidence_reference: string | null;
+  human_reviewer_id: string | null;
+  human_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +204,31 @@ type ArtifactRow = {
   external_path: string;
   checksum: string;
   created_at: string;
+};
+
+type PromotionAuditRow = {
+  id: string;
+  evidence_id: string;
+  requested_claim_state: ClaimState;
+  allowed: 0 | 1;
+  denial_reasons_json: string;
+  resolution_reference: string | null;
+  policy_version: string;
+  decided_at: string;
+};
+
+type IdentityDecisionRow = {
+  id: string;
+  left_entity_id: string;
+  right_entity_id: string;
+  action: IdentityMatchDecision["action"];
+  rule: IdentityMatchReason;
+  confidence_basis_points: number;
+  supporting_signals_json: string;
+  conflicting_signals_json: string;
+  verification_dimensions_json: string;
+  review_reason: string | null;
+  policy_version: string;
 };
 
 function mapRun(row: RunRow): LeadRun {
@@ -229,6 +289,8 @@ function mapIdentifier(row: IdentifierRow): BusinessIdentifier {
     scheme: row.scheme,
     value: row.value,
     source: row.source,
+    sourceClass: row.source_class,
+    claimState: row.claim_state,
     evidenceState: row.evidence_state,
     createdAt: row.created_at,
   };
@@ -244,6 +306,8 @@ function mapLocation(row: LocationRow): BusinessLocation {
     postalCode: row.postal_code,
     countryCode: row.country_code,
     evidenceState: row.evidence_state,
+    sourceClass: row.source_class,
+    claimState: row.claim_state,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -260,6 +324,9 @@ function mapContact(row: ContactRow): Contact {
     evidenceState: row.evidence_state,
     verificationState: row.verification_state,
     decisionState: row.decision_state,
+    sourceClass: row.source_class,
+    claimState: row.claim_state,
+    relationshipEvidenceId: row.relationship_evidence_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -273,6 +340,7 @@ function mapEvidence(row: EvidenceRow): Evidence {
     fieldName: row.field_name,
     claimedValue: row.claimed_value,
     source: row.source,
+    sourceClass: row.source_class,
     sourceUrl: row.source_url,
     observedAt: row.observed_at,
     fetchedAt: row.fetched_at,
@@ -284,8 +352,20 @@ function mapEvidence(row: EvidenceRow): Evidence {
     evidenceState: row.evidence_state,
     verificationState: row.verification_state,
     decisionState: row.decision_state,
+    claimState: row.claim_state,
+    sourceConfirmationState: row.source_confirmation_state,
+    externalVerificationState: row.external_verification_state,
+    humanReviewState: row.human_review_state,
+    verificationDimension: row.verification_dimension,
+    verifierId: row.verifier_id,
     verificationMethod: row.verification_method,
+    verificationResult: row.verification_result,
     verifiedAt: row.verified_at,
+    expiresAt: row.expires_at,
+    normalizedValue: row.normalized_value,
+    evidenceReference: row.evidence_reference,
+    humanReviewerId: row.human_reviewer_id,
+    humanReviewedAt: row.human_reviewed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -329,6 +409,38 @@ function mapArtifact(row: ArtifactRow): ArtifactReference {
     externalPath: row.external_path,
     checksum: row.checksum,
     createdAt: row.created_at,
+  };
+}
+
+function mapPromotionAudit(row: PromotionAuditRow) {
+  return {
+    id: row.id,
+    evidenceId: row.evidence_id,
+    requestedClaimState: row.requested_claim_state,
+    allowed: row.allowed === 1,
+    denialReasons: JSON.parse(row.denial_reasons_json) as string[],
+    resolutionReference: row.resolution_reference,
+    policyVersion: row.policy_version,
+    decidedAt: row.decided_at,
+  };
+}
+
+function mapIdentityDecision(row: IdentityDecisionRow): IdentityMatchDecision {
+  const conflictingSignals = JSON.parse(row.conflicting_signals_json) as string[];
+  return {
+    decisionId: row.id,
+    leftEntityId: row.left_entity_id,
+    rightEntityId: row.right_entity_id,
+    action: row.action,
+    reason: row.rule,
+    matchScore: row.confidence_basis_points,
+    confidenceBasisPoints: row.confidence_basis_points,
+    policyVersion: row.policy_version,
+    conflicts: conflictingSignals,
+    supportingSignals: JSON.parse(row.supporting_signals_json) as string[],
+    conflictingSignals,
+    verificationDimensions: JSON.parse(row.verification_dimensions_json) as VerificationDimension[],
+    reviewReason: row.review_reason,
   };
 }
 
@@ -392,6 +504,12 @@ export function createSqliteRepositories(
       | ArtifactRow
       | undefined;
     return row ? mapArtifact(row) : null;
+  };
+  const getIdentityDecision = (id: string): IdentityMatchDecision | null => {
+    const row = database.prepare("SELECT * FROM identity_decision_audits WHERE id = ?").get(id) as
+      | IdentityDecisionRow
+      | undefined;
+    return row ? mapIdentityDecision(row) : null;
   };
 
   let repositories: LeadEngineRepositories;
@@ -502,8 +620,8 @@ export function createSqliteRepositories(
       addIdentifier(identifier) {
         database.prepare(`
           INSERT INTO business_identifiers
-            (id, business_id, scheme, value, source, evidence_state, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+            (id, business_id, scheme, value, source, evidence_state, created_at, source_class, claim_state)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           identifier.id,
           identifier.businessId,
@@ -512,6 +630,8 @@ export function createSqliteRepositories(
           identifier.source,
           identifier.evidenceState,
           identifier.createdAt,
+          identifier.sourceClass,
+          identifier.claimState,
         );
         return mapIdentifier(
           database.prepare("SELECT * FROM business_identifiers WHERE id = ?").get(identifier.id) as IdentifierRow,
@@ -525,8 +645,9 @@ export function createSqliteRepositories(
       addLocation(location) {
         database.prepare(`
           INSERT INTO business_locations
-            (id, business_id, line1, city, region, postal_code, country_code, evidence_state, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, business_id, line1, city, region, postal_code, country_code, evidence_state, created_at, updated_at,
+             source_class, claim_state)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           location.id,
           location.businessId,
@@ -538,6 +659,8 @@ export function createSqliteRepositories(
           location.evidenceState,
           location.createdAt,
           location.updatedAt,
+          location.sourceClass,
+          location.claimState,
         );
         return mapLocation(
           database.prepare("SELECT * FROM business_locations WHERE id = ?").get(location.id) as LocationRow,
@@ -554,10 +677,15 @@ export function createSqliteRepositories(
         const business = getBusiness(contact.businessId);
         if (!business) throw new Error("Contact business was not found");
         assertContactIdentityPolicy(business.canonicalName, contact.personName);
+        const relationshipEvidence = contact.relationshipEvidenceId
+          ? getEvidence(contact.relationshipEvidenceId)
+          : null;
+        assertContactClaimSemantics(contact, relationshipEvidence);
         database.prepare(`
           INSERT INTO contacts
-            (id, business_id, entity_type, person_name, title, role, evidence_state, verification_state, decision_state, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, business_id, entity_type, person_name, title, role, evidence_state, verification_state,
+             decision_state, created_at, updated_at, source_class, claim_state, relationship_evidence_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           contact.id,
           contact.businessId,
@@ -570,6 +698,9 @@ export function createSqliteRepositories(
           contact.decisionState,
           contact.createdAt,
           contact.updatedAt,
+          contact.sourceClass,
+          contact.claimState,
+          contact.relationshipEvidenceId,
         );
         return getContact(contact.id) as Contact;
       },
@@ -580,14 +711,34 @@ export function createSqliteRepositories(
           .all(businessId) as ContactRow[]).map(mapContact);
       },
       updateStates(id, states) {
+        const current = getContact(id);
+        if (!current) throw new Error("Repository record was not found");
+        const next: Contact = {
+          ...current,
+          ...states,
+          claimState: states.claimState ?? current.claimState,
+          relationshipEvidenceId: states.relationshipEvidenceId === undefined
+            ? current.relationshipEvidenceId
+            : states.relationshipEvidenceId,
+        };
+        const business = getBusiness(next.businessId);
+        if (!business) throw new Error("Contact business was not found");
+        assertContactIdentityPolicy(business.canonicalName, next.personName);
+        const relationshipEvidence = next.relationshipEvidenceId
+          ? getEvidence(next.relationshipEvidenceId)
+          : null;
+        assertContactClaimSemantics(next, relationshipEvidence);
         const result = database.prepare(`
           UPDATE contacts
-          SET evidence_state = ?, verification_state = ?, decision_state = ?, updated_at = ?
+          SET evidence_state = ?, verification_state = ?, decision_state = ?, claim_state = ?,
+              relationship_evidence_id = ?, updated_at = ?
           WHERE id = ?
         `).run(
           states.evidenceState,
           states.verificationState,
           states.decisionState,
+          next.claimState,
+          next.relationshipEvidenceId,
           states.updatedAt,
           id,
         );
@@ -600,12 +751,15 @@ export function createSqliteRepositories(
         assertEvidenceSemantics(evidence);
         database.prepare(`
           INSERT INTO evidence
-            (id, entity_type, entity_id, field_name, claimed_value, source, source_url,
+            (id, entity_type, entity_id, field_name, claimed_value, source, source_class, source_url,
              observed_at, fetched_at, confidence_basis_points, extraction_method,
              conflict_status, raw_reference_checksum, policy_version, evidence_state,
-             verification_state, decision_state, verification_method, verified_at,
+             verification_state, decision_state, claim_state, source_confirmation_state,
+             external_verification_state, human_review_state, verification_dimension,
+             verifier_id, verification_method, verification_result, verified_at, expires_at,
+             normalized_value, evidence_reference, human_reviewer_id, human_reviewed_at,
              created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           evidence.id,
           evidence.entityType,
@@ -613,6 +767,7 @@ export function createSqliteRepositories(
           evidence.fieldName,
           evidence.claimedValue,
           evidence.source,
+          evidence.sourceClass,
           evidence.sourceUrl,
           evidence.observedAt,
           evidence.fetchedAt,
@@ -624,8 +779,20 @@ export function createSqliteRepositories(
           evidence.evidenceState,
           evidence.verificationState,
           evidence.decisionState,
+          evidence.claimState,
+          evidence.sourceConfirmationState,
+          evidence.externalVerificationState,
+          evidence.humanReviewState,
+          evidence.verificationDimension,
+          evidence.verifierId,
           evidence.verificationMethod,
+          evidence.verificationResult,
           evidence.verifiedAt,
+          evidence.expiresAt,
+          evidence.normalizedValue,
+          evidence.evidenceReference,
+          evidence.humanReviewerId,
+          evidence.humanReviewedAt,
           evidence.createdAt,
           evidence.updatedAt,
         );
@@ -643,21 +810,81 @@ export function createSqliteRepositories(
         assertEvidenceSemantics({ ...current, ...states });
         const result = database.prepare(`
           UPDATE evidence
-          SET evidence_state = ?, verification_state = ?, decision_state = ?, conflict_status = ?,
-              verification_method = ?, verified_at = ?, updated_at = ?
+          SET evidence_state = ?, decision_state = ?, conflict_status = ?, updated_at = ?
           WHERE id = ?
         `).run(
           states.evidenceState,
-          states.verificationState,
           states.decisionState,
           states.conflictStatus,
-          states.verificationMethod,
-          states.verifiedAt,
           states.updatedAt,
           id,
         );
         requireUpdate(result.changes);
         return getEvidence(id) as Evidence;
+      },
+      promote(id, request) {
+        const current = getEvidence(id);
+        if (!current) throw new Error("Repository record was not found");
+        const decision = evaluateEvidencePromotion({ ...request, evidence: current });
+        return withTransaction(database, () => {
+          database.prepare(`
+            INSERT INTO evidence_promotion_decisions
+              (id, evidence_id, requested_claim_state, allowed, denial_reasons_json,
+               resolution_reference, policy_version, decided_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            request.decisionId,
+            id,
+            request.targetClaimState,
+            decision.allowed ? 1 : 0,
+            JSON.stringify(decision.denialReasons),
+            request.resolutionReference,
+            decision.policyVersion,
+            request.requestedAt,
+          );
+          if (decision.allowed && decision.nextEvidence) {
+            const next = decision.nextEvidence;
+            const result = database.prepare(`
+              UPDATE evidence
+              SET evidence_state = ?, verification_state = ?, decision_state = ?, conflict_status = ?,
+                  claim_state = ?, source_confirmation_state = ?, external_verification_state = ?,
+                  human_review_state = ?, verification_dimension = ?, verifier_id = ?,
+                  verification_method = ?, verification_result = ?, verified_at = ?, expires_at = ?,
+                  normalized_value = ?, evidence_reference = ?, human_reviewer_id = ?,
+                  human_reviewed_at = ?, updated_at = ?
+              WHERE id = ?
+            `).run(
+              next.evidenceState,
+              next.verificationState,
+              next.decisionState,
+              next.conflictStatus,
+              next.claimState,
+              next.sourceConfirmationState,
+              next.externalVerificationState,
+              next.humanReviewState,
+              next.verificationDimension,
+              next.verifierId,
+              next.verificationMethod,
+              next.verificationResult,
+              next.verifiedAt,
+              next.expiresAt,
+              next.normalizedValue,
+              next.evidenceReference,
+              next.humanReviewerId,
+              next.humanReviewedAt,
+              next.updatedAt,
+              id,
+            );
+            requireUpdate(result.changes);
+          }
+          return decision;
+        });
+      },
+      listPromotionDecisions(evidenceId) {
+        return (database.prepare(`
+          SELECT * FROM evidence_promotion_decisions
+          WHERE evidence_id = ? ORDER BY decided_at, id
+        `).all(evidenceId) as PromotionAuditRow[]).map(mapPromotionAudit);
       },
       addConflict(conflict) {
         return withTransaction(database, () => {
@@ -684,6 +911,32 @@ export function createSqliteRepositories(
           );
         });
       },
+    },
+    identityDecisions: {
+      record(decision, decidedAt) {
+        database.prepare(`
+          INSERT INTO identity_decision_audits
+            (id, left_entity_id, right_entity_id, action, rule, confidence_basis_points,
+             supporting_signals_json, conflicting_signals_json, verification_dimensions_json,
+             review_reason, policy_version, decided_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          decision.decisionId,
+          decision.leftEntityId,
+          decision.rightEntityId,
+          decision.action,
+          decision.reason,
+          decision.confidenceBasisPoints,
+          JSON.stringify(decision.supportingSignals),
+          JSON.stringify(decision.conflictingSignals),
+          JSON.stringify(decision.verificationDimensions),
+          decision.reviewReason,
+          decision.policyVersion,
+          decidedAt,
+        );
+        return getIdentityDecision(decision.decisionId) as IdentityMatchDecision;
+      },
+      getById: getIdentityDecision,
     },
     providerCalls: {
       create(providerCall) {

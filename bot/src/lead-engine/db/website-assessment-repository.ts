@@ -3,6 +3,7 @@ import { withTransaction } from "./transaction.js";
 import type { RedirectHop } from "../crawl/types.js";
 import type { ConversionFeature } from "../extraction/conversion.js";
 import type { FeatureAssessmentStatus } from "../validation/website-assessment.js";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface WebsiteAssessmentRecord {
   id: string;
@@ -18,6 +19,7 @@ export interface WebsiteAssessmentRecord {
   browserStatus: "disabled" | "unavailable" | "not_checked";
   identityState: "agrees" | "conflicts" | "ambiguous" | "unavailable";
   reviewRequired: boolean;
+  sourceClass: Extract<ProvenanceSourceClass, "synthetic_fixture" | "public_business_website" | "legacy_unclassified">;
 }
 
 export interface WebsiteFetchRecord {
@@ -68,6 +70,8 @@ export interface PersonCandidateRecord {
   ambiguityState: "none" | "ambiguous" | "conflicting";
   extractionMethod: "html" | "json_ld";
   observedAt: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: Extract<ClaimState, "public_unverified_candidate">;
 }
 
 export interface ConversionObservationRecord {
@@ -80,6 +84,8 @@ export interface ConversionObservationRecord {
   observedAt: string;
   freshUntil: string;
   policyVersion: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
 }
 
 export interface WebsiteLinkRecord {
@@ -143,6 +149,8 @@ export interface StructuredDataObservationRecord {
   fetchedAt: string;
   contentChecksum: string;
   extractionPolicyVersion: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
 }
 
 export interface WebsiteContactObservationRecord {
@@ -159,6 +167,8 @@ export interface WebsiteContactObservationRecord {
   fetchedAt: string;
   contentChecksum: string;
   extractionPolicyVersion: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: Extract<ClaimState, "public_unverified_candidate">;
 }
 
 export interface ServiceEvidenceRecord {
@@ -171,6 +181,8 @@ export interface ServiceEvidenceRecord {
   basis: "heading" | "service_description" | "json_ld_service" | "navigation" | "provider_category" | "not_available";
   observedAt: string;
   extractionPolicyVersion: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
 }
 
 export interface WebsiteIdentityConflictRecord {
@@ -185,6 +197,8 @@ export interface WebsiteIdentityConflictRecord {
   reviewState: "pending" | "resolved" | "rejected";
   observedAt: string;
   resolvedAt: string | null;
+  sourceClass: ProvenanceSourceClass;
+  claimState: Extract<ClaimState, "conflicting">;
 }
 
 export interface WebsiteAssessmentRepository {
@@ -233,6 +247,7 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
       browserStatus: row.browser_status as WebsiteAssessmentRecord["browserStatus"],
       identityState: row.identity_state as WebsiteAssessmentRecord["identityState"],
       reviewRequired: bool(row.review_required as number),
+      sourceClass: row.source_class as WebsiteAssessmentRecord["sourceClass"],
     } : null;
   };
 
@@ -241,11 +256,12 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
     createAssessment(record) {
       database.prepare(`INSERT INTO website_assessments
         (id, business_id, source_website_url, canonical_homepage_url, status, started_at, assessed_at, fresh_until,
-         crawl_policy_version, extraction_policy_version, browser_status, identity_state, review_required)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         crawl_policy_version, extraction_policy_version, browser_status, identity_state, review_required, source_class)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.businessId, record.sourceWebsiteUrl, record.canonicalHomepageUrl, record.status,
           record.startedAt, record.assessedAt, record.freshUntil, record.crawlPolicyVersion,
-          record.extractionPolicyVersion, record.browserStatus, record.identityState, record.reviewRequired ? 1 : 0);
+          record.extractionPolicyVersion, record.browserStatus, record.identityState, record.reviewRequired ? 1 : 0,
+          record.sourceClass);
       return getAssessment(record.id) as WebsiteAssessmentRecord;
     },
     getAssessment,
@@ -298,11 +314,11 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
     addPersonCandidate(record) {
       database.prepare(`INSERT INTO person_evidence_candidates
         (id, assessment_id, business_id, page_id, evidence_id, displayed_name, displayed_title,
-         candidate_status, ambiguity_state, extraction_method, observed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         candidate_status, ambiguity_state, extraction_method, observed_at, source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.assessmentId, record.businessId, record.pageId, record.evidenceId,
           record.displayedName, record.displayedTitle, record.candidateStatus, record.ambiguityState,
-          record.extractionMethod, record.observedAt);
+          record.extractionMethod, record.observedAt, record.sourceClass, record.claimState);
       return repository.listPersonCandidates(record.assessmentId).find((value) => value.id === record.id) as PersonCandidateRecord;
     },
     listPersonCandidates(assessmentId) {
@@ -313,14 +329,16 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
         displayedTitle: row.displayed_title as string | null, candidateStatus: row.candidate_status as PersonCandidateRecord["candidateStatus"],
         ambiguityState: row.ambiguity_state as PersonCandidateRecord["ambiguityState"],
         extractionMethod: row.extraction_method as PersonCandidateRecord["extractionMethod"], observedAt: row.observed_at as string,
+        sourceClass: row.source_class as ProvenanceSourceClass, claimState: row.claim_state as PersonCandidateRecord["claimState"],
       }));
     },
     addConversionObservation(record) {
       database.prepare(`INSERT INTO conversion_feature_observations
-        (id, assessment_id, page_id, evidence_id, feature, status, observed_at, fresh_until, policy_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (id, assessment_id, page_id, evidence_id, feature, status, observed_at, fresh_until, policy_version,
+         source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.assessmentId, record.pageId, record.evidenceId, record.feature, record.status,
-          record.observedAt, record.freshUntil, record.policyVersion);
+          record.observedAt, record.freshUntil, record.policyVersion, record.sourceClass, record.claimState);
       return repository.listConversionObservations(record.assessmentId).find((value) => value.id === record.id) as ConversionObservationRecord;
     },
     listConversionObservations(assessmentId) {
@@ -330,6 +348,7 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
         evidenceId: row.evidence_id as string | null, feature: row.feature as ConversionFeature,
         status: row.status as FeatureAssessmentStatus, observedAt: row.observed_at as string,
         freshUntil: row.fresh_until as string, policyVersion: row.policy_version as string,
+        sourceClass: row.source_class as ProvenanceSourceClass, claimState: row.claim_state as ClaimState,
       }));
     },
     addLink(record) {
@@ -384,21 +403,23 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
     addStructuredDataObservation(record) {
       database.prepare(`INSERT INTO structured_data_observations
         (id, page_id, evidence_id, schema_type, structured_data_path, field_name, claimed_value,
-         confidence, observed_at, fetched_at, content_checksum, extraction_policy_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         confidence, observed_at, fetched_at, content_checksum, extraction_policy_version, source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.pageId, record.evidenceId, record.schemaType, record.structuredDataPath,
           record.fieldName, record.claimedValue, record.confidence, record.observedAt, record.fetchedAt,
-          record.contentChecksum, record.extractionPolicyVersion);
+          record.contentChecksum, record.extractionPolicyVersion, record.sourceClass, record.claimState);
       return { ...record };
     },
     addContactObservation(record) {
       database.prepare(`INSERT INTO website_contact_observations
         (id, assessment_id, page_id, evidence_id, contact_kind, displayed_value, candidate_status,
-         extraction_method, selector_or_path, observed_at, fetched_at, content_checksum, extraction_policy_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         extraction_method, selector_or_path, observed_at, fetched_at, content_checksum, extraction_policy_version,
+         source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.assessmentId, record.pageId, record.evidenceId, record.contactKind,
           record.displayedValue, record.candidateStatus, record.extractionMethod, record.selectorOrPath,
-          record.observedAt, record.fetchedAt, record.contentChecksum, record.extractionPolicyVersion);
+          record.observedAt, record.fetchedAt, record.contentChecksum, record.extractionPolicyVersion,
+          record.sourceClass, record.claimState);
       return repository.listContactObservations(record.assessmentId).find((value) => value.id === record.id) as WebsiteContactObservationRecord;
     },
     listContactObservations(assessmentId) {
@@ -410,14 +431,18 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
         extractionMethod: row.extraction_method as string, selectorOrPath: row.selector_or_path as string | null,
         observedAt: row.observed_at as string, fetchedAt: row.fetched_at as string,
         contentChecksum: row.content_checksum as string, extractionPolicyVersion: row.extraction_policy_version as string,
+        sourceClass: row.source_class as ProvenanceSourceClass,
+        claimState: row.claim_state as WebsiteContactObservationRecord["claimState"],
       }));
     },
     addServiceEvidence(record) {
       database.prepare(`INSERT INTO service_evidence
-        (id, assessment_id, page_id, evidence_id, evidence_state, term, basis, observed_at, extraction_policy_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (id, assessment_id, page_id, evidence_id, evidence_state, term, basis, observed_at, extraction_policy_version,
+         source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.assessmentId, record.pageId, record.evidenceId, record.evidenceState,
-          record.term, record.basis, record.observedAt, record.extractionPolicyVersion);
+          record.term, record.basis, record.observedAt, record.extractionPolicyVersion,
+          record.sourceClass, record.claimState);
       return repository.listServiceEvidence(record.assessmentId).find((value) => value.id === record.id) as ServiceEvidenceRecord;
     },
     listServiceEvidence(assessmentId) {
@@ -427,16 +452,17 @@ export function createWebsiteAssessmentRepository(database: SqliteDatabase): Web
         evidenceId: row.evidence_id as string | null, evidenceState: row.evidence_state as ServiceEvidenceRecord["evidenceState"],
         term: row.term as string | null, basis: row.basis as ServiceEvidenceRecord["basis"], observedAt: row.observed_at as string,
         extractionPolicyVersion: row.extraction_policy_version as string,
+        sourceClass: row.source_class as ProvenanceSourceClass, claimState: row.claim_state as ClaimState,
       }));
     },
     addIdentityConflict(record) {
       database.prepare(`INSERT INTO website_identity_conflicts
         (id, assessment_id, business_id, page_id, evidence_id, conflict_type, expected_value,
-         observed_value, review_state, observed_at, resolved_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         observed_value, review_state, observed_at, resolved_at, source_class, claim_state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(record.id, record.assessmentId, record.businessId, record.pageId, record.evidenceId,
           record.conflictType, record.expectedValue, record.observedValue, record.reviewState,
-          record.observedAt, record.resolvedAt);
+          record.observedAt, record.resolvedAt, record.sourceClass, record.claimState);
       return { ...record };
     },
     transaction(operation) {

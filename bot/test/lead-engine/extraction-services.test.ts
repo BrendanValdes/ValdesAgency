@@ -25,6 +25,13 @@ describe("service and niche evidence", () => {
   });
 
   it("records unavailable evidence without accepting or rejecting a business", () => {
-    expect(extractServiceEvidence({ html: null, jsonLd: null, niche })).toEqual([{ state: "unavailable", term: null, basis: "not_available", evidence: null }]);
+    expect(extractServiceEvidence({ html: null, jsonLd: null, niche })).toEqual([{
+      state: "unavailable",
+      term: null,
+      basis: "not_available",
+      sourceClass: "synthetic_fixture",
+      claimState: "unknown",
+      evidence: null,
+    }]);
   });
 });

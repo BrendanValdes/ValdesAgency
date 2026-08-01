@@ -25,7 +25,7 @@ function crawlWith(status: "successful" | "blocked" | "failed", html: string | n
     attempts: 3, redirectHistory: [], fetchedAt: assessedAt, httpStatus: null,
   } : null;
   const robots = { origin: new URL(url).origin, robotsUrl: new URL("/robots.txt", url).href, status: status === "blocked" ? "denied" as const : "allowed" as const, reason: status === "blocked" ? "matched_disallow" as const : "no_matching_rule" as const, matchedRule: status === "blocked" ? "/" : null, fetchedAt: assessedAt, expiresAt: freshUntil, contentChecksum: null, sitemapUrls: [] };
-  return { requestedUrl: url, canonicalHomepage: url, startedAt: assessedAt, completedAt: assessedAt,
+  return { requestedUrl: url, sourceClass: "synthetic_fixture", canonicalHomepage: url, startedAt: assessedAt, completedAt: assessedAt,
     pages: [{ url, kind: "homepage", inspectionStatus: status, fetch, html }], robots, robotsDecisions: [robots],
     complete: status === "successful", timedOut: false };
 }
@@ -43,7 +43,9 @@ describe("website assessment semantics", () => {
       const signals = extractConversionSignals({ html, homepage: fetched.finalUrl, validResponse: true });
       const result = assessConversionFeatures({ crawl, signals, browser: { status: "not_checked" }, assessedAt, freshUntil });
       expect(result.find(({ feature }) => feature === "contact_form")?.status).toBe("absent_after_successful_inspection");
+      expect(result.find(({ feature }) => feature === "contact_form")?.claimState).toBe("observed");
       expect(result.find(({ feature }) => feature === "valid_page_response")?.status).toBe("present");
+      expect(result.every(({ sourceClass, claimState }) => sourceClass === "synthetic_fixture" && ["observed", "unknown"].includes(claimState))).toBe(true);
     } finally {
       await server.close();
     }
@@ -76,5 +78,6 @@ describe("website assessment semantics", () => {
     const result = assessBusinessOperationalEvidence({ expectedBusinessName: "Clearwater Example Pool Care", crawl: crawlWith("successful", source), identity });
     expect(result.identityState).toBe("conflicts");
     expect(result.reviewRequired).toBe(true);
+    expect(result.evidence.find(({ kind }) => kind === "contact_consistency")?.claimState).toBe("unknown");
   });
 });

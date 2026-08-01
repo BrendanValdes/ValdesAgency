@@ -1,11 +1,13 @@
 import type { EvidenceValue } from "../crawl/types.js";
 import { EXTRACTION_POLICY_VERSION } from "../crawl/types.js";
+import type { ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface HtmlExtractionContext {
   pageUrl: string;
   observedAt: string;
   fetchedAt: string;
   contentChecksum: string;
+  sourceClass?: ProvenanceSourceClass;
 }
 
 export interface HtmlAnchor {
@@ -23,6 +25,8 @@ export interface HtmlForm {
 }
 
 export interface HtmlExtraction {
+  sourceClass: ProvenanceSourceClass;
+  claimState: "observed";
   title: EvidenceValue<string> | null;
   metaDescription: EvidenceValue<string> | null;
   canonicalUrl: EvidenceValue<string> | null;
@@ -81,6 +85,8 @@ function evidence(
 ): EvidenceValue<string> {
   return {
     value: value.trim().replace(/\s+/g, " "),
+    sourceClass: context.sourceClass ?? "synthetic_fixture",
+    claimState: "observed",
     pageUrl: context.pageUrl,
     extractionMethod: "html",
     selector,
@@ -180,6 +186,8 @@ export function extractHtml(html: string, context: HtmlExtractionContext): HtmlE
     .map((match, index) => evidence(context, (match[0] ?? "").trim(), `text:copyright(${index + 1})`, "medium"));
 
   return {
+    sourceClass: context.sourceClass ?? "synthetic_fixture",
+    claimState: "observed",
     title: titleValue ? evidence(context, titleValue, "title") : null,
     metaDescription,
     canonicalUrl,

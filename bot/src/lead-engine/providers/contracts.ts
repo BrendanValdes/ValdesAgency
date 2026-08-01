@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 export const PROVIDER_ERROR_CATEGORIES = [
   "unavailable",
@@ -82,6 +83,8 @@ export interface ProviderCacheMetadata {
 
 export interface ProviderEnvelope<T> {
   providerId: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   operation: ProviderOperation;
   providerSchemaVersion: string;
   correlationId: string;
@@ -95,4 +98,3 @@ export interface ProviderEnvelope<T> {
   error: { category: ProviderErrorCategory; retryable: boolean } | null;
   rawReferenceChecksum: string | null;
 }
-

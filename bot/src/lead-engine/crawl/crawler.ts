@@ -1,5 +1,6 @@
 import { extractHtml } from "../extraction/html.js";
 import { extractLinks } from "../extraction/links.js";
+import { provenanceForFetcherSource } from "../domain/provenance.js";
 import { planPages } from "./page-priority.js";
 import { DEFAULT_CRAWL_LIMITS, validateCrawlLimits } from "./policies.js";
 import { RobotsPolicyService } from "./robots.js";
@@ -51,6 +52,7 @@ export class WebsiteCrawler {
     signal?: AbortSignal;
   }): Promise<CrawlResult> {
     const started = this.#now();
+    const sourceClass = provenanceForFetcherSource(this.#fetcher.sourceClass);
     let homepage: string;
     try {
       homepage = homepageUrl(input.websiteUrl);
@@ -67,7 +69,7 @@ export class WebsiteCrawler {
         contentChecksum: null,
         sitemapUrls: [],
       };
-      return { requestedUrl: input.websiteUrl, canonicalHomepage: null, startedAt: timestamp, completedAt: timestamp, pages: [], robots: unavailableRobots, robotsDecisions: [unavailableRobots], complete: false, timedOut: false };
+      return { requestedUrl: input.websiteUrl, sourceClass, canonicalHomepage: null, startedAt: timestamp, completedAt: timestamp, pages: [], robots: unavailableRobots, robotsDecisions: [unavailableRobots], complete: false, timedOut: false };
     }
 
     const controller = new AbortController();
@@ -87,6 +89,7 @@ export class WebsiteCrawler {
         pages.push({ url: homepage, kind: "homepage", inspectionStatus: "blocked", fetch: null, html: null });
         return {
           requestedUrl: input.websiteUrl,
+          sourceClass,
           canonicalHomepage: homepage,
           startedAt: started.toISOString(),
           completedAt: this.#now().toISOString(),
@@ -121,6 +124,7 @@ export class WebsiteCrawler {
           observedAt: input.observedAt ?? fetched.fetchedAt,
           fetchedAt: fetched.fetchedAt,
           contentChecksum: fetched.contentChecksum,
+          sourceClass,
         });
         discoveredLinks.push(...extractLinks(extracted, homepage).filter((link) => !["external", "social", "telephone", "email"].includes(link.kind)).map((link) => link.url));
       };
@@ -158,6 +162,7 @@ export class WebsiteCrawler {
       const complete = !controller.signal.aborted && pages.length > 0 && pages[0]?.inspectionStatus === "successful" && pages.every((page) => page.inspectionStatus === "successful");
       return {
         requestedUrl: input.websiteUrl,
+        sourceClass,
         canonicalHomepage: homepage,
         startedAt: started.toISOString(),
         completedAt: this.#now().toISOString(),

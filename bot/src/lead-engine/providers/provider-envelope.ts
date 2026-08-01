@@ -7,9 +7,12 @@ import type {
   ProviderErrorCategory,
   ProviderOperation,
 } from "./contracts.js";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 interface EnvelopeBase {
   providerId: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   operation: ProviderOperation;
   providerSchemaVersion: string;
   correlationId: string;
@@ -48,6 +51,8 @@ export function normalizedEnvelope<T>(
   if (!parsed.success) {
     return {
       providerId: base.providerId,
+      sourceClass: base.sourceClass,
+      claimState: base.claimState,
       operation: base.operation,
       providerSchemaVersion: base.providerSchemaVersion,
       correlationId: base.correlationId,
@@ -70,6 +75,8 @@ export function normalizedEnvelope<T>(
   }
   return {
     providerId: base.providerId,
+    sourceClass: base.sourceClass,
+    claimState: base.claimState,
     operation: base.operation,
     providerSchemaVersion: base.providerSchemaVersion,
     correlationId: base.correlationId,
@@ -92,6 +99,8 @@ export function failedEnvelope<T>(
 ): ProviderEnvelope<T> {
   return {
     providerId: base.providerId,
+    sourceClass: base.sourceClass,
+    claimState: base.claimState,
     operation: base.operation,
     providerSchemaVersion: base.providerSchemaVersion,
     correlationId: base.correlationId,
@@ -106,4 +115,3 @@ export function failedEnvelope<T>(
     rawReferenceChecksum: rawChecksum(base),
   };
 }
-

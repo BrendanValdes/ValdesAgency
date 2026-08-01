@@ -2,8 +2,11 @@ import type { EvidenceValue } from "../crawl/types.js";
 import { normalizeBusinessName } from "../identity/normalize.js";
 import type { HtmlExtraction } from "./html.js";
 import type { JsonLdExtraction } from "./json-ld.js";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface BusinessIdentityEvidence {
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   names: ReadonlyArray<EvidenceValue<string>>;
   parked: boolean;
   placeholderOnly: boolean;
@@ -29,6 +32,8 @@ export function extractBusinessIdentity(input: {
   }
   const text = input.html.visibleText;
   return {
+    sourceClass: input.html.sourceClass,
+    claimState: "observed",
     names,
     parked: /\b(?:domain (?:is )?for sale|buy this domain|parked (?:free|domain)|sedo domain parking)\b/i.test(text),
     placeholderOnly: /\b(?:coming soon|website under construction|site under maintenance)\b/i.test(text) && text.length < 1_000,

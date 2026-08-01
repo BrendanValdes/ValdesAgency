@@ -9,36 +9,40 @@ import {
   normalizePhoneCandidate,
 } from "../../src/lead-engine/identity/normalize.js";
 import {
+  externallyVerifiedIdentityEvidence,
+  observedIdentityEvidence,
   safeVerifiedPhone,
   syntheticIdentity,
+  trustedProviderIdentifier,
+  verifiedDomain,
 } from "./fixtures/identity/synthetic.js";
 
 describe("hierarchical business identity and deduplication", () => {
   it("matches stable provider/place identifiers first", () => {
-    const left = syntheticIdentity({ providerIdentifiers: [{ providerId: "overture", value: "place-1" }] });
-    const right = syntheticIdentity({ entityId: "business-synthetic-b", providerIdentifiers: [{ providerId: "overture", value: "place-1" }] });
+    const left = syntheticIdentity({ providerIdentifiers: [trustedProviderIdentifier("place-1")] });
+    const right = syntheticIdentity({ entityId: "business-synthetic-b", providerIdentifiers: [trustedProviderIdentifier("place-1")] });
     expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "stable_provider_identifier", matchScore: 10000 });
   });
 
   it("matches verified domains when locations are not distinct", () => {
-    const left = syntheticIdentity({ domains: [{ value: "https://clearwater.example", verified: true }], address: null });
-    const right = syntheticIdentity({ entityId: "business-synthetic-b", locationId: "location-synthetic-a", domains: [{ value: "www.clearwater.example", verified: true }], address: null });
-    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "verified_domain" });
+    const left = syntheticIdentity({ domains: [verifiedDomain("https://clearwater.example")], address: null });
+    const right = syntheticIdentity({ entityId: "business-synthetic-b", locationId: "location-synthetic-a", domains: [verifiedDomain("www.clearwater.example")], address: null });
+    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "verified_canonical_domain" });
   });
 
   it("matches a safe verified E.164 business phone", () => {
-    const left = syntheticIdentity({ phones: [safeVerifiedPhone], address: null });
-    const right = syntheticIdentity({ entityId: "business-synthetic-b", phones: [{ ...safeVerifiedPhone, value: "+1 202 555 0100" }], address: null });
-    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "verified_e164_phone" });
+    const left = syntheticIdentity({ phones: [safeVerifiedPhone] });
+    const right = syntheticIdentity({ entityId: "business-synthetic-b", phones: [{ ...safeVerifiedPhone, value: "+1 202 555 0100" }] });
+    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "verified_phone_with_address" });
   });
 
   it("matches exact conservative normalized addresses", () => {
     const left = syntheticIdentity();
     const right = syntheticIdentity({
       entityId: "business-synthetic-b",
-      address: { line1: "100  EXAMPLE WAY", city: "Testville", region: "az", postalCode: "85000", countryCode: "US" },
+      address: { ...syntheticIdentity().address!, line1: "100  EXAMPLE WAY", region: "az" },
     });
-    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "exact_normalized_address" });
+    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "human_review", reason: "exact_address_review" });
   });
 
   it("requires multiple corroborating fields for a strong match", () => {
@@ -48,9 +52,9 @@ describe("hierarchical business identity and deduplication", () => {
       entityId: "business-synthetic-b",
       locationId: "location-synthetic-b",
       phones: [sharedCandidate],
-      address: { line1: "101 Different Way", city: "Testville", region: "AZ", postalCode: "85000", countryCode: "US" },
+      address: { ...syntheticIdentity().address!, line1: "101 Different Way" },
     });
-    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "auto_merge", reason: "strong_multi_field" });
+    expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "human_review", reason: "fuzzy_candidate" });
   });
 
   it("routes fuzzy name candidates to human review and never auto-merges them", () => {
@@ -65,14 +69,14 @@ describe("hierarchical business identity and deduplication", () => {
     { multipleLocations: true },
     { associationCertain: false },
   ])("does not merge on unsafe phone metadata %#", (metadata) => {
-    const phone = normalizePhoneCandidate("202-555-0123", { verified: true, associationCertain: true, ...metadata });
+    const phone = normalizePhoneCandidate("202-555-0123", { evidence: externallyVerifiedIdentityEvidence("phone_business_association"), associationCertain: true, ...metadata });
     const left = syntheticIdentity({ displayName: "Synthetic Alpha", phones: [phone], address: null });
     const right = syntheticIdentity({ entityId: "business-synthetic-b", displayName: "Synthetic Omega", phones: [phone], address: null });
     expect(matchBusinessIdentity(left, right).action).not.toBe("auto_merge");
   });
 
   it("does not merge on toll-free phone alone", () => {
-    const phone = normalizePhoneCandidate("800-555-0100", { verified: true, associationCertain: true });
+    const phone = normalizePhoneCandidate("800-555-0100", { evidence: externallyVerifiedIdentityEvidence("phone_business_association"), associationCertain: true });
     const decision = matchBusinessIdentity(
       syntheticIdentity({ displayName: "Synthetic Alpha", phones: [phone], address: null }),
       syntheticIdentity({ entityId: "business-synthetic-b", displayName: "Synthetic Omega", phones: [phone], address: null }),
@@ -81,15 +85,15 @@ describe("hierarchical business identity and deduplication", () => {
   });
 
   it("keeps chain locations distinct while linking their business group", () => {
-    const chain = { brandName: "Synthetic Pool Network", franchise: true, verified: true };
-    const left = syntheticIdentity({ groupId: "group-synthetic-chain", chainAffiliation: chain, domains: [{ value: "network.example", verified: true }] });
+    const chain = { brandName: "Synthetic Pool Network", franchise: true, evidence: externallyVerifiedIdentityEvidence("business_canonical_domain") };
+    const left = syntheticIdentity({ groupId: "group-synthetic-chain", chainAffiliation: chain, domains: [verifiedDomain("network.example")] });
     const right = syntheticIdentity({
       entityId: "business-synthetic-b",
       locationId: "location-synthetic-b",
       groupId: "group-synthetic-chain",
       chainAffiliation: chain,
-      domains: [{ value: "network.example", verified: true }],
-      address: { line1: "900 Other Road", city: "Sample City", region: "NV", postalCode: "89000", countryCode: "US" },
+      domains: [verifiedDomain("network.example")],
+      address: { ...syntheticIdentity().address!, line1: "900 Other Road", city: "Sample City", region: "NV", postalCode: "89000" },
     });
     const match = matchBusinessIdentity(left, right);
     expect(match).toMatchObject({ action: "group_link", reason: "verified_domain_group" });
@@ -109,23 +113,32 @@ describe("hierarchical business identity and deduplication", () => {
     expect(group.aliases.map((alias) => alias.kind).sort()).toEqual(["dba", "display", "legal"]);
   });
 
+  it("does not infer a shared chain group from an unverified affiliation", () => {
+    const chain = { brandName: "Synthetic Pool Network", franchise: true, evidence: observedIdentityEvidence() };
+    const groups = groupBusinessLocations([
+      syntheticIdentity({ chainAffiliation: chain }),
+      syntheticIdentity({ entityId: "business-synthetic-b", locationId: "location-synthetic-b", chainAffiliation: chain }),
+    ], [], "2026-02-01T12:00:00.000Z");
+    expect(groups).toHaveLength(2);
+  });
+
   it("routes conflicting strong identifiers to review", () => {
     const left = syntheticIdentity({
-      providerIdentifiers: [{ providerId: "overture", value: "place-1" }],
-      domains: [{ value: "alpha.example", verified: true }],
+      providerIdentifiers: [trustedProviderIdentifier("place-1")],
+      domains: [verifiedDomain("alpha.example")],
     });
     const right = syntheticIdentity({
       entityId: "business-synthetic-b",
-      providerIdentifiers: [{ providerId: "overture", value: "place-1" }],
-      domains: [{ value: "omega.example", verified: true }],
+      providerIdentifiers: [trustedProviderIdentifier("place-1")],
+      domains: [verifiedDomain("omega.example")],
     });
     expect(matchBusinessIdentity(left, right)).toMatchObject({ action: "human_review", reason: "conflicting_identifiers" });
   });
 
   it("is idempotent across repeated ordered deduplication runs", () => {
     const records = [
-      syntheticIdentity({ providerIdentifiers: [{ providerId: "fixture", value: "same" }] }),
-      syntheticIdentity({ entityId: "business-synthetic-b", providerIdentifiers: [{ providerId: "fixture", value: "same" }] }),
+      syntheticIdentity({ providerIdentifiers: [trustedProviderIdentifier("same", "fixture")] }),
+      syntheticIdentity({ entityId: "business-synthetic-b", providerIdentifiers: [trustedProviderIdentifier("same", "fixture")] }),
     ];
     expect(deduplicateIdentityCandidates(records, matchBusinessIdentity)).toEqual(
       deduplicateIdentityCandidates([...records].reverse(), matchBusinessIdentity),

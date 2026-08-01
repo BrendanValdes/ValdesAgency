@@ -1,4 +1,5 @@
 import { stableId } from "../shared/stable.js";
+import { isCurrentExternalVerification } from "../domain/provenance.js";
 import type {
   BusinessGroup,
   BusinessIdentityRecord,
@@ -8,6 +9,7 @@ import type {
 export function groupBusinessLocations(
   records: ReadonlyArray<BusinessIdentityRecord>,
   decisions: ReadonlyArray<IdentityMatchDecision> = [],
+  currentAt = new Date().toISOString(),
 ): BusinessGroup[] {
   const links = new Map<string, string>();
   for (const record of records) links.set(record.entityId, record.entityId);
@@ -29,7 +31,14 @@ export function groupBusinessLocations(
   }
   const explicitGroups = new Map<string, string>();
   for (const record of records) {
-    const key = record.groupId ?? (record.chainAffiliation?.verified ? record.chainAffiliation.brandName : null);
+    const key = record.groupId ??
+      (record.chainAffiliation && isCurrentExternalVerification(
+        record.chainAffiliation.evidence,
+        "business_canonical_domain",
+        currentAt,
+      )
+        ? record.chainAffiliation.brandName
+        : null);
     if (!key) continue;
     const existing = explicitGroups.get(key);
     if (existing) join(existing, record.entityId);

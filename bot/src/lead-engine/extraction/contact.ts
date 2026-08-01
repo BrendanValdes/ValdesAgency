@@ -2,11 +2,14 @@ import type { EvidenceValue } from "../crawl/types.js";
 import type { HtmlExtraction } from "./html.js";
 import type { JsonLdExtraction } from "./json-ld.js";
 import { extractLinks } from "./links.js";
+import type { ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface ContactObservation {
   kind: "phone" | "email" | "address";
   displayedValue: string;
   candidateStatus: "public_unverified";
+  sourceClass: ProvenanceSourceClass;
+  claimState: "public_unverified_candidate";
   evidence: EvidenceValue<string>;
 }
 
@@ -35,18 +38,20 @@ export function extractContactInformation(input: {
       kind: link.kind === "telephone" ? "phone" : "email",
       displayedValue: value,
       candidateStatus: "public_unverified",
+      sourceClass: link.evidence.sourceClass,
+      claimState: "public_unverified_candidate",
       evidence: { ...link.evidence, value },
     });
   }
   for (const address of input.html.addressTexts) {
-    observations.push({ kind: "address", displayedValue: address.value, candidateStatus: "public_unverified", evidence: address });
+    observations.push({ kind: "address", displayedValue: address.value, candidateStatus: "public_unverified", sourceClass: address.sourceClass, claimState: "public_unverified_candidate", evidence: address });
   }
   for (const address of input.jsonLd.addresses) {
-    observations.push({ kind: "address", displayedValue: address.value, candidateStatus: "public_unverified", evidence: address });
+    observations.push({ kind: "address", displayedValue: address.value, candidateStatus: "public_unverified", sourceClass: address.sourceClass, claimState: "public_unverified_candidate", evidence: address });
   }
   for (const point of input.jsonLd.contactPoints) {
     const kind = point.value.includes("@") ? "email" : "phone";
-    observations.push({ kind, displayedValue: point.value, candidateStatus: "public_unverified", evidence: point });
+    observations.push({ kind, displayedValue: point.value, candidateStatus: "public_unverified", sourceClass: point.sourceClass, claimState: "public_unverified_candidate", evidence: point });
   }
   const seen = new Set<string>();
   return observations.filter((observation) => {

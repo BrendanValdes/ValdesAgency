@@ -53,6 +53,8 @@ export class DiscoveryService {
     return acceptedDiscoveryObservations(
       observations.map((observation) => ({
         providerId: observation.providerId,
+        sourceClass: observation.sourceClass,
+        claimState: observation.claimState,
         operation: "discovery",
         providerSchemaVersion: "normalized-observation-1.0.0",
         correlationId: observation.correlationId,

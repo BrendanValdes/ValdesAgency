@@ -122,6 +122,8 @@ export class OvertureLocalDiscoveryProvider implements DiscoveryProviderGateway 
       return normalizedEnvelope(
         {
           providerId: this.providerId,
+          sourceClass: "synthetic_fixture",
+          claimState: "observed",
           operation: request.operation,
           providerSchemaVersion: `overture-${this.#options.releaseId}`,
           correlationId: request.correlationId,

@@ -40,6 +40,7 @@ describe("fixture-only discovery service", () => {
     const result = await service().service.discover(input);
     expect(result).toHaveLength(2);
     expect(result.map((entry) => entry.providerResultId)).toEqual(["fixture-place-001", "fixture-place-002"]);
+    expect(result.every((entry) => entry.sourceClass === "synthetic_fixture" && entry.claimState === "observed")).toBe(true);
   });
 
   it("rejects disabled niches before a provider task", async () => {

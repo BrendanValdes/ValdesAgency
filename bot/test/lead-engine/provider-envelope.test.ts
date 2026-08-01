@@ -47,6 +47,8 @@ describe("provider envelopes and fixture provider", () => {
     expect(first.status).toBe("complete");
     expect(first.envelopes[0]).toMatchObject({
       providerId: "fixture",
+      sourceClass: "synthetic_fixture",
+      claimState: "observed",
       providerSchemaVersion: "fixture-discovery-1.0.0",
       validation: { status: "accepted", issues: [] },
       cost: { billable: false, billableUnits: 0, unit: "none", microUsd: 0 },

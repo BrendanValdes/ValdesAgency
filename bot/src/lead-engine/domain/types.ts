@@ -1,6 +1,16 @@
 import type { MicroUsd } from "./money.js";
 import type { ReasonCode } from "./reason-codes.js";
 import type {
+  ClaimState,
+  ExternalVerificationState,
+  HumanReviewState,
+  ProvenanceSourceClass,
+  SourceConfirmationState,
+  VerificationDimension,
+  VerificationMethod,
+  VerificationResult,
+} from "./provenance.js";
+import type {
   ConflictStatus,
   DecisionState,
   EvidenceState,
@@ -72,6 +82,8 @@ export interface BusinessIdentifier {
   scheme: string;
   value: string;
   source: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   evidenceState: EvidenceState;
   createdAt: IsoTimestamp;
 }
@@ -85,6 +97,8 @@ export interface BusinessLocation {
   postalCode: string | null;
   countryCode: string;
   evidenceState: EvidenceState;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
 }
@@ -93,12 +107,15 @@ export interface Contact {
   id: ContactId;
   businessId: BusinessId;
   entityType: "person";
-  personName: string;
+  personName: string | null;
   title: string | null;
   role: "owner" | "manager" | "employee" | "unknown";
   evidenceState: EvidenceState;
   verificationState: VerificationState;
   decisionState: DecisionState;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
+  relationshipEvidenceId: EvidenceId | null;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
 }
@@ -110,6 +127,7 @@ export interface Evidence {
   fieldName: string;
   claimedValue: string | null;
   source: string;
+  sourceClass: ProvenanceSourceClass;
   sourceUrl: string | null;
   observedAt: IsoTimestamp;
   fetchedAt: IsoTimestamp;
@@ -121,8 +139,20 @@ export interface Evidence {
   evidenceState: EvidenceState;
   verificationState: VerificationState;
   decisionState: DecisionState;
-  verificationMethod: string | null;
+  claimState: ClaimState;
+  sourceConfirmationState: SourceConfirmationState;
+  externalVerificationState: ExternalVerificationState;
+  humanReviewState: HumanReviewState;
+  verificationDimension: VerificationDimension | null;
+  verifierId: string | null;
+  verificationMethod: VerificationMethod | null;
+  verificationResult: VerificationResult | null;
   verifiedAt: IsoTimestamp | null;
+  expiresAt: IsoTimestamp | null;
+  normalizedValue: string | null;
+  evidenceReference: string | null;
+  humanReviewerId: string | null;
+  humanReviewedAt: IsoTimestamp | null;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
 }

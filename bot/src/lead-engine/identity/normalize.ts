@@ -44,7 +44,19 @@ export function normalizePhoneCandidate(
   return {
     value,
     e164,
-    verified: metadata.verified ?? false,
+    evidence: metadata.evidence ?? {
+      sourceClass: "legacy_unclassified",
+      claimState: "observed",
+      externalVerificationState: "unassessed",
+      verificationDimension: null,
+      verifierId: null,
+      verificationMethod: null,
+      verificationResult: null,
+      verifiedAt: null,
+      expiresAt: null,
+      normalizedValue: null,
+      evidenceReference: null,
+    },
     shared: metadata.shared ?? false,
     tollFree,
     callCenter: metadata.callCenter ?? false,
@@ -65,4 +77,3 @@ export function normalizeAddress(address: AddressIdentity): string {
     country,
   ].filter(Boolean).join("|");
 }
-

@@ -46,15 +46,25 @@ describe("evidence-first semantics", () => {
     expect(evidence.decisionState).toBe("unknown");
   });
 
-  it("requires an explicit method and timestamp for external verification", () => {
+  it("requires complete external-provider proof for external verification", () => {
     expect(() =>
       makeSyntheticEvidence({ verificationState: "externally_verified" }),
-    ).toThrow("method and timestamp");
+    ).toThrow("complete compatible verifier evidence");
 
-    const evidence = makeSyntheticEvidence({
+    const evidence = createEvidence({
+      ...makeSyntheticEvidence(),
+      sourceClass: "external_verification_provider",
+      claimState: "externally_verified",
       verificationState: "externally_verified",
-      verificationMethod: "synthetic_test_procedure",
+      externalVerificationState: "current",
+      verificationDimension: "business_canonical_domain",
+      verifierId: "synthetic-verifier",
+      verificationMethod: "canonical_domain_verification",
+      verificationResult: "passed",
       verifiedAt: SYNTHETIC_TIMESTAMP,
+      expiresAt: "2027-01-15T12:00:00.000Z",
+      normalizedValue: "clearwater.example",
+      evidenceReference: "synthetic-verifier-reference",
     });
     expect(evidence.verificationState).toBe("externally_verified");
   });
@@ -62,6 +72,8 @@ describe("evidence-first semantics", () => {
   it("never lets business evidence satisfy confirmed-person policy", () => {
     const businessEvidence = makeSyntheticEvidence({
       verificationState: "source_confirmed",
+      claimState: "source_confirmed",
+      sourceConfirmationState: "confirmed",
       decisionState: "accepted",
     });
     expect(evidenceSupportsConfirmedPerson(businessEvidence)).toBe(false);
@@ -72,6 +84,15 @@ describe("evidence-first semantics", () => {
       entityType: "person",
       entityId: syntheticContact.id,
       fieldName: "person_name",
+      sourceClass: "human_review",
+      claimState: "human_confirmed",
+      verificationState: "not_checked",
+      humanReviewState: "accepted",
+      verificationDimension: "person_name_observed",
+      normalizedValue: "avery example",
+      humanReviewerId: "synthetic-reviewer",
+      humanReviewedAt: SYNTHETIC_TIMESTAMP,
+      evidenceReference: "synthetic-review-reference",
     });
     expect(evidenceSupportsConfirmedPerson(personEvidence)).toBe(true);
   });
@@ -82,20 +103,22 @@ describe("evidence-first semantics", () => {
         syntheticBusiness.canonicalName,
         syntheticBusiness.canonicalName,
       ),
-    ).toThrow("confirmed-person policy");
+    ).toThrow("business_name_as_person");
     expect(
       isConfirmedPerson(syntheticBusiness, {
         ...syntheticContact,
-        verificationState: "source_confirmed",
+        claimState: "human_confirmed",
         decisionState: "accepted",
+        relationshipEvidenceId: "evidence-person-synthetic",
       }),
     ).toBe(true);
     expect(
       isConfirmedPerson(syntheticBusiness, {
         ...syntheticContact,
         personName: syntheticBusiness.canonicalName,
-        verificationState: "source_confirmed",
+        claimState: "human_confirmed",
         decisionState: "accepted",
+        relationshipEvidenceId: "evidence-person-synthetic",
       }),
     ).toBe(false);
   });

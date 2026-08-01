@@ -29,6 +29,21 @@ describe("Phase 3 containment", () => {
     expect(source).not.toMatch(/(?:createDirectHttpFetcher|NetworkPolicyAuthorizer|issuePublicWebCapability)\s*\(/);
   });
 
+  it("does not activate Phase 3C provenance, promotion, or identity decisions through production surfaces", () => {
+    const productionFiles = [
+      path.join(process.cwd(), "src/index.ts"),
+      ...files(path.join(process.cwd(), "src/features")),
+      ...files(path.join(process.cwd(), "src/services")),
+      ...files(path.join(process.cwd(), "src/cron")),
+      ...files(path.join(process.cwd(), "src/commands")),
+      ...files(path.join(process.cwd(), "scripts")),
+    ].filter((file) => /\.(?:ts|mjs|js)$/.test(file));
+    const source = productionFiles.map((file) => readFileSync(file, "utf8")).join("\n");
+
+    expect(source).not.toMatch(/lead-engine\/(?:domain\/(?:provenance|verification-policy|person-quality)|identity\/(?:matcher|merge-policy))/);
+    expect(source).not.toMatch(/(?:evaluateEvidencePromotion|matchBusinessIdentity|createSqliteRepositories)\s*\(/);
+  });
+
   it("contains no Discord, Anthropic, Composio, CRM, messaging, booking, or social adapter imports", () => {
     const source = files(path.join(process.cwd(), "src/lead-engine"))
       .filter((file) => file.endsWith(".ts"))

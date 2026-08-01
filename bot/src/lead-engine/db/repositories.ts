@@ -22,6 +22,11 @@ import type {
   VerificationState,
 } from "../domain/states.js";
 import type { MicroUsd } from "../domain/money.js";
+import type {
+  EvidencePromotionDecision,
+  EvidencePromotionRequest,
+} from "../domain/verification-policy.js";
+import type { IdentityMatchDecision } from "../identity/hierarchy.js";
 
 export interface RunRepository {
   create(run: LeadRun): LeadRun;
@@ -73,6 +78,8 @@ export interface ContactRepository {
       evidenceState: EvidenceState;
       verificationState: VerificationState;
       decisionState: DecisionState;
+      claimState?: Contact["claimState"];
+      relationshipEvidenceId?: string | null;
       updatedAt: string;
     },
   ): Contact;
@@ -86,15 +93,33 @@ export interface EvidenceRepository {
     id: string,
     states: {
       evidenceState: EvidenceState;
-      verificationState: VerificationState;
       decisionState: DecisionState;
       conflictStatus: ConflictStatus;
-      verificationMethod: string | null;
-      verifiedAt: string | null;
       updatedAt: string;
     },
   ): Evidence;
+  promote(
+    id: string,
+    request: Omit<EvidencePromotionRequest, "evidence"> & { decisionId: string },
+  ): EvidencePromotionDecision;
+  listPromotionDecisions(evidenceId: string): EvidencePromotionAudit[];
   addConflict(conflict: EvidenceConflict): EvidenceConflict;
+}
+
+export interface EvidencePromotionAudit {
+  id: string;
+  evidenceId: string;
+  requestedClaimState: Evidence["claimState"];
+  allowed: boolean;
+  denialReasons: ReadonlyArray<string>;
+  resolutionReference: string | null;
+  policyVersion: string;
+  decidedAt: string;
+}
+
+export interface IdentityDecisionRepository {
+  record(decision: IdentityMatchDecision, decidedAt: string): IdentityMatchDecision;
+  getById(id: string): IdentityMatchDecision | null;
 }
 
 export interface ProviderCallRepository {
@@ -123,6 +148,7 @@ export interface LeadEngineRepositories {
   businesses: BusinessRepository;
   contacts: ContactRepository;
   evidence: EvidenceRepository;
+  identityDecisions: IdentityDecisionRepository;
   providerCalls: ProviderCallRepository;
   artifacts: ArtifactRepository;
   transaction<T>(operation: (repositories: LeadEngineRepositories) => T): T;

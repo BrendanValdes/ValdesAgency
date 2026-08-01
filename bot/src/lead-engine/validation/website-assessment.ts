@@ -1,6 +1,7 @@
 import type { BrowserRenderResult } from "../crawl/fetchers/browser-renderer.js";
 import type { CrawlResult, EvidenceValue } from "../crawl/types.js";
 import type { ConversionFeature, ConversionSignal } from "../extraction/conversion.js";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 export type FeatureAssessmentStatus =
   | "present"
@@ -14,6 +15,8 @@ export type FeatureAssessmentStatus =
 export interface ConversionFeatureAssessment {
   feature: ConversionFeature;
   status: FeatureAssessmentStatus;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   evidence: ReadonlyArray<EvidenceValue<string>>;
   assessedAt: string;
   policyVersion: string;
@@ -55,6 +58,21 @@ export function assessConversionFeatures(input: {
     else if (input.browser.status === "unavailable" || input.browser.status === "failed") status = "unavailable";
     else if (!input.crawl.complete) status = input.crawl.pages.length === 0 ? "not_checked" : "ambiguous";
     else status = "absent_after_successful_inspection";
-    return { feature, status, evidence, assessedAt: input.assessedAt, policyVersion: WEBSITE_ASSESSMENT_POLICY_VERSION };
+    const claimState: ClaimState = evidence.length > 0
+      ? evidence[0]?.claimState ?? "observed"
+      : status === "absent_after_successful_inspection"
+        ? "observed"
+        : status === "stale"
+          ? "stale"
+          : "unknown";
+    return {
+      feature,
+      status,
+      sourceClass: evidence[0]?.sourceClass ?? input.crawl.sourceClass,
+      claimState,
+      evidence,
+      assessedAt: input.assessedAt,
+      policyVersion: WEBSITE_ASSESSMENT_POLICY_VERSION,
+    };
   });
 }

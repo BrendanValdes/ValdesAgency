@@ -2,6 +2,7 @@ import type { EvidenceValue } from "../crawl/types.js";
 import { EXTRACTION_POLICY_VERSION } from "../crawl/types.js";
 import { parseHtmlAttributes } from "./html.js";
 import type { HtmlExtractionContext } from "./html.js";
+import type { ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface JsonLdPerson {
   name: string;
@@ -9,6 +10,8 @@ export interface JsonLdPerson {
 }
 
 export interface JsonLdExtraction {
+  sourceClass: ProvenanceSourceClass;
+  claimState: "observed";
   schemaTypes: ReadonlyArray<EvidenceValue<string>>;
   organizationNames: ReadonlyArray<EvidenceValue<string>>;
   addresses: ReadonlyArray<EvidenceValue<string>>;
@@ -22,6 +25,8 @@ export interface JsonLdExtraction {
 function evidence<T>(context: HtmlExtractionContext, value: T, path: string, confidence: EvidenceValue<T>["confidence"] = "high"): EvidenceValue<T> {
   return {
     value,
+    sourceClass: context.sourceClass ?? "synthetic_fixture",
+    claimState: "observed",
     pageUrl: context.pageUrl,
     extractionMethod: "json_ld",
     selector: 'script[type="application/ld+json"]',
@@ -129,5 +134,9 @@ export function extractJsonLd(html: string, context: HtmlExtractionContext): Jso
       }
     }
   }
-  return result;
+  return {
+    sourceClass: context.sourceClass ?? "synthetic_fixture",
+    claimState: "observed",
+    ...result,
+  };
 }

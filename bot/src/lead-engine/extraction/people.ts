@@ -1,6 +1,8 @@
 import type { EvidenceValue } from "../crawl/types.js";
 import { EXTRACTION_POLICY_VERSION } from "../crawl/types.js";
 import { normalizeBusinessName } from "../identity/normalize.js";
+import { evaluatePersonName } from "../domain/person-quality.js";
+import type { ProvenanceSourceClass } from "../domain/provenance.js";
 import type { HtmlExtraction } from "./html.js";
 import type { JsonLdExtraction, JsonLdPerson } from "./json-ld.js";
 
@@ -9,6 +11,8 @@ export interface PersonEvidenceCandidate {
   displayedTitle: string | null;
   candidateStatus: "unverified_evidence_candidate";
   ambiguityState: "none" | "ambiguous" | "conflicting";
+  sourceClass: ProvenanceSourceClass;
+  claimState: "public_unverified_candidate";
   evidence: EvidenceValue<JsonLdPerson>;
 }
 
@@ -18,6 +22,7 @@ const PERSON_NAME = /[\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+){1,3}/u;
 function validPersonName(name: string, businessNames: ReadonlyArray<string>): boolean {
   const normalized = normalizeBusinessName(name);
   return Boolean(
+    evaluatePersonName(name, businessNames).accepted &&
     PERSON_NAME.test(name) &&
     !ORGANIZATION_TERM.test(name) &&
     !businessNames.some((businessName) => normalizeBusinessName(businessName) === normalized),
@@ -32,6 +37,8 @@ function htmlEvidence(
   const source = html.title ?? html.headings[0] ?? html.copyrightTexts[0];
   return {
     value,
+    sourceClass: source?.sourceClass ?? "synthetic_fixture",
+    claimState: "observed",
     pageUrl: source?.pageUrl ?? "",
     extractionMethod: "html",
     selector,
@@ -57,6 +64,8 @@ export function extractPersonCandidates(input: {
       displayedTitle: person.value.title,
       candidateStatus: "unverified_evidence_candidate",
       ambiguityState: person.value.title ? "none" : "ambiguous",
+      sourceClass: person.sourceClass,
+      claimState: "public_unverified_candidate",
       evidence: person,
     });
   }
@@ -80,6 +89,8 @@ export function extractPersonCandidates(input: {
         displayedTitle: title,
         candidateStatus: "unverified_evidence_candidate",
         ambiguityState: title ? "none" : "ambiguous",
+        sourceClass: (input.html.title ?? input.html.headings[0] ?? input.html.copyrightTexts[0])?.sourceClass ?? "synthetic_fixture",
+        claimState: "public_unverified_candidate",
         evidence: htmlEvidence(input.html, { name, title }, `text:person-pattern(${patternIndex + 1})`),
       });
     }

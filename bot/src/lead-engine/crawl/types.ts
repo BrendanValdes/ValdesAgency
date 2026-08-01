@@ -1,3 +1,5 @@
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
+
 export const CRAWL_POLICY_VERSION = "website-crawl-1.0.0";
 export const EXTRACTION_POLICY_VERSION = "website-extraction-1.0.0";
 
@@ -5,6 +7,8 @@ export type ConfidenceCategory = "high" | "medium" | "low";
 
 export interface EvidenceValue<T> {
   value: T;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   pageUrl: string;
   extractionMethod: "html" | "json_ld" | "http" | "robots";
   selector: string | null;
@@ -170,6 +174,7 @@ export interface CrawlPage {
 
 export interface CrawlResult {
   requestedUrl: string;
+  sourceClass: ProvenanceSourceClass;
   canonicalHomepage: string | null;
   startedAt: string;
   completedAt: string;

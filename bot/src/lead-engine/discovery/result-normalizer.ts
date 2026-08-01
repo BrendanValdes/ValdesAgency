@@ -3,6 +3,7 @@ import type {
   NormalizedDiscoveryResult,
   ProviderEnvelope,
 } from "../providers/contracts.js";
+import type { ClaimState, ProvenanceSourceClass } from "../domain/provenance.js";
 
 export interface DiscoveryObservation {
   observationId: string;
@@ -11,6 +12,8 @@ export interface DiscoveryObservation {
   correlationId: string;
   observedAt: string;
   retrievedAt: string;
+  sourceClass: ProvenanceSourceClass;
+  claimState: ClaimState;
   result: NormalizedDiscoveryResult;
 }
 
@@ -35,6 +38,8 @@ export function acceptedDiscoveryObservations(
       correlationId: envelope.correlationId,
       observedAt: envelope.observedAt,
       retrievedAt: envelope.retrievedAt,
+      sourceClass: envelope.sourceClass,
+      claimState: envelope.claimState,
       result: envelope.normalizedResult,
     });
   }

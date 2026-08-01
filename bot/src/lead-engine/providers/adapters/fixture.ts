@@ -63,6 +63,8 @@ export class FixtureDiscoveryProvider implements DiscoveryProviderGateway {
 
     const base = {
       providerId: this.providerId,
+      sourceClass: "synthetic_fixture" as const,
+      claimState: "observed" as const,
       operation: request.operation,
       providerSchemaVersion: "fixture-discovery-1.0.0",
       correlationId: request.correlationId,

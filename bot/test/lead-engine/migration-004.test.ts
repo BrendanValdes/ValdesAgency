@@ -11,7 +11,7 @@ describe("migration 004 website assessment persistence", () => {
   it("applies 001 through 004 in order and remains idempotent", () => {
     const fixture = createTestDatabase();
     try {
-      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4]);
+      expect(getMigrationHistory(fixture.database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5]);
       expect(migrateDatabase(fixture.database)).toEqual(getMigrationHistory(fixture.database));
     } finally {
       fixture.cleanup();
@@ -29,6 +29,7 @@ describe("migration 004 website assessment persistence", () => {
         canonicalHomepageUrl: "https://clearwater.example/", status: "complete", startedAt: timestamp, assessedAt: timestamp,
         freshUntil: "2026-01-16T12:00:00.000Z", crawlPolicyVersion: CRAWL_POLICY_VERSION,
         extractionPolicyVersion: EXTRACTION_POLICY_VERSION, browserStatus: "disabled", identityState: "agrees", reviewRequired: false,
+        sourceClass: "synthetic_fixture",
       });
       expect(repository.getAssessment(assessment.id)).toEqual(assessment);
       const fetch = repository.addFetch({
@@ -46,6 +47,7 @@ describe("migration 004 website assessment persistence", () => {
         id: "person-candidate-synthetic-001", assessmentId: assessment.id, businessId: syntheticBusiness.id, pageId: page.id,
         evidenceId: null, displayedName: "Avery Example", displayedTitle: "Operations Manager",
         candidateStatus: "unverified_evidence_candidate", ambiguityState: "none", extractionMethod: "json_ld", observedAt: timestamp,
+        sourceClass: "synthetic_fixture", claimState: "public_unverified_candidate",
       });
       repository.addLink({
         id: "link-synthetic-001", pageId: page.id, targetUrl: "https://clearwater.example/contact",
@@ -70,27 +72,32 @@ describe("migration 004 website assessment persistence", () => {
         structuredDataPath: "$[1]", fieldName: "name", claimedValue: "Clearwater Example Pool Care",
         confidence: "high", observedAt: timestamp, fetchedAt: timestamp, contentChecksum: "a".repeat(64),
         extractionPolicyVersion: EXTRACTION_POLICY_VERSION,
+        sourceClass: "synthetic_fixture", claimState: "observed",
       });
       const contact = repository.addContactObservation({
         id: "contact-observation-synthetic-001", assessmentId: assessment.id, pageId: page.id, evidenceId: null,
         contactKind: "email", displayedValue: "hello@example.test", candidateStatus: "public_unverified",
         extractionMethod: "html", selectorOrPath: "a:nth-of-type(1)", observedAt: timestamp, fetchedAt: timestamp,
         contentChecksum: "a".repeat(64), extractionPolicyVersion: EXTRACTION_POLICY_VERSION,
+        sourceClass: "synthetic_fixture", claimState: "public_unverified_candidate",
       });
       const service = repository.addServiceEvidence({
         id: "service-evidence-synthetic-001", assessmentId: assessment.id, pageId: page.id, evidenceId: null,
         evidenceState: "positive", term: "pool maintenance", basis: "heading", observedAt: timestamp,
         extractionPolicyVersion: EXTRACTION_POLICY_VERSION,
+        sourceClass: "synthetic_fixture", claimState: "observed",
       });
       repository.addIdentityConflict({
         id: "identity-conflict-synthetic-001", assessmentId: assessment.id, businessId: syntheticBusiness.id,
         pageId: page.id, evidenceId: null, conflictType: "business_name", expectedValue: syntheticBusiness.canonicalName,
         observedValue: "Unrelated Example Roofing", reviewState: "pending", observedAt: timestamp, resolvedAt: null,
+        sourceClass: "synthetic_fixture", claimState: "conflicting",
       });
       repository.addConversionObservation({
         id: "conversion-synthetic-001", assessmentId: assessment.id, pageId: page.id, evidenceId: null,
         feature: "contact_form", status: "present", observedAt: timestamp, freshUntil: "2026-01-16T12:00:00.000Z",
         policyVersion: WEBSITE_ASSESSMENT_POLICY_VERSION,
+        sourceClass: "synthetic_fixture", claimState: "observed",
       });
       expect(repository.listFetches(assessment.id)).toEqual([fetch]);
       expect(repository.listPages(assessment.id)).toEqual([page]);
@@ -116,15 +123,15 @@ describe("migration 004 website assessment persistence", () => {
     try {
       expect(() => fixture.database.prepare(`INSERT INTO website_assessments
         (id, business_id, source_website_url, status, started_at, assessed_at, fresh_until, crawl_policy_version,
-         extraction_policy_version, browser_status, identity_state, review_required)
-        VALUES ('orphan', 'missing', 'https://clearwater.example/', 'failed', ?, ?, ?, 'v1', 'v1', 'disabled', 'unavailable', 0)`)
+         extraction_policy_version, browser_status, identity_state, review_required, source_class)
+        VALUES ('orphan', 'missing', 'https://clearwater.example/', 'failed', ?, ?, ?, 'v1', 'v1', 'disabled', 'unavailable', 0, 'synthetic_fixture')`)
         .run(timestamp, timestamp, timestamp)).toThrow();
       fixture.database.prepare("INSERT INTO businesses (id, canonical_name, state, niche_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
         .run(syntheticBusiness.id, syntheticBusiness.canonicalName, syntheticBusiness.state, syntheticBusiness.nicheId, timestamp, timestamp);
       fixture.database.prepare(`INSERT INTO website_assessments
         (id, business_id, source_website_url, status, started_at, assessed_at, fresh_until, crawl_policy_version,
-         extraction_policy_version, browser_status, identity_state, review_required)
-        VALUES ('cascade', ?, 'https://clearwater.example/', 'failed', ?, ?, ?, 'v1', 'v1', 'disabled', 'unavailable', 0)`)
+         extraction_policy_version, browser_status, identity_state, review_required, source_class)
+        VALUES ('cascade', ?, 'https://clearwater.example/', 'failed', ?, ?, ?, 'v1', 'v1', 'disabled', 'unavailable', 0, 'synthetic_fixture')`)
         .run(syntheticBusiness.id, timestamp, timestamp, timestamp);
       fixture.database.prepare("DELETE FROM businesses WHERE id = ?").run(syntheticBusiness.id);
       expect(fixture.database.prepare("SELECT count(*) AS count FROM website_assessments").get()).toEqual({ count: 0 });

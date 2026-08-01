@@ -79,6 +79,9 @@ export const syntheticContact: Contact = {
   evidenceState: "found",
   verificationState: "not_checked",
   decisionState: "unknown",
+  sourceClass: "synthetic_fixture",
+  claimState: "observed",
+  relationshipEvidenceId: null,
   createdAt: SYNTHETIC_TIMESTAMP,
   updatedAt: SYNTHETIC_TIMESTAMP,
 };
@@ -93,6 +96,7 @@ export function makeSyntheticEvidence(
     fieldName: "canonical_name",
     claimedValue: syntheticBusiness.canonicalName,
     source: "synthetic_fixture",
+    sourceClass: "synthetic_fixture",
     sourceUrl: "https://clearwater.example/source",
     observedAt: SYNTHETIC_TIMESTAMP,
     fetchedAt: SYNTHETIC_TIMESTAMP,

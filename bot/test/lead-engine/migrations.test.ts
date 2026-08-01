@@ -28,8 +28,10 @@ const expectedTables = [
   "discovery_queries",
   "evidence",
   "evidence_conflicts",
+  "evidence_promotion_decisions",
   "identity_candidates",
   "identity_conflicts",
+  "identity_decision_audits",
   "identity_matches",
   "lead_runs",
   "merge_decisions",
@@ -70,12 +72,13 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
         "003_discovery_identity.sql",
         "004_website_assessment.sql",
+        "005_provenance_verification_identity.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {
@@ -107,6 +110,10 @@ describe("forward-only migrations", () => {
       copyFileSync(
         path.join(DEFAULT_MIGRATIONS_DIRECTORY, "004_website_assessment.sql"),
         path.join(changedRoot, "004_website_assessment.sql"),
+      );
+      copyFileSync(
+        path.join(DEFAULT_MIGRATIONS_DIRECTORY, "005_provenance_verification_identity.sql"),
+        path.join(changedRoot, "005_provenance_verification_identity.sql"),
       );
       writeFileSync(
         path.join(changedRoot, "002_evidence_tasks_provider_calls.sql"),
