@@ -232,6 +232,7 @@ export function createOfflinePipelineFixture(
     queryVersion: overrides.queryVersion ?? "offline-query-1.0.0",
     extractionVersion: overrides.extractionVersion ?? EXTRACTION_POLICY_VERSION,
     orchestrationVersion: overrides.orchestrationVersion ?? OFFLINE_ORCHESTRATION_VERSION,
+    qualification: overrides.qualification,
     signal: overrides.signal,
   });
 

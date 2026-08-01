@@ -10,6 +10,7 @@ export const OFFLINE_DURABLE_STAGE_VERSIONS = {
   website_crawl: "website-crawl-1.0.0",
   extraction: "offline-extraction-1.0.0",
   assessment_persistence: "assessment-persistence-1.0.0",
+  qualification_scoring: "pool-service-qualification-stage-1.0.0",
   result_assembly: "result-assembly-1.0.0",
   finalization: "finalization-1.0.0",
 } as const;

@@ -41,6 +41,9 @@ import type {
   ProviderEnvelope,
 } from "../providers/contracts.js";
 import { assessBusinessOperationalEvidence } from "../validation/business-operational.js";
+import { createQualificationRepository } from "../qualification/repository.js";
+import { qualifyPoolServiceLead } from "../qualification/qualifier.js";
+import { POOL_SERVICE_ICP_MODEL_VERSION } from "../qualification/pool-service-model.js";
 import {
   assessConversionFeatures,
   WEBSITE_ASSESSMENT_POLICY_VERSION,
@@ -363,6 +366,7 @@ interface PipelineState {
   people: PersonEvidenceCandidate[];
   services: ServiceEvidenceObservation[];
   conversions: OfflineLeadPipelineResult["conversionSignals"];
+  qualification: OfflineLeadPipelineResult["qualification"];
   reviewReasons: string[];
   warnings: string[];
 }
@@ -549,6 +553,13 @@ function validateInput(
       "schema",
     );
   }
+  if (input.qualification && input.qualification.modelVersion !== POOL_SERVICE_ICP_MODEL_VERSION) {
+    deterministicInputFailure(
+      "qualification_model_version_mismatch",
+      "Offline qualification model version does not match the executable pool-service model",
+      "schema",
+    );
+  }
   try {
     validateBudget(input.budget);
   } catch (error) {
@@ -593,6 +604,7 @@ function semanticInput(input: OfflineLeadPipelineInput, fixtureUrl: string): unk
     queryVersion: input.queryVersion,
     extractionVersion: input.extractionVersion,
     orchestrationVersion: input.orchestrationVersion,
+    qualification: input.qualification ?? null,
   };
 }
 
@@ -610,6 +622,7 @@ function emptyState(): PipelineState {
     people: [],
     services: [],
     conversions: [],
+    qualification: null,
     reviewReasons: [],
     warnings: [],
   };
@@ -804,6 +817,7 @@ function resultFor(
     personCandidates: state.people,
     serviceEvidence: state.services,
     conversionSignals: state.conversions,
+    qualification: state.qualification,
     provenance: { sourceClasses: sources, claimStates: claims },
     verificationStates: {
       contacts: "not_checked",
@@ -1170,7 +1184,8 @@ export async function runOfflineLeadAssessment(
       });
     }
     if (OFFLINE_TERMINAL_RUN_STATES.has(existing.execution_state) && existing.result_json) {
-      return JSON.parse(existing.result_json) as OfflineLeadPipelineResult;
+      const stored = JSON.parse(existing.result_json) as OfflineLeadPipelineResult;
+      return { ...stored, qualification: stored.qualification ?? null };
     }
     if (OFFLINE_TERMINAL_RUN_STATES.has(existing.execution_state)) {
       throw new OfflineManualInterventionError(
@@ -2753,6 +2768,61 @@ export async function runOfflineLeadAssessment(
       sourceClass: crawl.sourceClass,
       complete: crawl.complete,
     });
+
+    if (input.qualification) {
+      checkpoint("qualification_scoring");
+      event("qualification_scoring", "started", {
+        modelVersion: input.qualification.modelVersion,
+        localOnly: true,
+        costMicroUsd: 0,
+      });
+      const qualificationRepository = createQualificationRepository(dependencies.database);
+      const qualificationOutput = await durable.run({
+        stage: "qualification_scoring",
+        fingerprintInput: {
+          modelVersion: input.qualification.modelVersion,
+          businessId,
+          assessmentId,
+          assessmentPersistenceFingerprint: dependencies.ids.hash(persistenceOutput),
+        },
+        execute: () => {
+          checkpoint("qualification_scoring");
+          const previous = qualificationRepository.getLatestForBusiness(businessId);
+          const qualificationInput = qualificationRepository.loadPoolServiceInput({
+            businessId,
+            runId,
+            assessmentId,
+            evaluatedAt: state.website?.record.assessedAt ?? dependencies.clock.now(),
+          });
+          const evaluated = qualifyPoolServiceLead(qualificationInput, {
+            modelVersion: input.qualification?.modelVersion ?? "",
+            supersedesEvaluationId: previous?.evaluationId ?? null,
+          });
+          const qualification = qualificationRepository.save(evaluated, assessmentId);
+          return {
+            output: { qualification },
+            references: [{
+              table: "icp_qualification_evaluations",
+              column: "id",
+              id: qualification.evaluationId,
+            }],
+          };
+        },
+      });
+      state.qualification = qualificationOutput.qualification;
+      if (state.qualification.reviewRequirements.required) {
+        state.reviewReasons.push(...state.qualification.reviewRequirements.reasons.map((reason) =>
+          `qualification:${reason}`
+        ));
+      }
+      event("qualification_scoring", "completed", {
+        evaluationId: state.qualification.evaluationId,
+        modelVersion: state.qualification.modelVersion,
+        icpResult: state.qualification.icpResult,
+        score: state.qualification.overallScore,
+        reviewRequired: state.qualification.reviewRequirements.required,
+      });
+    }
 
     event("finalization", "started");
     checkpoint("finalization");

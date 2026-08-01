@@ -19,7 +19,7 @@ function existingFiles(directories: ReadonlyArray<string>): string[] {
   });
 }
 
-describe("Phase 3D2 offline orchestration containment", () => {
+describe("Phase 4A offline qualification containment", () => {
   it("is not imported or invoked by startup, Discord, CRM, Retell, cron, commands, or services", () => {
     const root = process.cwd();
     const productionFiles = existingFiles([
@@ -31,7 +31,9 @@ describe("Phase 3D2 offline orchestration containment", () => {
     ]).filter((file) => /\.(?:ts|js|mjs)$/.test(file));
     const source = productionFiles.map((file) => readFileSync(file, "utf8")).join("\n");
     expect(source).not.toMatch(/lead-engine\/orchestration/);
+    expect(source).not.toMatch(/lead-engine\/qualification/);
     expect(source).not.toMatch(/runOfflineLeadAssessment\s*\(/);
+    expect(source).not.toMatch(/qualifyPoolServiceLead\s*\(/);
   });
 
   it("is not reachable through export scripts, website booking code, or package start/dev commands", () => {
@@ -42,7 +44,9 @@ describe("Phase 3D2 offline orchestration containment", () => {
     ]).filter((file) => /\.(?:ts|tsx|js|mjs|json)$/.test(file));
     const source = sourceFiles.map((file) => readFileSync(file, "utf8")).join("\n");
     expect(source).not.toMatch(/lead-engine\/orchestration/);
+    expect(source).not.toMatch(/lead-engine\/qualification/);
     expect(source).not.toMatch(/runOfflineLeadAssessment\s*\(/);
+    expect(source).not.toMatch(/qualifyPoolServiceLead\s*\(/);
 
     const packageJson = JSON.parse(
       readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
@@ -52,8 +56,10 @@ describe("Phase 3D2 offline orchestration containment", () => {
   });
 
   it("imports no public networking capability, live provider, or external integration", () => {
-    const source = files(path.join(process.cwd(), "src/lead-engine/orchestration"))
-      .filter((file) => /\.ts$/.test(file))
+    const source = [
+      path.join(process.cwd(), "src/lead-engine/orchestration"),
+      path.join(process.cwd(), "src/lead-engine/qualification"),
+    ].flatMap(files).filter((file) => /\.ts$/.test(file))
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
     expect(source).not.toMatch(/network-capability|direct-http|overture-local/);

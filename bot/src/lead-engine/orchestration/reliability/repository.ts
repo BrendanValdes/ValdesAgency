@@ -103,6 +103,7 @@ const REFERENCE_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
   person_evidence_candidates: new Set(["id"]),
   service_evidence: new Set(["id"]),
   conversion_feature_observations: new Set(["id"]),
+  icp_qualification_evaluations: new Set(["id"]),
 };
 
 function requireIso(name: string, value: string): number {

@@ -25,8 +25,9 @@ import type { FixtureScenario, ProviderEnvelope } from "../providers/contracts.j
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { FeatureAssessmentStatus } from "../validation/website-assessment.js";
 import type { OfflineReliabilityControl } from "./reliability/types.js";
+import type { PoolServiceQualificationResult } from "../qualification/types.js";
 
-export const OFFLINE_ORCHESTRATION_VERSION = "offline-orchestration-2.0.0";
+export const OFFLINE_ORCHESTRATION_VERSION = "offline-orchestration-3.0.0";
 
 export interface OfflineRunBudget {
   readonly maxProviderCalls: number;
@@ -73,6 +74,9 @@ export interface OfflineLeadPipelineInput {
   readonly queryVersion: string;
   readonly extractionVersion: string;
   readonly orchestrationVersion: string;
+  readonly qualification?: Readonly<{
+    modelVersion: string;
+  }>;
   readonly signal?: AbortSignal;
 }
 
@@ -233,6 +237,7 @@ export interface OfflineLeadPipelineResult {
     sourceClass: string;
     claimState: string;
   }>;
+  readonly qualification: PoolServiceQualificationResult | null;
   readonly provenance: Readonly<{
     sourceClasses: ReadonlyArray<string>;
     claimStates: ReadonlyArray<string>;

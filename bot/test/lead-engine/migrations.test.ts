@@ -29,6 +29,8 @@ const expectedTables = [
   "evidence",
   "evidence_conflicts",
   "evidence_promotion_decisions",
+  "icp_qualification_evaluations",
+  "icp_qualification_evidence_references",
   "identity_candidates",
   "identity_conflicts",
   "identity_decision_audits",
@@ -80,7 +82,7 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
@@ -89,6 +91,7 @@ describe("forward-only migrations", () => {
         "005_provenance_verification_identity.sql",
         "006_offline_orchestration.sql",
         "007_offline_reliability.sql",
+        "008_icp_qualification_scoring.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {
