@@ -5,7 +5,7 @@ import {
   gunzipSync,
   inflateSync,
 } from "node:zlib";
-import { Agent, request as undiciRequest } from "undici";
+import { Agent, buildConnector, request as undiciRequest } from "undici";
 import {
   assertPublicWebCapability,
   NetworkCapabilityError,
@@ -13,7 +13,13 @@ import {
   type PublicWebCapability,
   type PublicWebCapabilityBinding,
 } from "../../config/network-capability.js";
-import { assertPinnedConnection, resolveSafeDestination, systemDnsResolver } from "../dns-safety.js";
+import {
+  assertPinnedConnection,
+  DnsSafetyError,
+  resolveSafeDestination,
+  systemDnsResolver,
+} from "../dns-safety.js";
+import { classifyIpAddress, sameIpAddress } from "../ip-safety.js";
 import {
   DEFAULT_CRAWL_LIMITS,
   PERMITTED_CONTENT_TYPES,
@@ -71,12 +77,35 @@ async function readBoundedBody(
 const productionTransport: PinnedHttpTransport = {
   async request(input) {
     const selected = input.destination.selected;
+    const originalHostname = input.destination.hostname;
+    const connector = buildConnector({
+      timeout: input.connectionTimeoutMs,
+      family: selected.family,
+    });
+    let connectedAddress: string | null = null;
     const dispatcher = new Agent({
-      connect: {
-        timeout: input.connectionTimeoutMs,
-        lookup(_hostname, _options, callback) {
-          callback(null, selected.address, selected.family);
-        },
+      connect(options, callback) {
+        connector({
+          ...options,
+          hostname: selected.address,
+          servername: isIP(originalHostname) === 0 ? originalHostname : undefined,
+        }, (error, socket) => {
+          if (error || !socket) {
+            callback(error ?? new Error("Pinned connection did not return a socket"), null);
+            return;
+          }
+          const remoteAddress = socket.remoteAddress;
+          if (!remoteAddress || !sameIpAddress(selected.address, remoteAddress)) {
+            socket.destroy();
+            callback(Object.assign(
+              new Error("Connected address does not match the validated pinned destination"),
+              { fetchCode: "dns_rebinding" as const },
+            ), null);
+            return;
+          }
+          connectedAddress = classifyIpAddress(remoteAddress).normalizedAddress;
+          callback(null, socket);
+        });
       },
     });
     try {
@@ -94,12 +123,27 @@ const productionTransport: PinnedHttpTransport = {
         status: response.statusCode,
         headers: response.headers,
         compressedBody,
-        // The custom lookup above pins the connection to this validated address.
-        connectedAddress: selected.address,
+        connectedAddress: connectedAddress ?? (() => {
+          throw Object.assign(new Error("Pinned connection address was unavailable"), {
+            fetchCode: "dns_rebinding" as const,
+          });
+        })(),
       };
+    } catch (error) {
+      const fetchCode = (error as { fetchCode?: FetchErrorCode; cause?: { fetchCode?: FetchErrorCode } }).fetchCode ??
+        (error as { cause?: { fetchCode?: FetchErrorCode } }).cause?.fetchCode;
+      if (fetchCode) throw Object.assign(error as object, { fetchCode });
+      throw error;
     } finally {
       await dispatcher.close();
     }
+  },
+};
+
+const testLoopbackResolver: DnsResolver = {
+  async resolve(hostname) {
+    const family = isIP(hostname);
+    return family === 4 || family === 6 ? [{ address: hostname, family }] : [];
   },
 };
 
@@ -216,7 +260,7 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
     this.#options.assertAuthorization();
   }
 
-  async #destination(url: URL): Promise<ResolvedDestination> {
+  async #destination(url: URL, signal?: AbortSignal): Promise<ResolvedDestination> {
     const hostname = url.hostname.startsWith("[") && url.hostname.endsWith("]")
       ? url.hostname.slice(1, -1)
       : url.hostname;
@@ -226,18 +270,51 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
           fetchCode: "destination_blocked" as const,
         });
       }
+      let answers: ReadonlyArray<{ address: string; family: 4 | 6 }>;
+      try {
+        answers = await this.#options.resolver.resolve(hostname);
+      } catch {
+        throw Object.assign(new Error("Test loopback resolver failed"), {
+          fetchCode: "dns_failure" as const,
+        });
+      }
+      const expected = classifyIpAddress(this.#options.allowTestOrigin.hostname);
+      const unique = new Map<string, { address: string; family: 4 | 6 }>();
+      for (const answer of answers) {
+        const classification = classifyIpAddress(answer.address);
+        if (classification.family !== answer.family || !classification.normalizedAddress ||
+          expected.normalizedAddress === null || !sameIpAddress(classification.normalizedAddress, expected.normalizedAddress)) {
+          throw Object.assign(new Error("Test loopback resolver returned an unauthorized address"), {
+            fetchCode: "destination_blocked" as const,
+          });
+        }
+        unique.set(`${answer.family}:${classification.normalizedAddress}`, {
+          address: classification.normalizedAddress,
+          family: answer.family,
+        });
+      }
+      const addresses = [...unique.values()];
+      if (addresses.length === 0) {
+        throw Object.assign(new Error("Test loopback resolver returned no addresses"), {
+          fetchCode: "dns_failure" as const,
+        });
+      }
       return {
         hostname,
-        addresses: [{ address: hostname, family: isIP(hostname) as 4 | 6 }],
-        selected: { address: hostname, family: isIP(hostname) as 4 | 6 },
+        addresses,
+        selected: addresses[0] as { address: string; family: 4 | 6 },
       };
     }
     try {
-      return await resolveSafeDestination(hostname, this.#options.resolver);
+      return await resolveSafeDestination(hostname, this.#options.resolver, {
+        timeoutMs: this.#options.limits.connectionTimeoutMs,
+        signal,
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
+      const blocked = error instanceof DnsSafetyError &&
+        (error.code === "blocked_address" || error.code === "malformed_address");
       throw Object.assign(new Error("Destination DNS policy rejected the request"), {
-        fetchCode: (/blocked|malformed/i.test(message) ? "destination_blocked" : "dns_failure") as FetchErrorCode,
+        fetchCode: (blocked ? "destination_blocked" : "dns_failure") as FetchErrorCode,
       });
     }
   }
@@ -258,9 +335,12 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
     const allowedPorts = this.#options.allowTestOrigin
       ? new Set([Number(this.#options.allowTestOrigin.port)])
       : undefined;
+    const allowedIpAddresses = this.#options.allowTestOrigin
+      ? new Set([this.#options.allowTestOrigin.hostname])
+      : undefined;
     let requestedUrl: string;
     try {
-      requestedUrl = normalizeWebUrl(requestedInput, { allowedPorts });
+      requestedUrl = normalizeWebUrl(requestedInput, { allowedPorts, allowedIpAddresses });
     } catch (error) {
       const code = error instanceof UrlSafetyError ? error.code : "invalid_url";
       return asFailure({ requestedUrl: requestedInput, code, attempts: 0, redirects: [], now: this.#options.now });
@@ -283,7 +363,8 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
           visited.add(current);
           const currentUrl = new URL(current);
           this.#options.reserveRequest(currentUrl);
-          const destination = await this.#destination(currentUrl);
+          const destination = await this.#destination(currentUrl, request.signal);
+          this.#options.assertAuthorization();
           const headers: Record<string, string> = {
             "user-agent": RESEARCH_CRAWLER_USER_AGENT,
             accept: "text/html,application/xhtml+xml,text/plain,application/xml,text/xml,application/json;q=0.8,*/*;q=0.1",
@@ -301,12 +382,17 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
             responseTimeoutMs: this.#options.limits.responseTimeoutMs,
             maxCompressedBytes: this.#options.limits.maxCompressedBytes,
           });
-          if (!this.#options.allowTestOrigin) {
-            try {
+          try {
+            if (this.#options.allowTestOrigin) {
+              if (!sameIpAddress(destination.selected.address, response.connectedAddress) ||
+                !sameIpAddress(this.#options.allowTestOrigin.hostname, response.connectedAddress)) {
+                throw new Error("Test loopback connection address mismatch");
+              }
+            } else {
               assertPinnedConnection(destination, response.connectedAddress);
-            } catch {
-              return asFailure({ requestedUrl, finalUrl: current, code: "dns_rebinding", attempts: attempt, redirects, now: this.#options.now, status: response.status });
             }
+          } catch {
+            return asFailure({ requestedUrl, finalUrl: current, code: "dns_rebinding", attempts: attempt, redirects, now: this.#options.now, status: response.status });
           }
 
           if ([301, 302, 303, 307, 308].includes(response.status)) {
@@ -319,11 +405,19 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
             }
             let next: string;
             try {
-              const redirectTarget = new URL(location, current);
+              const authorizationTarget = new URL(location, current);
+              if (this.#options.allowTestOrigin && authorizationTarget.origin !== this.#options.allowTestOrigin.origin) {
+                return asFailure({ requestedUrl, finalUrl: current, code: "destination_blocked", attempts: attempt, redirects, now: this.#options.now, status: response.status });
+              }
+              next = normalizeWebUrl(location, {
+                allowedPorts,
+                allowedIpAddresses,
+                baseUrl: current,
+              });
+              const redirectTarget = new URL(next);
               if (this.#options.allowTestOrigin && redirectTarget.origin !== this.#options.allowTestOrigin.origin) {
                 return asFailure({ requestedUrl, finalUrl: current, code: "destination_blocked", attempts: attempt, redirects, now: this.#options.now, status: response.status });
               }
-              next = normalizeWebUrl(redirectTarget, { allowedPorts });
             } catch {
               return asFailure({ requestedUrl, finalUrl: current, code: "redirect_invalid", attempts: attempt, redirects, now: this.#options.now, status: response.status });
             }
@@ -448,14 +542,16 @@ export function createTestOnlyDirectHttpFetcher(options: {
   capability: TestLoopbackCapability;
   testScopeId: string;
   limits?: CrawlLimits;
+  resolver?: DnsResolver;
+  transport?: PinnedHttpTransport;
   now?: () => string;
   random?: () => number;
 }): SafeFetcher {
   const origin = requireTestLoopbackOrigin(options.capability, options.testScopeId);
   return new BoundedDirectHttpFetcher({
     limits: validateCrawlLimits(options.limits ?? DEFAULT_CRAWL_LIMITS),
-    resolver: systemDnsResolver,
-    transport: productionTransport,
+    resolver: options.resolver ?? testLoopbackResolver,
+    transport: options.transport ?? productionTransport,
     now: options.now ?? (() => new Date().toISOString()),
     random: options.random ?? (() => 0.5),
     allowTestOrigin: origin,

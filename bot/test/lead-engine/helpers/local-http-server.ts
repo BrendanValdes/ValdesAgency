@@ -119,6 +119,56 @@ export async function startSyntheticHttpServer(options: SyntheticServerOptions =
       response.end("blocked redirect");
       return;
     }
+    if (route === "/redirect-relative") {
+      response.writeHead(302, { location: "../contact?from=relative", "content-type": "text/plain" });
+      response.end("relative redirect");
+      return;
+    }
+    if (route === "/redirect-scheme-relative") {
+      response.writeHead(302, { location: `//127.0.0.1:${(server.address() as AddressInfo).port}/contact`, "content-type": "text/plain" });
+      response.end("scheme-relative redirect");
+      return;
+    }
+    if (route === "/redirect-credentials") {
+      response.writeHead(302, { location: `http://user:secret@127.0.0.1:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("credential redirect");
+      return;
+    }
+    if (route === "/redirect-wrong-port") {
+      response.writeHead(302, { location: "http://127.0.0.1:1/", "content-type": "text/plain" });
+      response.end("wrong-port redirect");
+      return;
+    }
+    if (route === "/redirect-ipv6-loopback") {
+      response.writeHead(302, { location: `http://[::1]:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("IPv6-loopback redirect");
+      return;
+    }
+    if (route === "/redirect-link-local") {
+      response.writeHead(302, { location: `http://169.254.169.254:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("link-local redirect");
+      return;
+    }
+    if (route === "/redirect-public-host") {
+      response.writeHead(302, { location: `http://public.example:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("public-host redirect");
+      return;
+    }
+    if (route === "/redirect-hostname-case") {
+      response.writeHead(302, { location: `http://LOCALHOST:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("hostname-case redirect");
+      return;
+    }
+    if (route === "/redirect-trailing-dot") {
+      response.writeHead(302, { location: `http://127.0.0.1.:${(server.address() as AddressInfo).port}/`, "content-type": "text/plain" });
+      response.end("trailing-dot redirect");
+      return;
+    }
+    if (route === "/redirect-fragment") {
+      response.writeHead(302, { location: "#different-fragment", "content-type": "text/plain" });
+      response.end("fragment redirect");
+      return;
+    }
     if (route === "/oversized") return html(response, `<html><body>${"x".repeat(50_000)}</body></html>`);
     if (route === "/compressed-oversized") {
       const encoded = gzipSync(Buffer.from(`<html><body>${"z".repeat(50_000)}</body></html>`));

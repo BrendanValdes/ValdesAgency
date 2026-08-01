@@ -26,9 +26,14 @@ describe("test-only loopback capability", () => {
         status: 200,
       });
       await expect(fetcher.fetch({ url: "http://127.0.0.1:1/" })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `http://2130706433:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `http://127.0.0.2:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `http://[::1]:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `http://localhost:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `https://127.0.0.1:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
       await expect(fetcher.fetch({ url: "http://10.0.0.1/" })).resolves.toMatchObject({ ok: false });
       await expect(fetcher.fetch({ url: "http://169.254.169.254/" })).resolves.toMatchObject({ ok: false });
-      await expect(fetcher.fetch({ url: "https://public.example/" })).resolves.toMatchObject({ ok: false });
+      await expect(fetcher.fetch({ url: `http://public.example:${new URL(server.origin).port}/` })).resolves.toMatchObject({ ok: false });
     } finally {
       await server.close();
     }
@@ -85,5 +90,24 @@ describe("test-only loopback capability", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("revalidates capability lifetime for every request", async () => {
+    let now = Date.parse("2026-01-15T12:00:00.000Z");
+    const testScopeId = "loopback-expiry-test";
+    const allowedOrigin = "http://127.0.0.1:49124";
+    const capability = issueTestLoopbackCapability({
+      testScopeId,
+      allowedOrigin,
+      ttlMs: 1_000,
+      now: () => now,
+    });
+    const fetcher = loopbackFetcher(capability, testScopeId);
+    now += 1_000;
+    await expect(fetcher.fetch({ url: `${allowedOrigin}/` })).resolves.toMatchObject({
+      ok: false,
+      errorCode: "policy_rejected",
+      attempts: 0,
+    });
   });
 });
