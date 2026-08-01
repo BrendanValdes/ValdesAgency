@@ -15,6 +15,20 @@ describe("Phase 3 containment", () => {
     expect(startup).not.toMatch(/lead-engine/);
   });
 
+  it("does not activate policy or network fetchers through production surfaces", () => {
+    const productionFiles = [
+      path.join(process.cwd(), "src/index.ts"),
+      ...files(path.join(process.cwd(), "src/features")),
+      ...files(path.join(process.cwd(), "src/services")),
+      ...files(path.join(process.cwd(), "src/cron")),
+      ...files(path.join(process.cwd(), "src/commands")),
+    ].filter((file) => file.endsWith(".ts"));
+    const source = productionFiles.map((file) => readFileSync(file, "utf8")).join("\n");
+
+    expect(source).not.toMatch(/lead-engine\/(?:config\/(?:lead-policy|network-capability)|crawl\/fetchers\/direct-http)/);
+    expect(source).not.toMatch(/(?:createDirectHttpFetcher|NetworkPolicyAuthorizer|issuePublicWebCapability)\s*\(/);
+  });
+
   it("contains no Discord, Anthropic, Composio, CRM, messaging, booking, or social adapter imports", () => {
     const source = files(path.join(process.cwd(), "src/lead-engine"))
       .filter((file) => file.endsWith(".ts"))

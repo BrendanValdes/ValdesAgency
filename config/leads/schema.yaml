@@ -1,5 +1,18 @@
 schema_version: "1.0.0"
+policy_version: "1.0.0"
 fixture_kind: synthetic
+network_mode: disabled
+paid_providers_enabled: false
+external_verification_enabled: false
+request_budget: 0
+byte_budget: 0
+cost_budget_micro_usd: 0
+max_request_duration_ms: 30000
+capability_ttl_seconds: 300
+cache_policy:
+  enabled: false
+  ttl_seconds: 86400
+  max_entries: 10000
 required_niche_fields:
   - id
   - display_name
@@ -21,4 +34,3 @@ required_niche_fields:
 default_niche: pool_service
 enabled_niches:
   - pool_service
-

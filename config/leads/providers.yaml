@@ -1,20 +1,83 @@
 configuration_version: "1.0.0"
 fixture_kind: synthetic
-network_mode: disabled
 providers:
   fixture:
+    source_class: synthetic_fixture
     enabled: true
     operations: [discovery]
-    billable: false
+    requires_network: false
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
   overture_local:
+    source_class: local_public_dataset
     enabled: true
     operations: [discovery]
-    billable: false
+    requires_network: false
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
     access: explicitly_configured_absolute_local_fixture_only
     pinned_release_required: true
     sha256_required: true
   overture_live:
+    source_class: public_web
     enabled: false
+    operations: [discovery]
+    requires_network: true
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
+  website_http:
+    source_class: public_web
+    enabled: false
+    operations: [website_assessment]
+    requires_network: true
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
   search:
+    source_class: public_web
     enabled: false
-
+    operations: [discovery]
+    requires_network: true
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
+  historical_manual:
+    source_class: historical_manual_artifact
+    enabled: false
+    operations: [historical_import]
+    requires_network: false
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}
+  verification_external:
+    source_class: external_verification_provider
+    enabled: false
+    operations: [external_verification]
+    requires_network: true
+    can_incur_cost: false
+    request_budget: 0
+    byte_budget: 0
+    cost_budget_micro_usd: 0
+    max_request_duration_ms: 0
+    cache_policy: {enabled: false, ttl_seconds: 0}

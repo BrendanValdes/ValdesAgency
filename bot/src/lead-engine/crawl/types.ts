@@ -84,7 +84,13 @@ export interface FetchRequest {
   ifModifiedSince?: string | null;
 }
 
+export type FetcherSourceClass =
+  | "synthetic_fixture"
+  | "test_loopback"
+  | "public_web";
+
 export interface SafeFetcher {
+  readonly sourceClass: FetcherSourceClass;
   fetch(request: FetchRequest): Promise<FetchResult>;
 }
 

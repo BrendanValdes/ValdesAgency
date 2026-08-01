@@ -6,7 +6,14 @@ import {
   inflateSync,
 } from "node:zlib";
 import { Agent, request as undiciRequest } from "undici";
-import { assertPinnedConnection, isBlockedIpAddress, resolveSafeDestination, systemDnsResolver } from "../dns-safety.js";
+import {
+  assertPublicWebCapability,
+  NetworkCapabilityError,
+  reservePublicWebRequest,
+  type PublicWebCapability,
+  type PublicWebCapabilityBinding,
+} from "../../config/network-capability.js";
+import { assertPinnedConnection, resolveSafeDestination, systemDnsResolver } from "../dns-safety.js";
 import {
   DEFAULT_CRAWL_LIMITS,
   PERMITTED_CONTENT_TYPES,
@@ -28,6 +35,11 @@ import type {
   TransportResponse,
 } from "../types.js";
 import { normalizeWebUrl, UrlSafetyError } from "../url-safety.js";
+import {
+  assertTestLoopbackRequest,
+  requireTestLoopbackOrigin,
+  type TestLoopbackCapability,
+} from "./test-loopback-capability.js";
 
 class TransportSizeError extends Error {
   readonly code = "compressed_size_exceeded" as const;
@@ -189,13 +201,19 @@ interface InternalFetcherOptions {
   now: () => string;
   random: () => number;
   allowTestOrigin: URL | null;
+  sourceClass: "public_web" | "test_loopback";
+  assertAuthorization: () => void;
+  reserveRequest: (url: URL) => void;
 }
 
 class BoundedDirectHttpFetcher implements SafeFetcher {
   readonly #options: InternalFetcherOptions;
+  readonly sourceClass: "public_web" | "test_loopback";
 
   constructor(options: InternalFetcherOptions) {
     this.#options = options;
+    this.sourceClass = options.sourceClass;
+    this.#options.assertAuthorization();
   }
 
   async #destination(url: URL): Promise<ResolvedDestination> {
@@ -226,6 +244,17 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
 
   async fetch(request: FetchRequest): Promise<FetchResult> {
     const requestedInput = request.url;
+    try {
+      this.#options.assertAuthorization();
+    } catch (error) {
+      return asFailure({
+        requestedUrl: requestedInput,
+        code: errorCode(error, request.signal),
+        attempts: 0,
+        redirects: [],
+        now: this.#options.now,
+      });
+    }
     const allowedPorts = this.#options.allowTestOrigin
       ? new Set([Number(this.#options.allowTestOrigin.port)])
       : undefined;
@@ -253,6 +282,7 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
           }
           visited.add(current);
           const currentUrl = new URL(current);
+          this.#options.reserveRequest(currentUrl);
           const destination = await this.#destination(currentUrl);
           const headers: Record<string, string> = {
             "user-agent": RESEARCH_CRAWLER_USER_AGENT,
@@ -368,42 +398,60 @@ class BoundedDirectHttpFetcher implements SafeFetcher {
 
 export function createDirectHttpFetcher(
   options: {
+    capability: PublicWebCapability;
+    providerId: string;
+    runId: string;
+    assessmentId: string;
     limits?: CrawlLimits;
     resolver?: DnsResolver;
     now?: () => string;
     random?: () => number;
-  } = {},
+  },
 ): SafeFetcher {
+  if (!options) throw new NetworkCapabilityError("capability_missing");
+  const limits = validateCrawlLimits(options.limits ?? DEFAULT_CRAWL_LIMITS);
+  const binding: PublicWebCapabilityBinding = {
+    providerId: options.providerId,
+    runId: options.runId,
+    assessmentId: options.assessmentId,
+  };
+  const capabilityLimits = {
+    maxBytesPerRequest: limits.maxCompressedBytes,
+    maxRequestDurationMs: Math.max(
+      limits.connectionTimeoutMs,
+      limits.responseTimeoutMs,
+    ),
+  };
+  assertPublicWebCapability(options.capability, binding, capabilityLimits);
   return new BoundedDirectHttpFetcher({
-    limits: validateCrawlLimits(options.limits ?? DEFAULT_CRAWL_LIMITS),
+    limits,
     resolver: options.resolver ?? systemDnsResolver,
     transport: productionTransport,
     now: options.now ?? (() => new Date().toISOString()),
     random: options.random ?? Math.random,
     allowTestOrigin: null,
+    sourceClass: "public_web",
+    assertAuthorization: () =>
+      assertPublicWebCapability(options.capability, binding, capabilityLimits),
+    reserveRequest: () =>
+      reservePublicWebRequest(options.capability, binding, {
+        bytes: limits.maxCompressedBytes,
+      }),
   });
 }
 
 /**
- * Explicit test boundary for a single loopback origin. It cannot be enabled by
- * LeadEngineConfig (whose networkMode remains the literal `disabled`) and it
- * refuses to construct outside NODE_ENV=test. Production URL/DNS policy is
- * never relaxed by createDirectHttpFetcher.
+ * Explicit test boundary for one pre-authorized 127.0.0.1 origin. The issuer
+ * refuses to run outside NODE_ENV=test and is separate from production policy.
  */
 export function createTestOnlyDirectHttpFetcher(options: {
-  allowedOrigin: string;
+  capability: TestLoopbackCapability;
+  testScopeId: string;
   limits?: CrawlLimits;
   now?: () => string;
   random?: () => number;
 }): SafeFetcher {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("The local-server transport is available only under NODE_ENV=test");
-  }
-  const origin = new URL(options.allowedOrigin);
-  const hostname = origin.hostname.startsWith("[") && origin.hostname.endsWith("]") ? origin.hostname.slice(1, -1) : origin.hostname;
-  if (origin.protocol !== "http:" || isIP(hostname) === 0 || !isBlockedIpAddress(hostname) || !origin.port) {
-    throw new Error("Test transport requires an explicit loopback HTTP origin and port");
-  }
+  const origin = requireTestLoopbackOrigin(options.capability, options.testScopeId);
   return new BoundedDirectHttpFetcher({
     limits: validateCrawlLimits(options.limits ?? DEFAULT_CRAWL_LIMITS),
     resolver: systemDnsResolver,
@@ -411,5 +459,11 @@ export function createTestOnlyDirectHttpFetcher(options: {
     now: options.now ?? (() => new Date().toISOString()),
     random: options.random ?? (() => 0.5),
     allowTestOrigin: origin,
+    sourceClass: "test_loopback",
+    assertAuthorization: () => {
+      requireTestLoopbackOrigin(options.capability, options.testScopeId);
+    },
+    reserveRequest: (url) =>
+      assertTestLoopbackRequest(options.capability, options.testScopeId, url),
   });
 }

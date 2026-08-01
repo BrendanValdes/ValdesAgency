@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { loadRuntimeLeadPolicy } from "../../src/lead-engine/config/lead-policy.js";
 import { DiscoveryService } from "../../src/lead-engine/discovery/discovery-service.js";
 import { planCoverage } from "../../src/lead-engine/geography/coverage-planner.js";
 import { FixtureDiscoveryProvider } from "../../src/lead-engine/providers/adapters/fixture.js";
@@ -19,7 +20,7 @@ function geography() {
 }
 
 function service() {
-  const registry = new ProviderRegistry();
+  const registry = new ProviderRegistry(loadRuntimeLeadPolicy());
   const provider = new FixtureDiscoveryProvider({ records: syntheticDiscoveryRecords });
   registry.register(provider);
   return { service: new DiscoveryService(registry), provider };
@@ -66,4 +67,3 @@ describe("fixture-only discovery service", () => {
     fetchSpy.mockRestore();
   });
 });
-

@@ -5,7 +5,7 @@ Phase 0 activates no provider and makes no network request. Network access is di
 | Capability | Candidate source or adapter | Future role | Phase 0 state | Approval rule |
 | --- | --- | --- | --- | --- |
 | Business discovery | Overture Maps data | First discovery source for the pool-service niche | Planned, not integrated, disabled | A later phase must approve dataset access and enable network or an operator-supplied offline snapshot |
-| Website evidence | Direct business website fetcher | Acquire pages needed for evidence | Not implemented, disabled | Explicit network enablement, crawl limits, and evidence-retention policy required |
+| Website evidence | Capability-gated direct business website fetcher | Acquire pages needed for evidence | Safety foundation implemented; provider disabled and not wired into startup | A validated executable policy must enable the reviewed provider and issue a run/provider/assessment-scoped capability within request, byte, time, and cost limits |
 | Search fallback | Search provider | Find missing official-site evidence only | Not selected, disabled | Separate provider review; any paid plan requires explicit cost approval |
 | Contact enrichment | Enrichment provider | Candidate contact evidence | Not selected, disabled | Separate explicit approval for provider, credentials, fields, privacy basis, and spend |
 | Claim verification | Verification provider or defined first-party procedure | Run a specific verification procedure | Not selected, disabled | Must define evidence and result semantics; provider presence alone cannot produce `verified` |
@@ -19,3 +19,5 @@ Phase 0 activates no provider and makes no network request. Network access is di
 - Raw provider responses and raw crawled pages remain outside Git.
 - Provider-derived claims retain source provenance and do not inherit a `verified` label.
 - No provider can trigger CRM, messaging, publishing, booking, Discord, email, SMS, or phone side effects.
+- `config/leads/schema.yaml`, `config/leads/providers.yaml`, and the niche files are validated together as executable policy. The checked-in policy cannot issue a public-web capability.
+- Loopback access is a separate test-only capability restricted to one explicit `127.0.0.1` origin and port; it is not production network authorization.

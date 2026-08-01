@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { leadEngineConfigSchema } from "../../src/lead-engine/config/schema.js";
-import { createDirectHttpFetcher, createTestOnlyDirectHttpFetcher } from "../../src/lead-engine/crawl/fetchers/direct-http.js";
+import { createDirectHttpFetcher } from "../../src/lead-engine/crawl/fetchers/direct-http.js";
+import { issueTestLoopbackCapability } from "../../src/lead-engine/crawl/fetchers/test-loopback-capability.js";
 import { normalizeWebUrl } from "../../src/lead-engine/crawl/url-safety.js";
 import { startSyntheticHttpServer } from "./helpers/local-http-server.js";
+import { createSyntheticLoopbackFetcher } from "./helpers/test-loopback-fetcher.js";
 
 describe("crawl URL safety", () => {
   it.each(["file:///etc/passwd", "ftp://example.com/file", "data:text/plain,test", "javascript:alert(1)"])("rejects unsupported scheme %s", (url) => {
@@ -23,15 +25,15 @@ describe("crawl URL safety", () => {
     expect(normalizeWebUrl("https://[2606:4700:4700::1111]/#fragment")).toBe("https://[2606:4700:4700::1111]/");
   });
 
-  it("keeps production loopback denial separate from explicit test-only transport", async () => {
+  it("keeps capability-gated production construction separate from explicit test-only transport", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const production = await createDirectHttpFetcher().fetch({ url: server.url("/") });
-      expect(production).toMatchObject({ ok: false, errorCode: "port_rejected" });
-      await expect(createDirectHttpFetcher().fetch({ url: "http://127.0.0.1/" })).resolves.toMatchObject({ ok: false, errorCode: "destination_blocked" });
-      await expect(createDirectHttpFetcher().fetch({ url: "http://[::1]/" })).resolves.toMatchObject({ ok: false, errorCode: "destination_blocked" });
-      const testFetcher = createTestOnlyDirectHttpFetcher({ allowedOrigin: server.origin });
+      expect(() => (createDirectHttpFetcher as unknown as () => unknown)()).toThrow("capability_missing");
+      const testFetcher = createSyntheticLoopbackFetcher({ allowedOrigin: server.origin });
       expect(await testFetcher.fetch({ url: server.url("/") })).toMatchObject({ ok: true, status: 200 });
+      await expect(testFetcher.fetch({ url: "http://127.0.0.1:1/" })).resolves.toMatchObject({ ok: false });
+      await expect(testFetcher.fetch({ url: "http://10.0.0.1/" })).resolves.toMatchObject({ ok: false });
+      await expect(testFetcher.fetch({ url: "https://public.example/" })).resolves.toMatchObject({ ok: false });
     } finally {
       await server.close();
     }
@@ -42,7 +44,10 @@ describe("crawl URL safety", () => {
     const before = process.env.NODE_ENV;
     process.env.NODE_ENV = "production";
     try {
-      expect(() => createTestOnlyDirectHttpFetcher({ allowedOrigin: "http://127.0.0.1:9999" })).toThrow("NODE_ENV=test");
+      expect(() => issueTestLoopbackCapability({
+        testScopeId: "production-forbidden",
+        allowedOrigin: "http://127.0.0.1:9999",
+      })).toThrow("test_environment_required");
     } finally {
       process.env.NODE_ENV = before;
     }

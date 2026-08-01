@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { DisabledBrowserRenderer } from "../../src/lead-engine/crawl/fetchers/browser-renderer.js";
-import { createTestOnlyDirectHttpFetcher } from "../../src/lead-engine/crawl/fetchers/direct-http.js";
 import type { CrawlResult } from "../../src/lead-engine/crawl/types.js";
 import { extractBusinessIdentity } from "../../src/lead-engine/extraction/business-identity.js";
 import { extractConversionSignals } from "../../src/lead-engine/extraction/conversion.js";
@@ -10,6 +9,7 @@ import { extractJsonLd } from "../../src/lead-engine/extraction/json-ld.js";
 import { assessBusinessOperationalEvidence } from "../../src/lead-engine/validation/business-operational.js";
 import { assessConversionFeatures } from "../../src/lead-engine/validation/website-assessment.js";
 import { startSyntheticHttpServer } from "./helpers/local-http-server.js";
+import { createSyntheticLoopbackFetcher } from "./helpers/test-loopback-fetcher.js";
 
 const assessedAt = "2026-01-15T12:00:00.000Z";
 const freshUntil = "2026-01-16T12:00:00.000Z";
@@ -34,7 +34,7 @@ describe("website assessment semantics", () => {
   it("allows absence only after a complete, successful, fresh inspection", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const fetched = await createTestOnlyDirectHttpFetcher({ allowedOrigin: server.origin }).fetch({ url: server.url("/missing-features") });
+      const fetched = await createSyntheticLoopbackFetcher({ allowedOrigin: server.origin }).fetch({ url: server.url("/missing-features") });
       expect(fetched.ok).toBe(true);
       if (!fetched.ok) return;
       const context = { pageUrl: fetched.finalUrl, observedAt: assessedAt, fetchedAt: fetched.fetchedAt, contentChecksum: fetched.contentChecksum };

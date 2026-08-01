@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createTestOnlyDirectHttpFetcher } from "../../src/lead-engine/crawl/fetchers/direct-http.js";
 import { DEFAULT_CRAWL_LIMITS, retryDelayMs } from "../../src/lead-engine/crawl/policies.js";
 import { startSyntheticHttpServer } from "./helpers/local-http-server.js";
+import { createSyntheticLoopbackFetcher } from "./helpers/test-loopback-fetcher.js";
 
 describe("bounded direct HTTP fetcher", () => {
   it("enforces response timeout and cancellation", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const fetcher = createTestOnlyDirectHttpFetcher({
+      const fetcher = createSyntheticLoopbackFetcher({
         allowedOrigin: server.origin,
         limits: { ...DEFAULT_CRAWL_LIMITS, maxRetries: 1, responseTimeoutMs: 100 },
       });
@@ -23,7 +23,7 @@ describe("bounded direct HTTP fetcher", () => {
   it("enforces content type plus compressed and decompressed size limits", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const small = createTestOnlyDirectHttpFetcher({
+      const small = createSyntheticLoopbackFetcher({
         allowedOrigin: server.origin,
         limits: { ...DEFAULT_CRAWL_LIMITS, maxRetries: 1, maxCompressedBytes: 1_024, maxDecompressedBytes: 2_048 },
       });
@@ -38,7 +38,7 @@ describe("bounded direct HTTP fetcher", () => {
   it("retries only transient statuses and honors Retry-After", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const fetcher = createTestOnlyDirectHttpFetcher({ allowedOrigin: server.origin });
+      const fetcher = createSyntheticLoopbackFetcher({ allowedOrigin: server.origin });
       await expect(fetcher.fetch({ url: server.url("/rate-limited") })).resolves.toMatchObject({ ok: true, attempts: 2 });
       await expect(fetcher.fetch({ url: server.url("/temporary-500") })).resolves.toMatchObject({ ok: true, attempts: 3 });
       await expect(fetcher.fetch({ url: server.url("/permanent-500") })).resolves.toMatchObject({ ok: false, errorCode: "server_failure", attempts: 3 });
@@ -52,7 +52,7 @@ describe("bounded direct HTTP fetcher", () => {
   it("does not send credentials, retain cookies, or submit forms", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const fetcher = createTestOnlyDirectHttpFetcher({ allowedOrigin: server.origin });
+      const fetcher = createSyntheticLoopbackFetcher({ allowedOrigin: server.origin });
       await expect(fetcher.fetch({ url: server.url("/auth") })).resolves.toMatchObject({ ok: false, errorCode: "authentication_required", attempts: 1 });
       const cookie = await fetcher.fetch({ url: server.url("/set-cookie") });
       expect(cookie).toMatchObject({ ok: true });

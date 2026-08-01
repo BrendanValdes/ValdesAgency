@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { WebsiteCrawler } from "../../src/lead-engine/crawl/crawler.js";
-import { createTestOnlyDirectHttpFetcher } from "../../src/lead-engine/crawl/fetchers/direct-http.js";
 import { DEFAULT_CRAWL_LIMITS, validateCrawlLimits } from "../../src/lead-engine/crawl/policies.js";
 import { startSyntheticHttpServer } from "./helpers/local-http-server.js";
+import { createSyntheticLoopbackFetcher } from "./helpers/test-loopback-fetcher.js";
 
 describe("bounded crawl", () => {
   it("keeps page, sitemap, domain, and concurrency limits deterministic", async () => {
     const server = await startSyntheticHttpServer();
     try {
-      const fetcher = createTestOnlyDirectHttpFetcher({ allowedOrigin: server.origin });
+      const fetcher = createSyntheticLoopbackFetcher({ allowedOrigin: server.origin });
       const result = await new WebsiteCrawler({ fetcher }).crawl({ websiteUrl: server.origin });
       expect(result.pages.length).toBeLessThanOrEqual(7);
       expect(result.pages[0]).toMatchObject({ kind: "homepage", inspectionStatus: "successful" });
