@@ -25,6 +25,11 @@ import { WebsiteCrawler } from "../src/lead-engine/crawl/crawler.js";
 import { createDirectHttpFetcher } from "../src/lead-engine/crawl/fetchers/direct-http.js";
 import { validateCrawlLimits } from "../src/lead-engine/crawl/policies.js";
 import { discoverSuburbanPhoenixCandidates } from "./overture-suburban-candidates.js";
+import {
+  calibrateServiceLanguage,
+  IDENTITY_CORROBORATION_VERSION,
+  SERVICE_LANGUAGE_RULESET_VERSION,
+} from "../src/lead-engine/assessment/calibration.js";
 
 /**
  * Phase 5C bounded end-to-end batch canary.
@@ -39,9 +44,14 @@ import { discoverSuburbanPhoenixCandidates } from "./overture-suburban-candidate
 
 export const BATCH_CANARY_LIMITS = Object.freeze({
   targetCallableLeads: 10,
-  maxCells: 12,
-  maxDiscoveryCandidates: 50,
-  maxWebsitesAttempted: 15,
+  maxCells: 20,
+  maxDiscoveryCandidates: 40,
+  // Discovery runs in bounded passes over distinct cell slices; each pass sits
+  // inside the 10,000-row provider rail, so the mandated 50,000-row ceiling is
+  // approached in steps rather than by raising any rail.
+  maxDiscoveryPasses: 3,
+  maxCellsPerPass: 7,
+  maxWebsitesAttempted: 20,
   maxPagesPerBusiness: 3,
   // The mandated 90-request total is split across the two live stages: bounded
   // Overture discovery spends at most 30, so the crawl stage takes 60. That also
@@ -66,6 +76,7 @@ export interface PoolBatchReport {
   readonly releaseId: string;
   readonly discovery: Readonly<Record<string, unknown>>;
   readonly websites: Readonly<Record<string, unknown>>;
+  readonly calibration: Readonly<Record<string, unknown>>;
   readonly evidence: Readonly<Record<string, number>>;
   readonly qualification: Readonly<Record<string, number>>;
   readonly queue: Readonly<Record<string, unknown>>;
@@ -123,19 +134,51 @@ export async function runPoolBatchCanary(input: {
   const now = (): Date => new Date();
   const empty = {
     ran: false, releaseId: "not_resolved",
-    discovery: {}, websites: {}, evidence: {}, qualification: {}, queue: {},
+    discovery: {}, websites: {}, calibration: {}, evidence: {}, qualification: {}, queue: {},
     usage: {}, aggregateVerdict: "blocked_live_batch_disabled",
     safetyWarnings: ["live_batch_disabled_by_default"],
   } satisfies PoolBatchReport;
   if (!args.enableLiveBatch) return empty;
 
   // Stage 1 — bounded live discovery over deterministic suburban cells.
-  const discovery = await discoverSuburbanPhoenixCandidates({
-    maxCells: BATCH_CANARY_LIMITS.maxCells,
-    targetWebsiteCandidates: BATCH_CANARY_LIMITS.targetCallableLeads,
-    maxAcceptedCandidates: BATCH_CANARY_LIMITS.maxDiscoveryCandidates,
-  });
-  const eligible = discovery.summary.eligibleWebsiteCandidates;
+  const passes: Awaited<ReturnType<typeof discoverSuburbanPhoenixCandidates>>[] = [];
+  const eligibleByKey = new Map<string, (typeof passes)[number]["summary"]["eligibleWebsiteCandidates"][number]>();
+  const seenHosts = new Set<string>();
+  for (let pass = 0; pass < BATCH_CANARY_LIMITS.maxDiscoveryPasses; pass += 1) {
+    if (eligibleByKey.size >= BATCH_CANARY_LIMITS.maxWebsitesAttempted) break;
+    const outcome = await discoverSuburbanPhoenixCandidates({
+      maxCells: BATCH_CANARY_LIMITS.maxCellsPerPass,
+      cellOffset: pass * BATCH_CANARY_LIMITS.maxCellsPerPass,
+      targetWebsiteCandidates: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
+      maxAcceptedCandidates: BATCH_CANARY_LIMITS.maxDiscoveryCandidates,
+    });
+    passes.push(outcome);
+    for (const found of outcome.summary.eligibleWebsiteCandidates) {
+      if (eligibleByKey.has(found.candidateKey) || seenHosts.has(found.candidateHost)) continue;
+      eligibleByKey.set(found.candidateKey, found);
+      seenHosts.add(found.candidateHost);
+    }
+  }
+  const discovery = passes[0];
+  if (!discovery) throw new Error("Bounded calibration produced no discovery pass");
+  const eligible = [...eligibleByKey.values()].slice(0, BATCH_CANARY_LIMITS.maxWebsitesAttempted);
+  const discoveryTotals = passes.reduce((totals, pass) => ({
+    cellsPlanned: totals.cellsPlanned + pass.summary.cellsPlanned,
+    cellsQueried: totals.cellsQueried + pass.summary.cellsQueried,
+    rows: totals.rows + pass.rowsConsidered,
+    requests: totals.requests + pass.requests,
+    bytes: totals.bytes + pass.downloadedBytes,
+    processed: totals.processed + pass.processedBytes,
+    envelopes: totals.envelopes + pass.summary.envelopesConsidered,
+    accepted: totals.accepted + pass.summary.acceptedCandidates,
+    duplicates: totals.duplicates + pass.summary.duplicatesAcrossCells,
+  }), { cellsPlanned: 0, cellsQueried: 0, rows: 0, requests: 0, bytes: 0, processed: 0, envelopes: 0, accepted: 0, duplicates: 0 });
+  const gateBlockedTotals: Record<string, number> = {};
+  for (const pass of passes) {
+    for (const [key, value] of Object.entries(pass.summary.gateBlockedCounts)) {
+      gateBlockedTotals[key] = (gateBlockedTotals[key] ?? 0) + value;
+    }
+  }
 
   const limits: LiveWebsiteAssessmentLimits = {
     maxBusinessesAttempted: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
@@ -221,21 +264,35 @@ export async function runPoolBatchCanary(input: {
       signal: new AbortController().signal,
     });
 
+    const calibration = calibrateServiceLanguage({
+      observationsBySite: websites.serviceLanguageBySite,
+    });
     const evidence = store.evidenceCounts();
     store.close();
     return {
       ran: true,
       releaseId: discovery.releaseId,
       discovery: {
-        cellsPlanned: discovery.summary.cellsPlanned,
-        cellsQueried: discovery.summary.cellsQueried,
-        rowsConsidered: discovery.rowsConsidered,
-        envelopesConsidered: discovery.summary.envelopesConsidered,
-        acceptedCandidates: discovery.summary.acceptedCandidates,
+        passes: passes.length,
+        cellsPlanned: discoveryTotals.cellsPlanned,
+        cellsQueried: discoveryTotals.cellsQueried,
+        rowsConsidered: discoveryTotals.rows,
+        envelopesConsidered: discoveryTotals.envelopes,
+        acceptedCandidates: discoveryTotals.accepted,
         eligibleCandidates: eligible.length,
-        duplicatesAcrossCells: discovery.summary.duplicatesAcrossCells,
-        gateBlockedCounts: discovery.summary.gateBlockedCounts,
-        stopReason: discovery.summary.stopReason,
+        duplicatesAcrossCells: discoveryTotals.duplicates,
+        gateBlockedCounts: gateBlockedTotals,
+        stopReason: passes[passes.length - 1]?.summary.stopReason ?? "not_started",
+      },
+      calibration: {
+        rulesetVersion: SERVICE_LANGUAGE_RULESET_VERSION,
+        identityVersion: IDENTITY_CORROBORATION_VERSION,
+        sitesObserved: calibration.sitesObserved,
+        minimumIndependentSites: calibration.minimumIndependentSites,
+        promoted: calibration.promoted,
+        rejected: calibration.rejected,
+        familyCounts: calibration.familyCounts,
+        identityDecisions: websites.identityDecisions,
       },
       websites: {
         attempted: websites.businessesAttempted,
@@ -264,12 +321,13 @@ export async function runPoolBatchCanary(input: {
         snapshotPersisted: queue.snapshotId !== null,
       },
       usage: {
-        discoveryRequests: discovery.requests,
-        discoveryBytes: discovery.downloadedBytes,
+        discoveryRequests: discoveryTotals.requests,
+        discoveryBytes: discoveryTotals.bytes,
+        discoveryProcessedBytes: discoveryTotals.processed,
         websiteRequests: websites.requests,
         websiteDownloadedBytes: websites.downloadedBytes,
         websiteProcessedBytes: websites.processedBytes,
-        totalRequests: discovery.requests + websites.requests,
+        totalRequests: discoveryTotals.requests + websites.requests,
         approvedWebsiteHostsContacted: contacted.size,
         elapsedMs: Date.now() - startedAt,
       },

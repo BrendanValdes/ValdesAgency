@@ -31,6 +31,10 @@ export interface EligibleCandidate {
   readonly candidateHost: string;
   readonly providerPlaceId: string | null;
   readonly releaseId: string;
+  /** Provider-observed locality, used only for identity corroboration. */
+  readonly expectedLocality: string | null;
+  /** Provider-observed public phones, used only for identity corroboration. */
+  readonly expectedPhones: ReadonlyArray<string>;
 }
 
 export interface CandidateGateOutcome {
@@ -136,6 +140,8 @@ export function selectAssessableCandidates(
       candidateHost: url.hostname,
       providerPlaceId: result.providerPlaceId,
       releaseId: observation.releaseId,
+      expectedLocality: result.address.city,
+      expectedPhones: Object.freeze([...result.phones]),
     });
   }
 

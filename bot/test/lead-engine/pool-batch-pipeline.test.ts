@@ -41,6 +41,8 @@ function candidate(index: number): EligibleCandidate {
     candidateHost: host,
     providerPlaceId: `place-${index}`,
     releaseId: "2026-07-22.0",
+    expectedLocality: "Mesa",
+    expectedPhones: ["+15550101001"],
   };
 }
 
@@ -295,9 +297,11 @@ describe("Phase 5C batch canary surface", () => {
   it("pins the mandated bounded batch budgets", () => {
     expect(BATCH_CANARY_LIMITS).toMatchObject({
       targetCallableLeads: 10,
-      maxCells: 12,
-      maxDiscoveryCandidates: 50,
-      maxWebsitesAttempted: 15,
+      maxCells: 20,
+      maxDiscoveryCandidates: 40,
+      maxDiscoveryPasses: 3,
+      maxCellsPerPass: 7,
+      maxWebsitesAttempted: 20,
       maxPagesPerBusiness: 3,
       maxTotalRequests: 90,
       maxDiscoveryRequests: 30,

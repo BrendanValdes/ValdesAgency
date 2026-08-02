@@ -184,6 +184,8 @@ function candidate(overrides: Partial<EligibleCandidate> = {}): EligibleCandidat
     candidateHost: HOST,
     providerPlaceId: "place-001",
     releaseId: "2026-07-22.0",
+    expectedLocality: "Phoenix",
+    expectedPhones: ["+15550101001"],
     ...overrides,
   };
 }

@@ -38,6 +38,20 @@ const SUBURBAN_CENTERS: ReadonlyArray<{ label: string; longitude: number; latitu
     { label: "Glendale residential", longitude: -112.186, latitude: 33.539 },
     { label: "Peoria residential", longitude: -112.238, latitude: 33.641 },
     { label: "Surprise residential", longitude: -112.368, latitude: 33.630 },
+    { label: "Tempe residential", longitude: -111.936, latitude: 33.395 },
+    { label: "Ahwatukee residential", longitude: -111.983, latitude: 33.323 },
+    { label: "Queen Creek residential", longitude: -111.634, latitude: 33.249 },
+    { label: "Goodyear residential", longitude: -112.359, latitude: 33.436 },
+    { label: "Avondale residential", longitude: -112.316, latitude: 33.436 },
+    { label: "Litchfield Park residential", longitude: -112.360, latitude: 33.494 },
+    { label: "Sun City residential", longitude: -112.286, latitude: 33.599 },
+    { label: "Cave Creek residential", longitude: -111.951, latitude: 33.798 },
+    { label: "Fountain Hills residential", longitude: -111.717, latitude: 33.611 },
+    { label: "Paradise Valley residential", longitude: -111.952, latitude: 33.542 },
+    { label: "North Scottsdale residential", longitude: -111.892, latitude: 33.664 },
+    { label: "East Mesa residential", longitude: -111.700, latitude: 33.415 },
+    { label: "West Chandler residential", longitude: -111.923, latitude: 33.302 },
+    { label: "Gilbert south residential", longitude: -111.760, latitude: 33.279 },
   ]);
 
 export function suburbanPhoenixTargets(): ReadonlyArray<GeographyTarget> {
@@ -65,9 +79,15 @@ export function planSuburbanCells(input: {
   configurationVersion: string;
   queryVersion: string;
   maxCells: number;
+  /** Skip this many cells, so successive bounded passes cover distinct slices. */
+  cellOffset?: number;
 }): ReadonlyArray<CoverageCell> {
-  if (!Number.isSafeInteger(input.maxCells) || input.maxCells < 1 || input.maxCells > 12) {
-    throw new Error("Suburban cell budget must be an integer between 1 and 12");
+  if (!Number.isSafeInteger(input.maxCells) || input.maxCells < 1 || input.maxCells > 24) {
+    throw new Error("Suburban cell budget must be an integer between 1 and 24");
+  }
+  const offset = input.cellOffset ?? 0;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 64) {
+    throw new Error("Suburban cell offset must be a nonnegative integer no greater than 64");
   }
   const manifest = planCoverage({
     nicheId: "pool_service",
@@ -78,7 +98,7 @@ export function planSuburbanCells(input: {
     resultCap: 100,
     maxDepth: 0,
   });
-  return Object.freeze(manifest.cells.slice(0, input.maxCells));
+  return Object.freeze(manifest.cells.slice(offset, offset + input.maxCells));
 }
 
 export type SuburbanStopReason =

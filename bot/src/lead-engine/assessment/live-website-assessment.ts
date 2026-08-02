@@ -1,4 +1,12 @@
-import { extractBusinessIdentity, identityAgreement } from "../extraction/business-identity.js";
+import { extractBusinessIdentity } from "../extraction/business-identity.js";
+import {
+  assessIdentityCorroboration,
+  type IdentityCorroborationResult,
+} from "../identity/corroboration.js";
+import {
+  evaluateServiceLanguage,
+  type ServiceLanguageEvaluation,
+} from "../qualification/service-language.js";
 import { extractContactInformation } from "../extraction/contact.js";
 import { extractConversionSignals } from "../extraction/conversion.js";
 import { extractHtml } from "../extraction/html.js";
@@ -82,6 +90,9 @@ export interface LiveWebsiteAssessmentSummary {
   readonly elapsedMs: number;
   readonly stopReason: AssessmentStopReason;
   readonly budgetsRemaining: Readonly<Record<string, number>>;
+  /** Per-site observed rule ids, for calibration. Ids only, never text. */
+  readonly serviceLanguageBySite: ReadonlyArray<ReadonlyArray<string>>;
+  readonly identityDecisions: Readonly<Record<string, number>>;
 }
 
 /**
@@ -104,6 +115,8 @@ export interface PageEvidence {
   readonly people: ReadonlyArray<PersonEvidenceCandidate>;
   readonly services: ReadonlyArray<ServiceEvidenceObservation>;
   readonly conversions: ReadonlyArray<ConversionFeatureAssessment>;
+  /** Rule identifiers only — never the matched text. */
+  readonly serviceLanguage: ServiceLanguageEvaluation;
   readonly structuredData: ReadonlyArray<{
     readonly schemaType: string;
     readonly path: string;
@@ -230,6 +243,8 @@ export async function runLiveWebsiteAssessment(input: {
   let structuredDataCount = 0;
   let identityAgrees = 0;
   let identityReview = 0;
+  const identityOutcomes: IdentityCorroborationResult[] = [];
+  const serviceLanguageBySite: string[][] = [];
   let stopReason: AssessmentStopReason = "all_candidates_processed";
 
   const elapsed = (): number => input.now().getTime() - startedAtMs;
@@ -342,6 +357,11 @@ export async function runLiveWebsiteAssessment(input: {
     let structuredCount = 0;
     let signalCount = 0;
     const observedNames: EvidenceValue<string>[] = [];
+    const structuredOrganizationNames: string[] = [];
+    const observedPhones: string[] = [];
+    const observedLocalities: string[] = [];
+    const observedServiceAreas: string[] = [];
+    const serviceLanguageRuleIds = new Set<string>();
 
     for (const page of usablePages) {
       const fetched = page.fetch;
@@ -364,6 +384,21 @@ export async function runLiveWebsiteAssessment(input: {
       });
       const services = extractServiceEvidence({ html, jsonLd, niche: input.niche })
         .filter((observation) => observation.state !== "unavailable");
+      structuredOrganizationNames.push(...jsonLd.organizationNames.map((value) => value.value));
+      observedPhones.push(...contacts.filter((entry) => entry.kind === "phone")
+        .map((entry) => entry.displayedValue));
+      // Text is inspected in memory only; nothing but rule ids and dimension
+      // states leaves this loop.
+      const pageText = html.visibleText;
+      const locality = candidate.expectedLocality;
+      if (locality && pageText.toLocaleLowerCase("en-US").includes(locality.toLocaleLowerCase("en-US"))) {
+        observedLocalities.push(locality);
+        if (/\b(?:service\s+areas?|areas?\s+we\s+serve|we\s+serve|proudly\s+serving)\b/i.test(pageText)) {
+          observedServiceAreas.push(locality);
+        }
+      }
+      const serviceLanguage = evaluateServiceLanguage(pageText);
+      for (const hit of serviceLanguage.hits) serviceLanguageRuleIds.add(hit.ruleId);
       const structuredData = jsonLd.organizationNames.map((value) => ({
         schemaType: "Organization", path: "organizationNames", fieldName: "name",
         claimedValue: value.value, confidence: value.confidence,
@@ -392,14 +427,30 @@ export async function runLiveWebsiteAssessment(input: {
         metaDescription: html.metaDescription?.value ?? null,
         language: html.language?.value ?? null,
         viewport: html.viewport?.value ?? null,
-        contacts, people, services, conversions, structuredData,
+        contacts, people, services, conversions, structuredData, serviceLanguage,
       });
     }
 
-    // Domain/business compatibility uses the existing identity rules. A conflict
-    // or ambiguity routes the candidate to review; it is not counted as assessed.
-    const identityState = identityAgreement(candidate.expectedBusinessName, observedNames);
-    const reviewRequired = identityState !== "agrees";
+    // Domain/business compatibility is corroborated across independent
+    // dimensions. Name similarity alone never attaches, and any conflicting
+    // dimension forces review.
+    const corroboration = assessIdentityCorroboration({
+      expectedName: candidate.expectedBusinessName,
+      candidateHost: candidate.candidateHost,
+      expectedLocality: candidate.expectedLocality,
+      expectedPhones: candidate.expectedPhones,
+      observedNames: observedNames.map((entry) => entry.value),
+      structuredOrganizationNames,
+      observedPhones,
+      observedLocalities,
+      observedServiceAreas,
+    });
+    identityOutcomes.push(corroboration);
+    const identityState = corroboration.decision === "attach"
+      ? "agrees" as const
+      : corroboration.decision === "conflict" ? "conflicts" as const
+        : corroboration.compatibleCount > 0 ? "ambiguous" as const : "unavailable" as const;
+    const reviewRequired = corroboration.decision !== "attach";
     if (reviewRequired) {
       identityReview += 1;
       blockedCounts.identity_review += 1;
@@ -420,6 +471,7 @@ export async function runLiveWebsiteAssessment(input: {
       startedAt, assessedAt, pages: crawl.pages.length, ...usage,
     });
 
+    serviceLanguageBySite.push([...serviceLanguageRuleIds].sort());
     if (!reviewRequired) {
       websitesAssessed += 1;
       opportunitySignals += signalCount;
@@ -449,6 +501,12 @@ export async function runLiveWebsiteAssessment(input: {
     identityReview,
     elapsedMs: elapsed(),
     stopReason,
+    serviceLanguageBySite: Object.freeze(serviceLanguageBySite.map((ids) => Object.freeze(ids))),
+    identityDecisions: Object.freeze({
+      attach: identityOutcomes.filter((entry) => entry.decision === "attach").length,
+      review_required: identityOutcomes.filter((entry) => entry.decision === "review_required").length,
+      conflict: identityOutcomes.filter((entry) => entry.decision === "conflict").length,
+    }),
     budgetsRemaining: Object.freeze({
       businessesAttempted: Math.max(0, limits.maxBusinessesAttempted - businessesAttempted),
       websitesAssessed: Math.max(0, limits.maxWebsitesAssessed - websitesAssessed),

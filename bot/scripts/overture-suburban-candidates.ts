@@ -102,6 +102,7 @@ export async function discoverSuburbanPhoenixCandidates(options: {
   maxCells?: number;
   targetWebsiteCandidates?: number;
   maxAcceptedCandidates?: number;
+  cellOffset?: number;
 } = {}): Promise<SuburbanDiscoveryOutcome> {
   const maxCells = options.maxCells ?? SUBURBAN_MAX_CELLS;
   const targetWebsiteCandidates = options.targetWebsiteCandidates ?? SUBURBAN_TARGET_WEBSITE_CANDIDATES;
@@ -126,6 +127,7 @@ export async function discoverSuburbanPhoenixCandidates(options: {
       configurationVersion: policy.policy.schemaVersion,
       queryVersion: "overture-suburban-canary-1.0.0",
       maxCells,
+      cellOffset: options.cellOffset ?? 0,
     });
     if (cells.length === 0) throw new Error("Suburban discovery planned no coverage cells");
 

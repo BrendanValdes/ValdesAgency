@@ -10,6 +10,7 @@ import {
   type WebsitePageRecord,
 } from "../db/website-assessment-repository.js";
 import { WEBSITE_ASSESSMENT_POLICY_VERSION } from "../validation/website-assessment.js";
+import { SERVICE_LANGUAGE_RULESET_VERSION } from "../qualification/service-language.js";
 import {
   LIVE_WEBSITE_ASSESSMENT_VERSION,
   type AssessmentSink,
@@ -38,6 +39,7 @@ export interface AssessmentEvidenceCounts {
   readonly conversions: number;
   readonly structured: number;
   readonly conflicts: number;
+  readonly serviceLanguageHits: number;
 }
 
 export interface AssessmentStore {
@@ -92,7 +94,8 @@ export function createAssessmentStore(input: {
   const pendingConflicts = new Map<string, { candidateKey: string; observedNameCount: number }>();
   let persisted = 0;
   const counts = {
-    pages: 0, contacts: 0, people: 0, services: 0, conversions: 0, structured: 0, conflicts: 0,
+    pages: 0, contacts: 0, people: 0, services: 0, conversions: 0, structured: 0,
+    conflicts: 0, serviceLanguageHits: 0,
   };
 
   const ensureBusiness = (candidateKey: string): string => {
@@ -157,6 +160,24 @@ export function createAssessmentStore(input: {
         sourceClass: person.sourceClass, claimState: "public_unverified_candidate",
       });
       counts.people += 1;
+    }
+    // Service-language rule hits persist as service evidence keyed by rule id,
+    // so calibration reads observations from the database, not from memory.
+    for (const hit of evidence.serviceLanguage.hits) {
+      websiteAssessments.addServiceEvidence({
+        id: rowId("sev", pageId, `rule:${hit.ruleId}`),
+        assessmentId: evidence.assessmentId, pageId, evidenceId: null,
+        evidenceState: evidence.serviceLanguage.facilityOrRetail ? "ambiguous" : "positive",
+        // Canonical model term so the unchanged qualifier can match it; the
+        // originating rule id stays traceable through the row id.
+        term: hit.canonicalServiceTerm,
+        basis: "service_description",
+        observedAt: evidence.observedAt,
+        extractionPolicyVersion: SERVICE_LANGUAGE_RULESET_VERSION,
+        sourceClass: "public_business_website", claimState: "observed",
+      });
+      counts.services += 1;
+      counts.serviceLanguageHits += 1;
     }
     for (const [index, service] of evidence.services.entries()) {
       websiteAssessments.addServiceEvidence({
