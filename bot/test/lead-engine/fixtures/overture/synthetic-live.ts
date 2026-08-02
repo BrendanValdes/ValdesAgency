@@ -91,11 +91,12 @@ export function syntheticPhoenixCell(): CoverageCell {
 
 export function syntheticQueryPlan(
   releaseId = SYNTHETIC_OVERTURE_RELEASE,
+  maxRows = 100,
 ): OverturePlacesQueryPlan {
   return createOverturePlacesQueryPlan({
     releaseId,
     coverageCell: syntheticPhoenixCell(),
-    maxRows: 100,
+    maxRows,
     maxAreaSquareKm: 25,
   });
 }

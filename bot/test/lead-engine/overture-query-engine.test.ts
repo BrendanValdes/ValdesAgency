@@ -2,7 +2,11 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { OverturePlacesLiveDiscoveryProvider } from "../../src/lead-engine/providers/adapters/overture-places-live.js";
-import { parseOvertureCanaryArguments } from "../../scripts/run-overture-places-canary.js";
+import { existsSync } from "node:fs";
+import {
+  parseOvertureCanaryArguments,
+  runOverturePlacesCanary,
+} from "../../scripts/run-overture-places-canary.js";
 import { createTestOnlyOvertureRangeHttpTransport } from "../../src/lead-engine/providers/overture/range-http-transport.js";
 import {
   validateOvertureParquetMetadata,
@@ -15,7 +19,9 @@ import {
   type OvertureParquetReader,
 } from "../../src/lead-engine/providers/overture/secure-asset-query-engine.js";
 import { OVERTURE_SELECTED_PLACE_COLUMNS } from "../../src/lead-engine/providers/overture/query.js";
+import { OvertureBudgetTracker } from "../../src/lead-engine/providers/overture/budgets.js";
 import {
+  SYNTHETIC_OVERTURE_RELEASE,
   SYNTHETIC_OVERTURE_RELEASE_PIN,
   syntheticBudget,
   syntheticDiscoveryRequest,
@@ -164,6 +170,42 @@ function rawGroup(input: {
   return { num_rows: input.rows, total_byte_size: input.projectedBytes * 2, columns };
 }
 
+function gappedGroup(input: { rows: number; gapBytes: number; base: number; extent: typeof INSIDE }) {
+  const columns = SELECTED.map((name, index) => ({
+    meta_data: {
+      path_in_schema: name.split("."),
+      codec: "SNAPPY",
+      total_compressed_size: index < 2 ? 100 : 0,
+      total_uncompressed_size: index < 2 ? 200 : 0,
+      // Spread the two sized chunks apart so the coalesced span is much larger
+      // than the compressed bytes the pruner projects.
+      data_page_offset: index === 1 ? input.base + input.gapBytes : input.base + 4,
+    },
+  }));
+  columns.push(
+    rawColumn("bbox.xmin", { min: input.extent.xmin, max: input.extent.xmin }),
+    rawColumn("bbox.xmax", { min: input.extent.xmax, max: input.extent.xmax }),
+    rawColumn("bbox.ymin", { min: input.extent.ymin, max: input.extent.ymin }),
+    rawColumn("bbox.ymax", { min: input.extent.ymax, max: input.extent.ymax }),
+  );
+  return { num_rows: input.rows, total_byte_size: 400, columns };
+}
+
+function craftGappedMetadata(count: number, gapBytes: number): OvertureParquetMetadata {
+  return validateOvertureParquetMetadata(
+    {
+      num_rows: count * 2,
+      // Each group occupies its own region so its warmed span is a distinct
+      // range rather than a cache hit on a previous group's span.
+      row_groups: Array.from({ length: count }, (_unused, index) =>
+        gappedGroup({ rows: 2, gapBytes, base: index * (gapBytes + 1024 * 1024), extent: INSIDE })),
+      key_value_metadata: [{ key: "geo" }],
+    },
+    100 * 1024 * 1024,
+    { maxRows: 1_000_000, maxRowGroups: 1_000, maxColumnsPerRowGroup: 512 },
+  );
+}
+
 function craftMetadata(groups: ReadonlyArray<Parameters<typeof rawGroup>[0]>): OvertureParquetMetadata {
   const rawGroups = groups.map((group) => rawGroup(group));
   const totalRows = groups.reduce((sum, group) => sum + group.rows, 0);
@@ -192,7 +234,7 @@ describe("Overture Parquet metadata statistics extension", () => {
 
 const RANGE_TOTAL = 4_096;
 
-function footerServer() {
+function footerServer(total = RANGE_TOTAL) {
   return createTestOnlyOvertureRangeHttpTransport(async (request) => {
     const start = request.start;
     const end = request.endExclusive;
@@ -203,7 +245,7 @@ function footerServer() {
       headers: {
         "content-type": "application/octet-stream",
         "content-encoding": "identity",
-        "content-range": `bytes ${start}-${end - 1}/${RANGE_TOTAL}`,
+        "content-range": `bytes ${start}-${end - 1}/${total}`,
         "content-length": String(end - start),
         "etag": '"engine-fixture"',
       },
@@ -260,25 +302,32 @@ async function runEngine(input: {
   metadata: OvertureParquetMetadata;
   rows: (rowStart: number, rowEnd: number) => ReadonlyArray<Record<string, unknown>>;
   maxRows?: number;
+  candidateTarget?: number | null;
+  isCandidate?: (row: Record<string, unknown>) => boolean;
+  budget?: OvertureBudgetTracker;
+  signal?: AbortSignal;
+  rangeTotal?: number;
 }) {
   const live = syntheticLivePolicy();
   const calls: ReaderCall[] = [];
-  const budget = syntheticBudget();
+  const budget = input.budget ?? syntheticBudget();
   try {
     const engine = createSecureOvertureAssetQueryEngine({
       policy: live.policy,
       capability: live.capability,
       runId: "run-synthetic-overture",
       assessmentId: "scope-synthetic-overture",
-      transport: footerServer(),
+      transport: footerServer(input.rangeTotal ?? RANGE_TOTAL),
       reader: syntheticReader({ metadata: input.metadata, rows: input.rows, calls }),
       now: () => "2026-08-01T12:00:00.000Z",
+      ...(input.candidateTarget === undefined ? {} : { candidateTarget: input.candidateTarget }),
+      ...(input.isCandidate ? { isCandidate: input.isCandidate } : {}),
     });
     const result = await engine.query({
       release: SYNTHETIC_OVERTURE_RELEASE_PIN,
       coverageCell: CELL,
-      plan: syntheticQueryPlan(),
-      signal: new AbortController().signal,
+      plan: syntheticQueryPlan(SYNTHETIC_OVERTURE_RELEASE, input.maxRows ?? 100),
+      signal: input.signal ?? new AbortController().signal,
       budget,
     });
     return { result, calls, budget };
@@ -433,6 +482,149 @@ describe("secure Overture asset query engine", () => {
   });
 });
 
+describe("bounded candidate-yield traversal", () => {
+  // Three intersecting groups: the first two decode rows that fall outside the
+  // cell, the third holds the only in-cell matches.
+  const THREE_GROUPS = () => craftMetadata([
+    { rows: 2, projectedBytes: 500, extent: INSIDE },
+    { rows: 2, projectedBytes: 500, extent: INSIDE },
+    { rows: 2, projectedBytes: 500, extent: INSIDE },
+  ]);
+  const lateMatch = (rowStart: number) => rowStart < 4
+    ? [place(`far-${rowStart}-a`, -100, 40), place(`far-${rowStart}-b`, -101, 41)]
+    : [place("late-hit-1", -112.07, 33.45), place("late-hit-2", -112.06, 33.46)];
+
+  it("keeps traversing when the first group yields no matches and finds a later one", async () => {
+    const { result, calls } = await runEngine({ metadata: THREE_GROUPS(), rows: lateMatch, maxRows: 100 });
+    expect(calls.map((call) => call.rowStart)).toEqual([0, 2, 4]);
+    expect(result.records.map((row) => (row as { id: string }).id)).toEqual(["late-hit-1", "late-hit-2"]);
+    expect(result.rowGroupsRead).toBe(3);
+    expect(result.stopReason).toBe("no_relevant_row_groups_remaining");
+  });
+
+  it("stops as soon as the candidate target is reached", async () => {
+    const { result, calls } = await runEngine({
+      metadata: craftMetadata([
+        { rows: 2, projectedBytes: 500, extent: INSIDE },
+        { rows: 2, projectedBytes: 500, extent: INSIDE },
+        { rows: 2, projectedBytes: 500, extent: INSIDE },
+      ]),
+      rows: (rowStart) => [place(`hit-${rowStart}-a`, -112.07, 33.45), place(`hit-${rowStart}-b`, -112.06, 33.46)],
+      maxRows: 100,
+      candidateTarget: 2,
+    });
+    // Target met inside the first group; later groups are never requested.
+    expect(calls).toHaveLength(1);
+    expect(result.rowGroupsRead).toBe(1);
+    expect(result.stopReason).toBe("candidate_target_reached");
+  });
+
+  it("honours an injected authoritative candidate predicate", async () => {
+    const { result, calls } = await runEngine({
+      metadata: THREE_GROUPS(),
+      rows: (rowStart) => [place(`hit-${rowStart}`, -112.07, 33.45), place(`skip-${rowStart}`, -112.06, 33.46)],
+      maxRows: 100,
+      candidateTarget: 2,
+      // Only ids beginning "hit-" count, standing in for taxonomy acceptance.
+      isCandidate: (row) => String((row as { id: string }).id).startsWith("hit-"),
+    });
+    expect(result.stopReason).toBe("candidate_target_reached");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("stops on the row budget", async () => {
+    const { result } = await runEngine({
+      metadata: THREE_GROUPS(),
+      rows: lateMatch,
+      maxRows: 2,
+    });
+    expect(result.rowsRead).toBe(2);
+    expect(result.rowGroupsRead).toBe(1);
+    expect(result.stopReason).toBe("row_budget_exhausted");
+  });
+
+  it("stops on the byte budget", async () => {
+    // Each group's warmed span is far larger than the compressed bytes the
+    // pruner projects, so real consumption outruns the projection and the
+    // traversal must halt at a group boundary instead of overrunning the budget.
+    const gap = 6 * 1024 * 1024;
+    const budget = syntheticBudget();
+    const { result } = await runEngine({
+      metadata: craftGappedMetadata(3, gap),
+      rows: lateMatch,
+      maxRows: 100,
+      budget,
+      rangeTotal: 24 * 1024 * 1024,
+    });
+    expect(result.stopReason).toBe("byte_budget_exhausted");
+    expect(result.rowGroupsRead).toBeGreaterThanOrEqual(1);
+    expect(result.rowGroupsRead).toBeLessThan(3);
+  });
+
+  it("stops on the asset request budget", async () => {
+    const budget = syntheticBudget({ maxAssetRequests: 2 });
+    const { result } = await runEngine({ metadata: THREE_GROUPS(), rows: lateMatch, maxRows: 100, budget });
+    expect(result.stopReason).toBe("request_budget_exhausted");
+  });
+
+  it("stops on cancellation", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { result } = await runEngine({
+      metadata: THREE_GROUPS(), rows: lateMatch, maxRows: 100, signal: controller.signal,
+    });
+    expect(result.stopReason).toBe("cancelled");
+    expect(result.rowGroupsRead).toBe(0);
+  });
+
+  it("never yields the same place twice across row groups", async () => {
+    const { result } = await runEngine({
+      metadata: THREE_GROUPS(),
+      // The same place id repeats in every group.
+      rows: () => [place("repeated", -112.07, 33.45), place("also-repeated", -112.06, 33.46)],
+      maxRows: 100,
+    });
+    expect(result.records).toHaveLength(2);
+    expect(result.duplicateRowsSkipped).toBe(4);
+  });
+
+  it("produces identical deterministic output across repeated runs", async () => {
+    const ids = async () => (await runEngine({
+      metadata: THREE_GROUPS(),
+      rows: (rowStart) => [place(`b-${rowStart}`, -112.07, 33.45), place(`a-${rowStart}`, -112.06, 33.46)],
+      maxRows: 100,
+    })).result.records.map((row) => (row as { id: string }).id);
+    const first = await ids();
+    expect(await ids()).toEqual(first);
+    expect(await ids()).toEqual(first);
+  });
+
+  it("resumes a retry against the same pinned release without rereading more groups", async () => {
+    const run = async () => runEngine({ metadata: THREE_GROUPS(), rows: lateMatch, maxRows: 100 });
+    const first = await run();
+    const second = await run();
+    expect(second.result.rowGroupsRead).toBe(first.result.rowGroupsRead);
+    expect(second.result.rowsRead).toBe(first.result.rowsRead);
+    expect(second.result.assets.map((asset) => asset.url)).toEqual(first.result.assets.map((asset) => asset.url));
+  });
+
+  it("never broadens beyond the pruned groups or the projected columns", async () => {
+    const { result, calls } = await runEngine({
+      metadata: craftMetadata([
+        { rows: 2, projectedBytes: 500, extent: INSIDE },
+        { rows: 2, projectedBytes: 500, extent: OUTSIDE },
+        { rows: 2, projectedBytes: 500, extent: INSIDE },
+      ]),
+      rows: () => [place("in", -112.07, 33.45)],
+      maxRows: 100,
+    });
+    // The nonintersecting middle group is never decoded.
+    expect(calls.map((call) => call.rowStart)).toEqual([0, 4]);
+    expect(result.rowGroupsSelected).toBe(2);
+    for (const call of calls) expect(call.columns).toEqual([...OVERTURE_SELECTED_PLACE_COLUMNS]);
+  });
+});
+
 describe("secure engine wired into the live adapter", () => {
   it("flows decoded records through the adapter into truthful normalized envelopes", async () => {
     const live = syntheticLivePolicy();
@@ -490,5 +682,44 @@ describe("canary secure-engine opt-in", () => {
     ];
     expect(parseOvertureCanaryArguments(base, repositoryRoot).enableSecureEngine).toBe(false);
     expect(parseOvertureCanaryArguments([...base, "--enable-secure-engine"], repositoryRoot).enableSecureEngine).toBe(true);
+  });
+
+  it("emits an aggregate-only report with no raw business or contact fields", async () => {
+    const repositoryRoot = path.resolve(process.cwd(), "..");
+    const databasePath = path.join(os.tmpdir(), `rocco-canary-aggregate-${process.pid}.sqlite`);
+    // Default path: no --enable-secure-engine, so this performs zero network I/O.
+    const report = await runOverturePlacesCanary({
+      argv: [
+        "--confirm-live-overture",
+        "--market", "phoenix-canary",
+        "--max-results", "25",
+        "--max-bytes", String(32 * 1024 * 1024),
+        "--max-seconds", "60",
+        "--database", databasePath,
+        "--release", "latest",
+      ],
+      repositoryRoot,
+    });
+
+    // Every field is a count, an identifier, a version, or a verdict.
+    expect(Object.keys(report).sort()).toEqual([
+      "acceptedCount", "aggregateVerdict", "approvedDestinationsContacted", "budgetRemaining", "bytes",
+      "candidateTarget", "coverageCellSafeId", "duplicateCount", "duplicateRowsSkipped", "elapsedMs",
+      "ran", "rejectedCount", "releaseId", "requests", "reviewCount", "rowGroupsRead",
+      "rowGroupsSelected", "rowsConsidered", "safetyWarnings", "schemaVersion", "taxonomyMappingVersion",
+      "traversalStopReason",
+    ]);
+    for (const [key, value] of Object.entries(report)) {
+      if (key === "budgetRemaining") continue;
+      const kind = Array.isArray(value) ? "array" : typeof value;
+      expect(["number", "string", "boolean", "array", "object"]).toContain(kind);
+    }
+    // No raw business or contact field ever appears in the serialized report.
+    const serialized = JSON.stringify(report).toLowerCase();
+    for (const forbidden of ["phone", "email", "website", "address", "freeform", "locality", "postcode", "geometry"]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+    expect(report.coverageCellSafeId).toMatch(/^coverage_[0-9a-f]+$/);
+    expect(existsSync(databasePath)).toBe(false);
   });
 });

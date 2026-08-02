@@ -9,6 +9,8 @@ import {
 } from "./types.js";
 import { validateOvertureReleaseId } from "./asset-validator.js";
 
+export const OVERTURE_MAX_PLAN_ROWS = 2_000;
+
 export const OVERTURE_SELECTED_PLACE_COLUMNS = Object.freeze([
   "id",
   "version",
@@ -62,8 +64,12 @@ export function createOverturePlacesQueryPlan(input: {
       category: "policy_blocked",
     });
   }
-  if (!Number.isSafeInteger(input.maxRows) || input.maxRows < 1 || input.maxRows > 100) {
-    throw overtureFailure("query_invalid", "Overture row limit must be between 1 and 100", {
+  // Phase 5A.2 calibration bound: a bounded candidate-yield traversal crosses
+  // several row groups, so the plan admits up to OVERTURE_MAX_PLAN_ROWS decoded
+  // rows. Still a hard ceiling — the traversal also stops on candidate target,
+  // byte, request, runtime, and cancellation limits.
+  if (!Number.isSafeInteger(input.maxRows) || input.maxRows < 1 || input.maxRows > OVERTURE_MAX_PLAN_ROWS) {
+    throw overtureFailure("query_invalid", `Overture row limit must be between 1 and ${OVERTURE_MAX_PLAN_ROWS}`, {
       category: "policy_blocked",
     });
   }

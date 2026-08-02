@@ -41,6 +41,7 @@ import {
   type OvertureAssetQueryInput,
   type OvertureAssetQueryResult,
   type OverturePlaceSchemaDescriptor,
+  type OvertureTraversalStopReason,
   type ValidatedOvertureAsset,
 } from "./types.js";
 import type { OvertureBudgetSnapshot, OvertureBudgetTracker } from "./budgets.js";
@@ -235,6 +236,8 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
   readonly #maxSelectedRowGroups: number;
   readonly #maxUnprunableRowGroups: number;
   readonly #maxCoalescedSpanBytes: number;
+  readonly #candidateTarget: number | null;
+  readonly #isCandidate: (row: Record<string, unknown>) => boolean;
 
   constructor(input: {
     policy: RuntimeLeadPolicy;
@@ -249,6 +252,8 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     maxSelectedRowGroups: number;
     maxUnprunableRowGroups: number;
     maxCoalescedSpanBytes: number;
+    candidateTarget: number | null;
+    isCandidate: (row: Record<string, unknown>) => boolean;
   }) {
     this.#policy = input.policy;
     this.#capability = input.capability;
@@ -262,6 +267,8 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     this.#maxSelectedRowGroups = input.maxSelectedRowGroups;
     this.#maxUnprunableRowGroups = input.maxUnprunableRowGroups;
     this.#maxCoalescedSpanBytes = input.maxCoalescedSpanBytes;
+    this.#candidateTarget = input.candidateTarget;
+    this.#isCandidate = input.isCandidate;
   }
 
   async query(
@@ -287,12 +294,44 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     const before = budget.snapshot().consumed;
     const records: Record<string, unknown>[] = [];
     const assetsUsed: ValidatedOvertureAsset[] = [];
+    // Overture place ids are globally unique, so one seen-set deduplicates rows
+    // across row groups and across mirrored assets.
+    const seenIds = new Set<string>();
     let rowsRead = 0;
     let processedBytes = 0;
+    let rowGroupsSelected = 0;
+    let rowGroupsRead = 0;
+    let duplicateRowsSkipped = 0;
+    let candidateCount = 0;
+    let stopReason: OvertureTraversalStopReason = "no_relevant_row_groups_remaining";
+    let halted = false;
+
+    // A traversal stops only for an explicit bounded reason. An empty row group
+    // is never one of them: the next relevant group is still read.
+    const haltReason = (needBytes = 0): OvertureTraversalStopReason | null => {
+      if (signal.aborted) return "cancelled";
+      if (this.#candidateTarget !== null && candidateCount >= this.#candidateTarget) {
+        return "candidate_target_reached";
+      }
+      if (rowsRead >= maxRows) return "row_budget_exhausted";
+      const remaining = budget.snapshot().remaining;
+      // Halt before a read that the remaining byte budget cannot cover, rather
+      // than letting the reservation throw mid-traversal.
+      if (remaining.maxDownloadedBytes <= 0 || remaining.maxDownloadedBytes < needBytes) {
+        return "byte_budget_exhausted";
+      }
+      if (remaining.maxAssetRequests <= 0) return "request_budget_exhausted";
+      return null;
+    };
 
     const assets = release.assets.slice(0, Math.max(1, this.#maxAssetsInspected));
     for (const asset of assets) {
-      if (rowsRead >= maxRows) break;
+      const assetHalt = haltReason();
+      if (assetHalt) {
+        stopReason = assetHalt;
+        halted = true;
+        break;
+      }
       budget.assertActive();
       const source = await createCapabilityRangeSource({
         policy: this.#policy,
@@ -331,10 +370,45 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
           spatialPlans.map((group) => [group.index, [group.projectedStartOffset, group.projectedEndOffset] as const]),
         );
 
-        for (const group of selection.selected) {
-          if (rowsRead >= maxRows) break;
+        rowGroupsSelected += selection.selectedCount;
+        // Deterministic traversal order, most spatially relevant group first.
+        // A group whose extent barely clips the cell yields almost nothing per
+        // decoded row, so reading it first would spend the whole row budget for
+        // no candidates. Relevance is the share of the group's own extent that
+        // overlaps the cell; ties break on ascending index, so the order is a
+        // pure function of the metadata and repeats exactly across runs.
+        const extentByIndex = new Map(spatialPlans.map((group) => [group.index, group.extent]));
+        const relevance = (index: number): number => {
+          const extent = extentByIndex.get(index) ?? null;
+          if (!extent) return 0;
+          const width = extent.xmax - extent.xmin;
+          const height = extent.ymax - extent.ymin;
+          const overlapWidth = Math.min(extent.xmax, bounds.east) - Math.max(extent.xmin, bounds.west);
+          const overlapHeight = Math.min(extent.ymax, bounds.north) - Math.max(extent.ymin, bounds.south);
+          if (overlapWidth <= 0 || overlapHeight <= 0) return 0;
+          const area = width * height;
+          // A degenerate (zero-area) extent that still overlaps is maximally specific.
+          if (area <= 0) return 1;
+          return (overlapWidth * overlapHeight) / area;
+        };
+        const ordered = [...selection.selected].sort((left, right) =>
+          relevance(right.index) - relevance(left.index) || left.index - right.index);
+        for (const group of ordered) {
+          const plannedSpan = spanByIndex.get(group.index);
+          const groupHalt = haltReason(
+            plannedSpan && plannedSpan[1] > plannedSpan[0] ? plannedSpan[1] - plannedSpan[0] : 0,
+          );
+          if (groupHalt) {
+            stopReason = groupHalt;
+            halted = true;
+            break;
+          }
           const toRead = Math.min(group.rowCount, maxRows - rowsRead);
-          if (toRead <= 0) break;
+          if (toRead <= 0) {
+            stopReason = "row_budget_exhausted";
+            halted = true;
+            break;
+          }
           // Warm the bounded range cache with the row group's projected column
           // span in a single range read. The cache serves enclosing sub-ranges,
           // so each column chunk below is a cache hit instead of its own request.
@@ -354,17 +428,38 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
           });
           const decoded = Math.min(rows.length, toRead);
           rowsRead += decoded;
+          rowGroupsRead += 1;
           const groupUncompressed = uncompressedByIndex.get(group.index) ?? 0;
           processedBytes += group.rowCount > 0
             ? Math.round(groupUncompressed * (decoded / group.rowCount))
             : 0;
           for (const row of rows.slice(0, decoded)) {
-            if (pointInBounds(row, bounds)) records.push(row);
+            if (!pointInBounds(row, bounds)) continue;
+            const id = typeof row.id === "string" ? row.id : null;
+            if (id !== null) {
+              if (seenIds.has(id)) {
+                duplicateRowsSkipped += 1;
+                continue;
+              }
+              seenIds.add(id);
+            }
+            records.push(row);
+            if (!this.#isCandidate(row)) continue;
+            candidateCount += 1;
+            // Enforce the candidate target inside the group as well as between
+            // groups, so a single dense group cannot overshoot the hard ceiling.
+            if (this.#candidateTarget !== null && candidateCount >= this.#candidateTarget) {
+              stopReason = "candidate_target_reached";
+              halted = true;
+              break;
+            }
           }
+          if (halted) break;
         }
       } finally {
         source.clearCache();
       }
+      if (halted) break;
     }
 
     const after = budget.snapshot().consumed;
@@ -376,6 +471,10 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
       downloadedBytes: after.downloadedBytes - before.downloadedBytes,
       processedBytes,
       rowsRead,
+      rowGroupsSelected,
+      rowGroupsRead,
+      duplicateRowsSkipped,
+      stopReason,
     };
   }
 
@@ -405,6 +504,14 @@ export function createSecureOvertureAssetQueryEngine(input: {
   maxSelectedRowGroups?: number;
   maxUnprunableRowGroups?: number;
   maxCoalescedSpanBytes?: number;
+  /**
+   * Stop the bounded traversal once this many candidates have been collected.
+   * Null reads until a budget stop. The predicate is injected so the caller's
+   * authoritative classifier decides what counts — the engine never embeds its
+   * own taxonomy rules.
+   */
+  candidateTarget?: number | null;
+  isCandidate?: (row: Record<string, unknown>) => boolean;
 }): OvertureAssetQueryEngine {
   assertRuntimeLeadPolicy(input.policy);
   const provider = requireProviderPolicy(input.policy, OVERTURE_PLACES_PROVIDER_ID);
@@ -436,6 +543,11 @@ export function createSecureOvertureAssetQueryEngine(input: {
   )) {
     throw new Error("Secure Overture engine limits must be positive integers");
   }
+  const candidateTarget = input.candidateTarget ?? null;
+  if (candidateTarget !== null &&
+    (!Number.isSafeInteger(candidateTarget) || candidateTarget < 1 || candidateTarget > 10_000)) {
+    throw new Error("Secure Overture engine candidate target must be a positive integer up to 10000");
+  }
   return trustOvertureAssetQueryEngine(new SecureOvertureAssetQueryEngine({
     policy: input.policy,
     capability: input.capability,
@@ -449,5 +561,7 @@ export function createSecureOvertureAssetQueryEngine(input: {
     maxSelectedRowGroups,
     maxUnprunableRowGroups,
     maxCoalescedSpanBytes,
+    candidateTarget,
+    isCandidate: input.isCandidate ?? (() => true),
   }));
 }

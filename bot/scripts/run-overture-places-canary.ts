@@ -27,11 +27,31 @@ import {
 } from "../src/lead-engine/providers/overture/range-http-transport.js";
 import { OvertureReleaseResolver } from "../src/lead-engine/providers/overture/release-resolver.js";
 import { createSecureOvertureAssetQueryEngine } from "../src/lead-engine/providers/overture/secure-asset-query-engine.js";
+import { overturePlaceRecordSchema } from "../src/lead-engine/providers/overture/schema.js";
+import { classifyOverturePoolCategory } from "../src/lead-engine/providers/overture/taxonomy.js";
 import {
   OVERTURE_PLACES_PROVIDER_ID,
   OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
   OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
 } from "../src/lead-engine/providers/overture/types.js";
+
+// Stop the bounded traversal once this many pool-service candidates are found.
+// The hard ceiling stays OVERTURE_CANARY_HARD_LIMITS.maxCandidates.
+const PHOENIX_CANARY_CANDIDATE_TARGET = 10;
+
+/**
+ * Candidate predicate for traversal stopping. Delegates to the same authoritative
+ * classifier the adapter uses, so traversal never applies its own taxonomy rules.
+ */
+function isPoolServiceCandidate(row: Record<string, unknown>): boolean {
+  const parsed = overturePlaceRecordSchema.safeParse(row);
+  if (!parsed.success) return false;
+  const decision = classifyOverturePoolCategory({
+    basicCategory: parsed.data.basic_category,
+    taxonomy: parsed.data.taxonomy,
+  });
+  return decision.disposition !== "excluded" && decision.disposition !== "missing";
+}
 
 const PHOENIX_CANARY_TARGET: GeographyTarget = Object.freeze({
   level: "grid_cell",
@@ -78,6 +98,12 @@ export interface OvertureCanaryReport {
   readonly budgetRemaining: Readonly<Record<string, number>>;
   readonly aggregateVerdict: string;
   readonly safetyWarnings: ReadonlyArray<string>;
+  // Aggregate bounded-traversal progress.
+  readonly candidateTarget: number;
+  readonly rowGroupsSelected: number;
+  readonly rowGroupsRead: number;
+  readonly duplicateRowsSkipped: number;
+  readonly traversalStopReason: string | null;
 }
 
 function positiveInteger(name: string, value: string | undefined): number {
@@ -226,6 +252,11 @@ export async function runOverturePlacesCanary(input: {
       budgetRemaining: snapshot.remaining,
       aggregateVerdict: "blocked_secure_transport_unavailable",
       safetyWarnings: ["secure_remote_geoparquet_transport_unavailable"],
+      candidateTarget: PHOENIX_CANARY_CANDIDATE_TARGET,
+      rowGroupsSelected: 0,
+      rowGroupsRead: 0,
+      duplicateRowsSkipped: 0,
+      traversalStopReason: null,
     };
   } finally {
     policy.cleanup();
@@ -295,6 +326,11 @@ async function runSecureOverturePlacesCanary(input: {
     rowsConsidered: snapshot.consumed.rowsRead,
     elapsedMs: snapshot.elapsedMs,
     budgetRemaining: snapshot.remaining,
+    candidateTarget: PHOENIX_CANARY_CANDIDATE_TARGET,
+    rowGroupsSelected: 0,
+    rowGroupsRead: 0,
+    duplicateRowsSkipped: 0,
+    traversalStopReason: null as string | null,
   });
 
   try {
@@ -357,6 +393,8 @@ async function runSecureOverturePlacesCanary(input: {
       transport: rangeTransport,
       audit: { record: (event) => contacted.add(event.destinationHost) },
       now: nowIso,
+      candidateTarget: PHOENIX_CANARY_CANDIDATE_TARGET,
+      isCandidate: isPoolServiceCandidate,
     });
     const provider = new OverturePlacesLiveDiscoveryProvider({
       policy,
@@ -397,6 +435,10 @@ async function runSecureOverturePlacesCanary(input: {
       reviewCount: audit?.reviewCount ?? 0,
       aggregateVerdict: failed ? verdictForCode(failureCode ?? "canary_error") : "completed",
       safetyWarnings: failureCode ? [failureCode] : [],
+      rowGroupsSelected: audit?.rowGroupsSelected ?? 0,
+      rowGroupsRead: audit?.rowGroupsRead ?? 0,
+      duplicateRowsSkipped: audit?.duplicateRowsSkipped ?? 0,
+      traversalStopReason: audit?.traversalStopReason ?? null,
     };
   } catch (error) {
     const code = error instanceof OverturePlacesError ? error.code : "canary_error";

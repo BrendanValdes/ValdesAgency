@@ -10,13 +10,20 @@ import {
 const text = z.string().trim().min(1).max(2_048);
 const category = z.string().trim().min(1).max(200);
 
+// Real Overture source rows carry an empty `property` for the record-level
+// source, and omit update_time entirely on some records. Accept what the
+// official data actually contains rather than an idealised shape.
 const sourceSchema = z.object({
-  property: text.nullable().optional(),
+  property: z.string().trim().max(2_048).nullable().optional(),
   dataset: text.nullable().optional(),
   record_id: text.nullable().optional(),
-  update_time: z.string().datetime().nullable().optional(),
+  update_time: z.string().trim().max(64).nullable().optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
 });
+
+// A contact list that Overture may omit entirely or pad with nulls.
+const contacts = z.array(text.nullable()).max(20).nullable().optional()
+  .transform((value) => (value ?? []).filter((entry): entry is string => typeof entry === "string"));
 
 const addressSchema = z.object({
   freeform: text.nullable(),
@@ -35,21 +42,34 @@ export const overturePlaceRecordSchema = z.object({
     common: z.record(z.string().min(2).max(20), text).default({}),
   }),
   basic_category: category.nullable(),
+  // Overture omits taxonomy entirely on some places, and omits the alternates or
+  // hierarchy arrays on many more. Missing means "no extra signal", so the shape
+  // is normalised to concrete arrays and classification falls back to
+  // basic_category, which is always projected. Taxonomy stays the authoritative
+  // classifier input wherever Overture supplies it.
   taxonomy: z.object({
-    primary: category.nullable(),
-    hierarchy: z.array(category).max(30),
-    alternates: z.array(category).max(30),
-  }),
+    primary: category.nullable().optional(),
+    hierarchy: z.array(category).max(30).nullable().optional(),
+    alternates: z.array(category).max(30).nullable().optional(),
+  }).nullable().optional().transform((value) => ({
+    primary: value?.primary ?? null,
+    hierarchy: value?.hierarchy ?? [],
+    alternates: value?.alternates ?? [],
+  })),
   confidence: z.number().min(0).max(1).nullable(),
+  // Absent operating_status means Overture makes no claim; treat as unknown
+  // rather than rejecting an otherwise valid place.
   operating_status: z.enum([
     "open",
     "temporarily_closed",
     "permanently_closed",
     "unknown",
-  ]),
-  websites: z.array(text).max(20),
-  emails: z.array(text).max(20),
-  phones: z.array(text).max(20),
+  ]).nullable().optional().transform((value) => value ?? "unknown"),
+  // Contact arrays are absent whenever Overture holds no such contact, and may
+  // contain null entries. Normalise to a dense array of real values.
+  websites: contacts,
+  emails: contacts,
+  phones: contacts,
   addresses: z.array(addressSchema).max(20),
   brand: text.nullable().optional(),
   geometry: z.object({

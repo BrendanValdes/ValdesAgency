@@ -78,6 +78,18 @@ export interface OverturePlaceSchemaDescriptor {
   }>;
 }
 
+/**
+ * Why a bounded candidate-yield traversal stopped. Aggregate only — never tied
+ * to an individual record.
+ */
+export type OvertureTraversalStopReason =
+  | "candidate_target_reached"
+  | "row_budget_exhausted"
+  | "byte_budget_exhausted"
+  | "request_budget_exhausted"
+  | "cancelled"
+  | "no_relevant_row_groups_remaining";
+
 export interface OvertureAssetQueryResult {
   readonly schema: OverturePlaceSchemaDescriptor;
   readonly records: ReadonlyArray<unknown>;
@@ -86,6 +98,11 @@ export interface OvertureAssetQueryResult {
   readonly downloadedBytes: number;
   readonly processedBytes: number;
   readonly rowsRead: number;
+  // Aggregate traversal progress.
+  readonly rowGroupsSelected: number;
+  readonly rowGroupsRead: number;
+  readonly duplicateRowsSkipped: number;
+  readonly stopReason: OvertureTraversalStopReason;
 }
 
 export interface OvertureAssetQueryInput {

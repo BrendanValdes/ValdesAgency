@@ -38,6 +38,7 @@ import {
   OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
   type OverturePlacesQueryPlan,
   type OvertureReleasePin,
+  type OvertureTraversalStopReason,
 } from "../overture/types.js";
 
 export interface OverturePlacesAdapterAudit {
@@ -56,6 +57,11 @@ export interface OverturePlacesAdapterAudit {
   readonly status: "complete" | "partial" | "failed";
   readonly failureCode: string | null;
   readonly budget: OvertureBudgetSnapshot;
+  // Aggregate bounded-traversal progress. Counts only — never per-record data.
+  readonly rowGroupsSelected: number;
+  readonly rowGroupsRead: number;
+  readonly duplicateRowsSkipped: number;
+  readonly traversalStopReason: OvertureTraversalStopReason | null;
 }
 
 function primaryName(record: OverturePlaceRecord): string | null {
@@ -339,6 +345,10 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         duplicateCount,
         status,
         failureCode: null,
+        rowGroupsSelected: result.rowGroupsSelected,
+        rowGroupsRead: result.rowGroupsRead,
+        duplicateRowsSkipped: result.duplicateRowsSkipped,
+        traversalStopReason: result.stopReason,
       });
       return { status, envelopes };
     } catch (error) {
@@ -355,6 +365,10 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         duplicateCount: 0,
         status: "failed",
         failureCode: failure.code,
+        rowGroupsSelected: 0,
+        rowGroupsRead: 0,
+        duplicateRowsSkipped: 0,
+        traversalStopReason: null,
       });
       return { status: "failed", envelopes: [envelope] };
     }

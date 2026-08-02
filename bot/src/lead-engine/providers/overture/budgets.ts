@@ -67,12 +67,16 @@ export const OVERTURE_CANARY_HARD_LIMITS: OvertureBudgetLimits = Object.freeze({
   // Official Places resolution is five documents: root, release, theme catalog,
   // place collection, and the one partition item covering the coverage cell.
   maxStacRequests: 5,
-  maxAssetRequests: 12,
+  // Phase 5A.2 calibration bounds: a bounded candidate-yield traversal may cross
+  // several row groups, so it needs more decoded rows and range requests than the
+  // single-group Phase 5A.1 proof. Byte, processed-byte, area, runtime, retry, and
+  // cost ceilings are unchanged.
+  maxAssetRequests: 20,
   maxAssetsInspected: 2,
   maxRowGroupsInspected: 64,
   maxDownloadedBytes: 32 * 1024 * 1024,
   maxProcessedBytes: 64 * 1024 * 1024,
-  maxRowsRead: 100,
+  maxRowsRead: 2_000,
   maxCandidates: 25,
   maxAreaSquareKm: 25,
   maxRuntimeMs: 60_000,

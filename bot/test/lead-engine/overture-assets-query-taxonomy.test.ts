@@ -116,9 +116,9 @@ describe("bounded typed Overture query planning", () => {
     expect(() => createOverturePlacesQueryPlan({
       releaseId: SYNTHETIC_OVERTURE_RELEASE,
       coverageCell: cell,
-      maxRows: 101,
+      maxRows: 2_001,
       maxAreaSquareKm: 25,
-    })).toThrow("between 1 and 100");
+    })).toThrow("between 1 and 2000");
   });
 
   it("rejects plans whose derived area or fingerprint was altered after planning", () => {
