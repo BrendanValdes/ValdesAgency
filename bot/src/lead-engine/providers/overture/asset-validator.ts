@@ -62,18 +62,34 @@ export function validateOvertureCatalogUrl(input: string, releaseId?: string): s
       category: "authorization_failed",
     });
   }
+  // Fixed templates only — no wildcards, no arbitrary themes, no caller-supplied
+  // paths, no generic STAC traversal. Theme is pinned to OVERTURE_THEME and type
+  // to OVERTURE_FEATURE_TYPE, so no other Overture theme is ever an approved
+  // destination. These are the only four official documents the resolver reads.
   const allowedPaths = releaseId
     ? new Set([
         `/${validateOvertureReleaseId(releaseId)}/catalog.json`,
-        `/${releaseId}/collections/places.json`,
+        `/${releaseId}/${OVERTURE_THEME}/catalog.json`,
+        `/${releaseId}/${OVERTURE_THEME}/${OVERTURE_FEATURE_TYPE}/collection.json`,
       ])
     : new Set(["/catalog.json"]);
-  if (!allowedPaths.has(url.pathname)) {
-    throw overtureFailure("asset_invalid", "Overture catalog URL path is outside the fixed catalog templates", {
-      category: "authorization_failed",
-    });
-  }
-  return url.href;
+  if (allowedPaths.has(url.pathname)) return url.href;
+  if (releaseId && OVERTURE_PLACES_ITEM_PATH(releaseId).test(url.pathname)) return url.href;
+  throw overtureFailure("asset_invalid", "Overture catalog URL path is outside the fixed catalog templates", {
+    category: "authorization_failed",
+  });
+}
+
+/**
+ * Official Places STAC Items live at a fixed zero-padded partition template under
+ * the pinned release/theme/type prefix, where the directory and the document
+ * share the same 5-digit partition id. This is a fixed shape with a bounded
+ * numeric segment — not a wildcard and not generic traversal.
+ */
+export function OVERTURE_PLACES_ITEM_PATH(releaseId: string): RegExp {
+  return new RegExp(
+    `^/${validateOvertureReleaseId(releaseId)}/${OVERTURE_THEME}/${OVERTURE_FEATURE_TYPE}/(\\d{5})/\\1\\.json$`,
+  );
 }
 
 export function validateOvertureAsset(input: {

@@ -64,7 +64,9 @@ const OVERTURE_BUDGET_USAGE_KEYS = Object.freeze([
 ] as const);
 
 export const OVERTURE_CANARY_HARD_LIMITS: OvertureBudgetLimits = Object.freeze({
-  maxStacRequests: 4,
+  // Official Places resolution is five documents: root, release, theme catalog,
+  // place collection, and the one partition item covering the coverage cell.
+  maxStacRequests: 5,
   maxAssetRequests: 12,
   maxAssetsInspected: 2,
   maxRowGroupsInspected: 64,

@@ -175,6 +175,9 @@ function pointInBounds(row: Record<string, unknown>, bounds: BoundingArea): bool
 
 interface EngineSpatialPlan extends OvertureRowGroupSpatialPlan {
   readonly projectedUncompressedBytes: number;
+  // Byte span covering just the projected column chunks of this row group.
+  readonly projectedStartOffset: number;
+  readonly projectedEndOffset: number;
 }
 
 function buildSpatialPlans(
@@ -184,10 +187,14 @@ function buildSpatialPlans(
   return metadata.rowGroups.map((group, index) => {
     let compressed = 0;
     let uncompressed = 0;
+    let spanStart = Number.POSITIVE_INFINITY;
+    let spanEnd = 0;
     for (const column of group.columns) {
       if (selectedColumns.has(topLevel(column.path))) {
         compressed += column.compressedBytes;
         uncompressed += column.uncompressedBytes;
+        spanStart = Math.min(spanStart, column.startOffset);
+        spanEnd = Math.max(spanEnd, column.endOffset);
       }
     }
     return {
@@ -196,6 +203,8 @@ function buildSpatialPlans(
       rowCount: group.rowCount,
       projectedCompressedBytes: compressed,
       projectedUncompressedBytes: uncompressed,
+      projectedStartOffset: Number.isFinite(spanStart) ? spanStart : 0,
+      projectedEndOffset: spanEnd,
       extent: extentForGroup(metadata, index),
     };
   });
@@ -225,6 +234,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
   readonly #maxAssetsInspected: number;
   readonly #maxSelectedRowGroups: number;
   readonly #maxUnprunableRowGroups: number;
+  readonly #maxCoalescedSpanBytes: number;
 
   constructor(input: {
     policy: RuntimeLeadPolicy;
@@ -238,6 +248,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     maxAssetsInspected: number;
     maxSelectedRowGroups: number;
     maxUnprunableRowGroups: number;
+    maxCoalescedSpanBytes: number;
   }) {
     this.#policy = input.policy;
     this.#capability = input.capability;
@@ -250,6 +261,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     this.#maxAssetsInspected = input.maxAssetsInspected;
     this.#maxSelectedRowGroups = input.maxSelectedRowGroups;
     this.#maxUnprunableRowGroups = input.maxUnprunableRowGroups;
+    this.#maxCoalescedSpanBytes = input.maxCoalescedSpanBytes;
   }
 
   async query(
@@ -315,11 +327,23 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
         const uncompressedByIndex = new Map(
           spatialPlans.map((group) => [group.index, group.projectedUncompressedBytes]),
         );
+        const spanByIndex = new Map(
+          spatialPlans.map((group) => [group.index, [group.projectedStartOffset, group.projectedEndOffset] as const]),
+        );
 
         for (const group of selection.selected) {
           if (rowsRead >= maxRows) break;
           const toRead = Math.min(group.rowCount, maxRows - rowsRead);
           if (toRead <= 0) break;
+          // Warm the bounded range cache with the row group's projected column
+          // span in a single range read. The cache serves enclosing sub-ranges,
+          // so each column chunk below is a cache hit instead of its own request.
+          // This lowers the request count for identical bytes; it does not widen
+          // any byte, capability, or destination limit.
+          const span = spanByIndex.get(group.index);
+          if (span && span[1] > span[0] && span[1] - span[0] <= this.#maxCoalescedSpanBytes) {
+            await source.slice(span[0], span[1]);
+          }
           const rows = await this.#reader.readColumns({
             footer,
             source,
@@ -380,6 +404,7 @@ export function createSecureOvertureAssetQueryEngine(input: {
   maxAssetsInspected?: number;
   maxSelectedRowGroups?: number;
   maxUnprunableRowGroups?: number;
+  maxCoalescedSpanBytes?: number;
 }): OvertureAssetQueryEngine {
   assertRuntimeLeadPolicy(input.policy);
   const provider = requireProviderPolicy(input.policy, OVERTURE_PLACES_PROVIDER_ID);
@@ -400,6 +425,12 @@ export function createSecureOvertureAssetQueryEngine(input: {
   const maxAssetsInspected = input.maxAssetsInspected ?? 2;
   const maxSelectedRowGroups = input.maxSelectedRowGroups ?? 16;
   const maxUnprunableRowGroups = input.maxUnprunableRowGroups ?? 4;
+  // Never coalesce more than one bounded range request's worth of bytes.
+  const maxCoalescedSpanBytes = input.maxCoalescedSpanBytes ?? 8 * 1024 * 1024;
+  if (!Number.isSafeInteger(maxCoalescedSpanBytes) || maxCoalescedSpanBytes < 1 ||
+    maxCoalescedSpanBytes > 8 * 1024 * 1024) {
+    throw new Error("Secure Overture engine coalesced span must be a positive integer up to 8 MiB");
+  }
   if (![maxAssetsInspected, maxSelectedRowGroups, maxUnprunableRowGroups].every(
     (value) => Number.isSafeInteger(value) && value >= 1,
   )) {
@@ -417,5 +448,6 @@ export function createSecureOvertureAssetQueryEngine(input: {
     maxAssetsInspected,
     maxSelectedRowGroups,
     maxUnprunableRowGroups,
+    maxCoalescedSpanBytes,
   }));
 }

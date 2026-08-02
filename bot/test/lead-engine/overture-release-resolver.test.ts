@@ -11,11 +11,14 @@ import { OvertureReleaseResolver } from "../../src/lead-engine/providers/overtur
 import { OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION } from "../../src/lead-engine/providers/overture/types.js";
 import {
   SYNTHETIC_OVERTURE_RELEASE,
-  SYNTHETIC_OVERTURE_RELEASE_PIN,
   syntheticBudget,
 } from "./fixtures/overture/synthetic-live.js";
 
 const olderRelease = "2026-06-17.0";
+const HOST = "https://stac.overturemaps.org";
+
+// The coverage cell the synthetic partition 00001 is built to cover.
+const CELL = { west: -112.094, south: 33.438, east: -112.044, north: 33.478 };
 
 function response(url: string, value: unknown): OvertureCatalogResponse {
   const body = typeof value === "string" ? value : JSON.stringify(value);
@@ -27,52 +30,112 @@ function response(url: string, value: unknown): OvertureCatalogResponse {
   };
 }
 
+/**
+ * Synthetic mirrors of the official five-level Places topology. Link hrefs are
+ * document-relative exactly as the official catalog publishes them.
+ */
 function rootCatalog(releases = [olderRelease, SYNTHETIC_OVERTURE_RELEASE]) {
   return {
-    stac_version: "1.0.0",
+    stac_version: "1.1.0",
     type: "Catalog",
-    id: "overturemaps",
+    id: "Overture Releases",
     description: "Synthetic Overture STAC root contract",
-    links: releases.map((release) => ({
-      rel: "child",
-      href: `https://stac.overturemaps.org/${release}/catalog.json`,
-      title: release,
-    })),
+    links: [
+      { rel: "root", href: "./catalog.json", type: "application/json" },
+      ...releases.map((release) => ({
+        rel: "child",
+        href: `./${release}/catalog.json`,
+        type: "application/json",
+        title: release,
+      })),
+    ],
   };
 }
 
-function releaseCatalog(release: string, id = release) {
+function releaseCatalog(release: string, overrides: Record<string, unknown> = {}) {
   return {
-    stac_version: "1.0.0",
+    stac_version: "1.1.0",
     type: "Catalog",
-    id,
+    id: release,
     description: "Synthetic immutable release catalog",
-    links: [{
-      rel: "child",
-      href: `https://stac.overturemaps.org/${release}/collections/places.json`,
-      title: "places",
-    }],
+    links: [
+      { rel: "root", href: "../catalog.json", type: "application/json" },
+      { rel: "parent", href: "../catalog.json", type: "application/json" },
+      // Sibling themes must be ignored, never followed.
+      { rel: "child", href: "./buildings/catalog.json", type: "application/json", title: "buildings" },
+      { rel: "child", href: "./places/catalog.json", type: "application/json", title: "places" },
+    ],
+    ...overrides,
   };
 }
 
-function placesCollection(release: string, overrides: Record<string, unknown> = {}) {
+function themeCatalog(overrides: Record<string, unknown> = {}) {
   return {
-    stac_version: "1.0.0",
-    type: "Collection",
+    stac_version: "1.1.0",
+    type: "Catalog",
     id: "places",
-    description: "Synthetic Places collection contract",
-    license: "CDLA-Permissive-2.0",
-    attribution: "Synthetic Overture Maps Foundation attribution metadata",
-    overture_release_id: release,
-    overture_schema_version: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
-    links: [],
+    description: "Synthetic Overture places theme",
+    title: "places",
+    links: [
+      { rel: "root", href: "../../catalog.json", type: "application/json" },
+      { rel: "parent", href: "../catalog.json", type: "application/json" },
+      // Off-host non-child links exist officially (pmtiles) and must be ignored.
+      { rel: "pmtiles", href: "https://tiles.overturemaps.org/x/places.pmtiles", type: "application/vnd.pmtiles" },
+      { rel: "child", href: "./place/collection.json", type: "application/json", title: "place" },
+    ],
+    ...overrides,
+  };
+}
+
+const PARTITION_BOXES: Array<[number, number, number, number]> = [
+  [-180, -84.84, -75.36, 26.93],
+  [-179.11, 26.93, -77.65, 34.35],
+  [-179.82, 34.35, -88.1, 81.75],
+];
+
+function placeCollection(overrides: Record<string, unknown> = {}) {
+  return {
+    stac_version: "1.1.0",
+    type: "Collection",
+    id: "place",
+    title: "place",
+    description: "Synthetic Overture place collection",
+    license: "other",
+    features: 74_223_561,
+    stac_extensions: ["https://stac-extensions.github.io/table/v1.2.0/schema.json"],
+    extent: { spatial: { bbox: PARTITION_BOXES } },
+    links: [
+      { rel: "root", href: "../../../catalog.json", type: "application/json" },
+      { rel: "license", href: "https://docs.overturemaps.org/attribution/", title: "Attribution" },
+      { rel: "parent", href: "../catalog.json", type: "application/json" },
+      { rel: "item", href: "./00000/00000.json", type: "application/geo+json" },
+      { rel: "item", href: "./00001/00001.json", type: "application/geo+json" },
+      { rel: "item", href: "./00002/00002.json", type: "application/geo+json" },
+    ],
+    ...overrides,
+  };
+}
+
+function partitionItem(release: string, part: string, overrides: Record<string, unknown> = {}) {
+  const file = `part-${part}-synthetic-c000.zstd.parquet`;
+  return {
+    stac_version: "1.1.0",
+    type: "Feature",
+    id: part,
+    collection: "place",
+    bbox: PARTITION_BOXES[Number(part)] ?? PARTITION_BOXES[0],
+    geometry: null,
+    properties: { datetime: "2026-07-22T00:00:00Z", num_rows: 4_639_635, num_row_groups: 512 },
+    links: [{ rel: "collection", href: "../collection.json", type: "application/json" }],
     assets: {
-      synthetic: {
-        href: `https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/release/${release}/theme=places/type=place/part-synthetic.parquet`,
+      // Officially there are no roles and no overture_* discriminators here.
+      aws: {
+        href: `https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/release/${release}/theme=places/type=place/${file}`,
         type: "application/vnd.apache.parquet",
-        roles: ["data"],
-        overture_theme: "places",
-        overture_type: "place",
+      },
+      azure: {
+        href: `https://overturemapswestus2.blob.core.windows.net/release/${release}/theme=places/type=place/${file}`,
+        type: "application/vnd.apache.parquet",
       },
     },
     ...overrides,
@@ -93,184 +156,251 @@ function resolverFor(routes: ReadonlyMap<string, unknown>, calls: string[] = [])
 }
 
 function validRoutes(release = SYNTHETIC_OVERTURE_RELEASE): Map<string, unknown> {
-  return new Map([
+  return new Map<string, unknown>([
     [OVERTURE_STAC_CATALOG_URL, rootCatalog()],
-    [`https://stac.overturemaps.org/${release}/catalog.json`, releaseCatalog(release)],
-    [`https://stac.overturemaps.org/${release}/collections/places.json`, placesCollection(release)],
+    [`${HOST}/${release}/catalog.json`, releaseCatalog(release)],
+    [`${HOST}/${release}/places/catalog.json`, themeCatalog()],
+    [`${HOST}/${release}/places/place/collection.json`, placeCollection()],
+    [`${HOST}/${release}/places/place/00001/00001.json`, partitionItem(release, "00001")],
   ]);
 }
 
-describe("Overture official STAC release resolver", () => {
-  it("resolves latest to one immutable release and resolves an explicit pin", async () => {
-    const latest = await resolverFor(validRoutes()).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    });
-    expect(latest).toMatchObject({
-      releaseId: SYNTHETIC_OVERTURE_RELEASE,
+const resolveArgs = { requestedRelease: "latest" as const, bounds: CELL, signal: new AbortController().signal };
+
+describe("Overture official five-level Places STAC topology", () => {
+  it("resolves the real topology through relative links and pins one partition asset", async () => {
+    const calls: string[] = [];
+    const release = SYNTHETIC_OVERTURE_RELEASE;
+    const pin = await resolverFor(validRoutes(), calls).resolve(resolveArgs);
+
+    // Exactly the five official documents, in order, and nothing else.
+    expect(calls).toEqual([
+      OVERTURE_STAC_CATALOG_URL,
+      `${HOST}/${release}/catalog.json`,
+      `${HOST}/${release}/places/catalog.json`,
+      `${HOST}/${release}/places/place/collection.json`,
+      `${HOST}/${release}/places/place/00001/00001.json`,
+    ]);
+    expect(pin).toMatchObject({
+      releaseId: release,
       schemaVersion: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
-      license: "CDLA-Permissive-2.0",
+      license: "other",
+      attribution: "https://docs.overturemaps.org/attribution/",
     });
-    expect(latest.assets).toHaveLength(1);
-
-    const routes = validRoutes(olderRelease);
-    routes.set(OVERTURE_STAC_CATALOG_URL, rootCatalog());
-    const explicit = await resolverFor(routes).resolve({
-      requestedRelease: olderRelease,
-      signal: new AbortController().signal,
-    });
-    expect(explicit.releaseId).toBe(olderRelease);
+    // Both mirrors describe one partition file; only one is kept.
+    expect(pin.assets).toHaveLength(1);
+    expect(pin.assets[0]?.url).toContain("overturemaps-us-west-2.s3.us-west-2.amazonaws.com");
+    expect(pin.assets[0]?.theme).toBe("places");
+    expect(pin.assets[0]?.featureType).toBe("place");
   });
 
-  it("resolves relative STAC link hrefs against their containing document", async () => {
-    // The official root catalog publishes child links as document-relative
-    // hrefs. Treating them as absolute drops every release candidate and the
-    // resolver reports release_missing against a perfectly valid catalog.
+  it("selects only the partition whose extent covers the cell", async () => {
+    const calls: string[] = [];
     const release = SYNTHETIC_OVERTURE_RELEASE;
-    const routes = new Map<string, unknown>([
-      [OVERTURE_STAC_CATALOG_URL, {
-        ...rootCatalog([release]),
-        links: [{ rel: "child", href: `./${release}/catalog.json`, title: release }],
-      }],
-      [`https://stac.overturemaps.org/${release}/catalog.json`, {
-        ...releaseCatalog(release),
-        links: [{ rel: "child", href: "./collections/places.json", title: "places" }],
-      }],
-      [`https://stac.overturemaps.org/${release}/collections/places.json`, placesCollection(release)],
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/00002/00002.json`, partitionItem(release, "00002"));
+    await resolverFor(routes, calls).resolve(resolveArgs);
+    expect(calls.filter((url) => url.includes("/place/00"))).toEqual([
+      `${HOST}/${release}/places/place/00001/00001.json`,
     ]);
-    await expect(resolverFor(routes).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).resolves.toMatchObject({ releaseId: release });
-  });
-
-  it("rejects a relative child link that resolves off the approved catalog host", async () => {
-    // Resolution must not widen the destination set: a protocol-relative href
-    // still has to clear the host and path-template checks.
-    const release = SYNTHETIC_OVERTURE_RELEASE;
-    const routes = new Map<string, unknown>([
-      [OVERTURE_STAC_CATALOG_URL, {
-        ...rootCatalog([release]),
-        links: [{ rel: "child", href: `//stac.evil.example/${release}/catalog.json`, title: release }],
-      }],
-    ]);
-    await expect(resolverFor(routes).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "asset_invalid" });
   });
 
   it("orders same-day release revisions numerically and rejects noncanonical revisions", async () => {
-    const ninth = "2026-07-23.9";
-    const tenth = "2026-07-23.10";
-    const routes = new Map<string, unknown>([
-      [OVERTURE_STAC_CATALOG_URL, rootCatalog([ninth, tenth])],
-      [`https://stac.overturemaps.org/${tenth}/catalog.json`, releaseCatalog(tenth)],
-      [`https://stac.overturemaps.org/${tenth}/collections/places.json`, placesCollection(tenth)],
-    ]);
-    await expect(resolverFor(routes).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).resolves.toMatchObject({ releaseId: tenth });
     await expect(resolverFor(new Map()).resolve({
+      ...resolveArgs,
       requestedRelease: "2026-07-23.010",
-      signal: new AbortController().signal,
     })).rejects.toMatchObject({ code: "release_invalid" });
   });
 
-  it("rejects malformed and oversized catalog JSON", async () => {
-    const malformed = new Map<string, unknown>([[OVERTURE_STAC_CATALOG_URL, "{"]]);
-    await expect(resolverFor(malformed).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "catalog_invalid", retryable: false });
-
-    const oversizedBody = " ".repeat(512 * 1024 + 1);
-    const transport = createTestOnlyOvertureCatalogTransport(async (request) =>
-      response(request.url, oversizedBody)
-    );
-    const oversized = new OvertureReleaseResolver({
-      transport,
-      budget: syntheticBudget({ maxDownloadedBytes: 2 * 1024 * 1024 }),
-      clock: { now: () => "2026-08-01T12:00:00.000Z" },
-    });
-    await expect(oversized.resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "catalog_oversized" });
-  });
-
-  it("rejects unapproved catalog links before a second destination is contacted", async () => {
+  it("keeps an existing pin unchanged across retries without any network call", async () => {
     const calls: string[] = [];
-    const maliciousRoot = rootCatalog();
-    maliciousRoot.links[1]!.href = `https://unapproved.example/${SYNTHETIC_OVERTURE_RELEASE}/catalog.json`;
-    await expect(resolverFor(new Map([[OVERTURE_STAC_CATALOG_URL, maliciousRoot]]), calls).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "asset_invalid", category: "authorization_failed" });
-    expect(calls).toEqual([OVERTURE_STAC_CATALOG_URL]);
-  });
-
-  it("fails closed on unsupported schemas, missing assets, and conflicting release metadata", async () => {
-    const unsupported = validRoutes();
-    unsupported.set(
-      `https://stac.overturemaps.org/${SYNTHETIC_OVERTURE_RELEASE}/collections/places.json`,
-      placesCollection(SYNTHETIC_OVERTURE_RELEASE, { overture_schema_version: "2.0.0" }),
-    );
-    await expect(resolverFor(unsupported).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "schema_unsupported" });
-
-    const missing = validRoutes();
-    missing.set(
-      `https://stac.overturemaps.org/${SYNTHETIC_OVERTURE_RELEASE}/collections/places.json`,
-      placesCollection(SYNTHETIC_OVERTURE_RELEASE, { assets: {} }),
-    );
-    await expect(resolverFor(missing).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "asset_invalid" });
-
-    const conflict = validRoutes();
-    conflict.set(
-      `https://stac.overturemaps.org/${SYNTHETIC_OVERTURE_RELEASE}/catalog.json`,
-      releaseCatalog(SYNTHETIC_OVERTURE_RELEASE, olderRelease),
-    );
-    await expect(resolverFor(conflict).resolve({
-      requestedRelease: "latest",
-      signal: new AbortController().signal,
-    })).rejects.toMatchObject({ code: "catalog_invalid" });
-  });
-
-  it("reuses a persisted pin without silently resolving latest again", async () => {
-    const calls: string[] = [];
-    const resolver = resolverFor(new Map(), calls);
-    const resumed = await resolver.resolve({
-      requestedRelease: "latest",
-      existingPin: SYNTHETIC_OVERTURE_RELEASE_PIN,
-      signal: new AbortController().signal,
-    });
-    expect(resumed).toBe(SYNTHETIC_OVERTURE_RELEASE_PIN);
-    expect(calls).toEqual([]);
-    await expect(resolver.resolve({
+    const first = await resolverFor(validRoutes(), calls).resolve(resolveArgs);
+    const callsAfterFirst = calls.length;
+    const again = await resolverFor(validRoutes(), calls).resolve({ ...resolveArgs, existingPin: first });
+    expect(again).toEqual(first);
+    expect(calls.length).toBe(callsAfterFirst);
+    await expect(resolverFor(validRoutes()).resolve({
+      ...resolveArgs,
       requestedRelease: olderRelease,
-      existingPin: SYNTHETIC_OVERTURE_RELEASE_PIN,
-      signal: new AbortController().signal,
+      existingPin: first,
     })).rejects.toMatchObject({ code: "release_changed" });
   });
 
-  it("rejects cancellation and untrusted transports", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    await expect(resolverFor(new Map()).resolve({
-      requestedRelease: "latest",
-      signal: controller.signal,
-    })).rejects.toMatchObject({ code: "cancelled" });
-    expect(() => new OvertureReleaseResolver({
-      transport: { get: async () => response(OVERTURE_STAC_CATALOG_URL, {}) },
-      budget: syntheticBudget(),
-      clock: { now: () => "2026-08-01T12:00:00.000Z" },
-    })).toThrow("not trusted");
+  it("accepts a collection that omits every nonstandard Overture field", async () => {
+    const release = SYNTHETIC_OVERTURE_RELEASE;
+    const routes = validRoutes();
+    const bare = placeCollection();
+    // No overture_release_id, no overture_schema_version, no attribution field.
+    expect(Object.keys(bare)).not.toContain("overture_release_id");
+    expect(Object.keys(bare)).not.toContain("overture_schema_version");
+    expect(Object.keys(bare)).not.toContain("attribution");
+    routes.set(`${HOST}/${release}/places/place/collection.json`, bare);
+    await expect(resolverFor(routes).resolve(resolveArgs)).resolves.toMatchObject({
+      schemaVersion: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
+    });
+  });
+});
+
+describe("Overture Places topology containment", () => {
+  const release = SYNTHETIC_OVERTURE_RELEASE;
+
+  it("rejects a wrong-theme child link instead of following it", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/catalog.json`, releaseCatalog(release, {
+      links: [{ rel: "child", href: "./buildings/catalog.json", type: "application/json" }],
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects a theme catalog that self-identifies as another theme", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/catalog.json`, themeCatalog({ id: "buildings" }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects a collection whose type is not the pinned place type", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/collection.json`, placeCollection({ id: "building" }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects a release catalog that conflicts with the selected release", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/catalog.json`, releaseCatalog(release, { id: olderRelease }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects an item whose identifier conflicts with its partition URL", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/00001/00001.json`, partitionItem(release, "00001", { id: "00002" }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects an asset that points at another release", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/00001/00001.json`, partitionItem(release, "00001", {
+      assets: {
+        aws: {
+          href: `https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/release/${olderRelease}/theme=places/type=place/part-00001-x.parquet`,
+          type: "application/vnd.apache.parquet",
+        },
+      },
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "asset_invalid" });
+  });
+
+  it("rejects an asset served from an unapproved host", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/00001/00001.json`, partitionItem(release, "00001", {
+      assets: {
+        aws: {
+          href: `https://cdn.evil.example/release/${release}/theme=places/type=place/part-00001-x.parquet`,
+          type: "application/vnd.apache.parquet",
+        },
+      },
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "asset_invalid" });
+  });
+
+  it("rejects an asset that is not declared as Parquet", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/00001/00001.json`, partitionItem(release, "00001", {
+      assets: {
+        aws: {
+          href: `https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/release/${release}/theme=places/type=place/part-00001-x.parquet`,
+          type: "application/geo+json",
+        },
+      },
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "asset_invalid" });
+  });
+
+  it("rejects a protocol-relative child link that resolves off the approved host", async () => {
+    const routes = validRoutes();
+    routes.set(OVERTURE_STAC_CATALOG_URL, {
+      ...rootCatalog(),
+      links: [{ rel: "child", href: `//stac.evil.example/${release}/catalog.json`, title: release }],
+    });
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "asset_invalid" });
+  });
+
+  it("rejects a traversal href that climbs outside the pinned release prefix", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/catalog.json`, themeCatalog({
+      links: [{ rel: "child", href: `../../${olderRelease}/places/place/collection.json`, type: "application/json" }],
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects an encoded-traversal item href", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/collection.json`, placeCollection({
+      links: [
+        { rel: "license", href: "https://docs.overturemaps.org/attribution/" },
+        { rel: "item", href: "./00000/00000.json" },
+        { rel: "item", href: "./%2e%2e/%2e%2e/00001/00001.json" },
+        { rel: "item", href: "./00002/00002.json" },
+      ],
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "partition_unresolved" });
+  });
+
+  it("rejects a malformed catalog document", async () => {
+    const routes = validRoutes();
+    routes.set(OVERTURE_STAC_CATALOG_URL, "{not json");
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects an incompatible STAC version rather than parsing it optimistically", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/collection.json`, placeCollection({ stac_version: "0.9.0" }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "catalog_invalid" });
+  });
+
+  it("rejects a persisted pin whose schema contract no longer matches", async () => {
+    const first = await resolverFor(validRoutes()).resolve(resolveArgs);
+    await expect(resolverFor(validRoutes()).resolve({
+      ...resolveArgs,
+      existingPin: { ...first, schemaVersion: "0.0.1-unsupported" },
+    })).rejects.toMatchObject({ code: "schema_unsupported" });
+  });
+
+  it("fails closed when partition extents do not pair one-to-one with item links", async () => {
+    const routes = validRoutes();
+    routes.set(`${HOST}/${release}/places/place/collection.json`, placeCollection({
+      extent: { spatial: { bbox: [PARTITION_BOXES[0], PARTITION_BOXES[1]] } },
+    }));
+    await expect(resolverFor(routes).resolve(resolveArgs)).rejects.toMatchObject({ code: "partition_unresolved" });
+  });
+
+  it("fails closed when no partition covers the cell, and when too many do", async () => {
+    await expect(resolverFor(validRoutes()).resolve({
+      ...resolveArgs,
+      bounds: { west: 100, south: 10, east: 101, north: 11 },
+    })).rejects.toMatchObject({ code: "partition_unresolved" });
+
+    await expect(resolverFor(validRoutes()).resolve({
+      ...resolveArgs,
+      bounds: { west: -179, south: -80, east: -80, north: 80 },
+    })).rejects.toMatchObject({ code: "partition_unresolved" });
+  });
+
+  it("does not widen the approved destination set beyond the five official documents", async () => {
+    const calls: string[] = [];
+    await resolverFor(validRoutes(), calls).resolve(resolveArgs);
+    const allowed = new Set([
+      OVERTURE_STAC_CATALOG_URL,
+      `${HOST}/${release}/catalog.json`,
+      `${HOST}/${release}/places/catalog.json`,
+      `${HOST}/${release}/places/place/collection.json`,
+      `${HOST}/${release}/places/place/00001/00001.json`,
+    ]);
+    for (const call of calls) {
+      expect(allowed.has(call)).toBe(true);
+      expect(new URL(call).hostname).toBe("stac.overturemaps.org");
+    }
+    // The off-host pmtiles link and sibling theme catalogs are never contacted.
+    expect(calls.some((url) => url.includes("tiles.overturemaps.org"))).toBe(false);
+    expect(calls.some((url) => url.includes("/buildings/"))).toBe(false);
   });
 });

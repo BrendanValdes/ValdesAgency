@@ -355,6 +355,68 @@ describe("secure Overture asset query engine", () => {
     expect(result.processedBytes).toBeLessThanOrEqual(consumed.processedBytes + result.processedBytes);
   });
 
+  it("warms one coalesced range per selected group so column chunks are cache hits", async () => {
+    // Official Places parts split each row group across one chunk per column.
+    // Without a single warming read per group the projected columns would cost
+    // one range request each and exhaust the bounded asset-request budget.
+    const ranges: Array<[number, number]> = [];
+    const live = syntheticLivePolicy();
+    try {
+      const transport = createTestOnlyOvertureRangeHttpTransport(async (request) => {
+        ranges.push([request.start, request.endExclusive]);
+        const body = Buffer.alloc(request.endExclusive - request.start);
+        if (request.start === 0 && request.endExclusive >= 4) body.write("PAR1", 0, "ascii");
+        return {
+          status: 206,
+          headers: {
+            "content-type": "application/octet-stream",
+            "content-encoding": "identity",
+            "content-range": `bytes ${request.start}-${request.endExclusive - 1}/${RANGE_TOTAL}`,
+            "content-length": String(request.endExclusive - request.start),
+            "etag": '"engine-fixture"',
+          },
+          body,
+          connectedAddress: "203.0.113.10",
+          destinationHost: new URL(request.asset.url).hostname,
+          headerBytes: 200,
+        };
+      });
+      const metadata = craftMetadata([{ rows: 2, projectedBytes: 512, extent: INSIDE }]);
+      const engine = createSecureOvertureAssetQueryEngine({
+        policy: live.policy,
+        capability: live.capability,
+        runId: "run-synthetic-overture",
+        assessmentId: "scope-synthetic-overture",
+        transport,
+        reader: {
+          async readMetadata() {
+            return { metadata, raw: { placeholder: true } as never };
+          },
+          async readColumns(request) {
+            // Every projected column chunk sits inside the warmed span, so each
+            // of these reads must be served from cache, not from the network.
+            for (const _column of request.columns) await request.source.slice(4, 300);
+            return [place("in-cell", -112.07, 33.45)];
+          },
+        },
+        now: () => "2026-08-01T12:00:00.000Z",
+      });
+      await engine.query({
+        release: SYNTHETIC_OVERTURE_RELEASE_PIN,
+        coverageCell: CELL,
+        plan: syntheticQueryPlan(),
+        signal: new AbortController().signal,
+        budget: syntheticBudget(),
+      });
+      // One warming read for the group's projected span; the 13 column reads add
+      // no further requests. Well under the bounded per-run asset-request cap.
+      expect(ranges.length).toBeLessThanOrEqual(2);
+      expect(ranges.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      live.cleanup();
+    }
+  });
+
   it("fails closed with overture_data_layout_unsupported when a required column is absent", async () => {
     const metadata = craftMetadata([{ rows: 1, projectedBytes: 500, extent: INSIDE }]);
     // Strip the geometry column from the descriptor to simulate a foreign layout.

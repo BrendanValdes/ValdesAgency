@@ -101,7 +101,8 @@ export function syntheticQueryPlan(
 }
 
 export const SYNTHETIC_OVERTURE_BUDGET_LIMITS: OvertureBudgetLimits = Object.freeze({
-  maxStacRequests: 4,
+  // Five official Places documents: root, release, theme, collection, partition.
+  maxStacRequests: 5,
   maxAssetRequests: 16,
   maxAssetsInspected: 4,
   maxRowGroupsInspected: 64,

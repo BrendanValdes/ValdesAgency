@@ -50,15 +50,35 @@ describe("Overture official asset validation", () => {
     expect(validateOvertureCatalogUrl("https://stac.overturemaps.org/catalog.json")).toBe(
       "https://stac.overturemaps.org/catalog.json",
     );
-    expect(validateOvertureCatalogUrl(
-      `https://stac.overturemaps.org/${SYNTHETIC_OVERTURE_RELEASE}/collections/places.json`,
-      SYNTHETIC_OVERTURE_RELEASE,
-    )).toContain("/collections/places.json");
+    // The four official per-release documents, and nothing else.
+    for (const path of [
+      `/${SYNTHETIC_OVERTURE_RELEASE}/catalog.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/catalog.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/collection.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/00001/00001.json`,
+    ]) {
+      expect(validateOvertureCatalogUrl(
+        `https://stac.overturemaps.org${path}`,
+        SYNTHETIC_OVERTURE_RELEASE,
+      )).toBe(`https://stac.overturemaps.org${path}`);
+    }
     expect(() => validateOvertureCatalogUrl("https://redirect.invalid/catalog.json")).toThrow("host");
-    expect(() => validateOvertureCatalogUrl(
-      `https://stac.overturemaps.org/${SYNTHETIC_OVERTURE_RELEASE}/collections/buildings.json`,
-      SYNTHETIC_OVERTURE_RELEASE,
-    )).toThrow("templates");
+    for (const rejected of [
+      // The previously assumed collection path does not exist officially.
+      `/${SYNTHETIC_OVERTURE_RELEASE}/collections/places.json`,
+      // No other theme, type, or partition shape is an approved destination.
+      `/${SYNTHETIC_OVERTURE_RELEASE}/buildings/catalog.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/building/collection.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/0001/0001.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/00001/00002.json`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/00001/00001.json.bak`,
+      `/${SYNTHETIC_OVERTURE_RELEASE}/places/place/`,
+    ]) {
+      expect(() => validateOvertureCatalogUrl(
+        `https://stac.overturemaps.org${rejected}`,
+        SYNTHETIC_OVERTURE_RELEASE,
+      )).toThrow("templates");
+    }
   });
 });
 

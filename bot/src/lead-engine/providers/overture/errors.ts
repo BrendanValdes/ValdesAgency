@@ -44,7 +44,11 @@ export type OverturePlacesErrorCode =
   // The official asset layout cannot support safe bounded row-group pruning or
   // projection within the canary budget; the reader fails closed rather than
   // scanning the asset.
-  | "overture_data_layout_unsupported";
+  | "overture_data_layout_unsupported"
+  // The official place collection could not be paired one-to-one with partition
+  // extents, covers no partition for the coverage cell, or spans more partitions
+  // than the bounded run may read. Never widened by guessing a partition.
+  | "partition_unresolved";
 
 export class OverturePlacesError extends Error {
   readonly code: OverturePlacesErrorCode;

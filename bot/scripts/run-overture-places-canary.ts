@@ -253,6 +253,7 @@ function verdictForCode(code: string): string {
     "asset_identity_changed",
     "result_invalid",
     "query_invalid",
+    "partition_unresolved",
   ];
   if (environment.includes(code)) return "blocked_environment";
   if (dataLayout.includes(code)) return "blocked_overture_data_layout";
@@ -326,7 +327,11 @@ async function runSecureOverturePlacesCanary(input: {
       clock: { now: nowIso },
     });
     contacted.add(OVERTURE_CATALOG_HOST);
-    const release = await resolver.resolve({ requestedRelease: args.release, signal: controller.signal });
+    const release = await resolver.resolve({
+      requestedRelease: args.release,
+      bounds: cell.bounds,
+      signal: controller.signal,
+    });
 
     const plan = createOverturePlacesQueryPlan({
       releaseId: release.releaseId,
