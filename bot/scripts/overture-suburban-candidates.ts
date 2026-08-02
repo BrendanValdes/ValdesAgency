@@ -98,8 +98,18 @@ export interface SuburbanDiscoveryOutcome {
   readonly elapsedMs: number;
 }
 
-export async function discoverSuburbanPhoenixCandidates(): Promise<SuburbanDiscoveryOutcome> {
-  const limits = SUBURBAN_CANARY_LIMITS;
+export async function discoverSuburbanPhoenixCandidates(options: {
+  maxCells?: number;
+  targetWebsiteCandidates?: number;
+  maxAcceptedCandidates?: number;
+} = {}): Promise<SuburbanDiscoveryOutcome> {
+  const maxCells = options.maxCells ?? SUBURBAN_MAX_CELLS;
+  const targetWebsiteCandidates = options.targetWebsiteCandidates ?? SUBURBAN_TARGET_WEBSITE_CANDIDATES;
+  const limits: OvertureBudgetLimits = {
+    ...SUBURBAN_CANARY_LIMITS,
+    maxAssetsInspected: Math.min(16, Math.max(1, maxCells)),
+    maxCandidates: options.maxAcceptedCandidates ?? SUBURBAN_CANARY_LIMITS.maxCandidates,
+  };
   const startedAt = Date.now();
   const policy = createEphemeralOvertureCanaryPolicy({
     checkedInConfigurationRoot: DEFAULT_LEAD_POLICY_ROOT,
@@ -115,7 +125,7 @@ export async function discoverSuburbanPhoenixCandidates(): Promise<SuburbanDisco
     const cells = planSuburbanCells({
       configurationVersion: policy.policy.schemaVersion,
       queryVersion: "overture-suburban-canary-1.0.0",
-      maxCells: SUBURBAN_MAX_CELLS,
+      maxCells,
     });
     if (cells.length === 0) throw new Error("Suburban discovery planned no coverage cells");
 
@@ -172,8 +182,8 @@ export async function discoverSuburbanPhoenixCandidates(): Promise<SuburbanDisco
     const summary = await discoverSuburbanWebsiteCandidates({
       cells,
       limits: {
-        maxCells: SUBURBAN_MAX_CELLS,
-        targetWebsiteCandidates: SUBURBAN_TARGET_WEBSITE_CANDIDATES,
+        maxCells,
+        targetWebsiteCandidates,
         maxAcceptedCandidates: limits.maxCandidates,
       },
       signal: controller.signal,
@@ -199,7 +209,7 @@ export async function discoverSuburbanPhoenixCandidates(): Promise<SuburbanDisco
           transport: rangeTransport,
           audit: { record: (event) => contacted.add(event.destinationHost) },
           now: nowIso,
-          candidateTarget: SUBURBAN_TARGET_WEBSITE_CANDIDATES,
+          candidateTarget: targetWebsiteCandidates,
           isCandidate: isStrongPoolServiceCandidate,
           // Off-target rows are never materialised, so review-grade places
           // cannot consume the accepted-candidate budget or reach the gate.

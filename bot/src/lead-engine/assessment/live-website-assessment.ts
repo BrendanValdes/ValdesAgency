@@ -7,7 +7,11 @@ import { extractPersonCandidates } from "../extraction/people.js";
 import { extractServiceEvidence } from "../extraction/services.js";
 import { assessConversionFeatures, WEBSITE_ASSESSMENT_POLICY_VERSION } from "../validation/website-assessment.js";
 import { sameSite } from "../crawl/url-safety.js";
-import type { CrawlPage, CrawlResult } from "../crawl/types.js";
+import type { CrawlPage, CrawlResult, PageKind } from "../crawl/types.js";
+import type { ContactObservation } from "../extraction/contact.js";
+import type { PersonEvidenceCandidate } from "../extraction/people.js";
+import type { ServiceEvidenceObservation } from "../extraction/services.js";
+import type { ConversionFeatureAssessment } from "../validation/website-assessment.js";
 import type { NicheConfiguration } from "../config/niches.js";
 import type { EvidenceValue } from "../crawl/types.js";
 import type { EligibleCandidate } from "./candidate-gate.js";
@@ -80,6 +84,35 @@ export interface LiveWebsiteAssessmentSummary {
   readonly budgetsRemaining: Readonly<Record<string, number>>;
 }
 
+/**
+ * Per-page evidence handed to the persistence layer. Everything here stays
+ * public-unverified: the extractors set candidateStatus/claimState and nothing
+ * in this phase promotes or verifies any value.
+ */
+export interface PageEvidence {
+  readonly assessmentId: string;
+  readonly pageUrl: string;
+  readonly pageKind: PageKind;
+  readonly contentChecksum: string;
+  readonly fetchedAt: string;
+  readonly observedAt: string;
+  readonly title: string | null;
+  readonly metaDescription: string | null;
+  readonly language: string | null;
+  readonly viewport: string | null;
+  readonly contacts: ReadonlyArray<ContactObservation>;
+  readonly people: ReadonlyArray<PersonEvidenceCandidate>;
+  readonly services: ReadonlyArray<ServiceEvidenceObservation>;
+  readonly conversions: ReadonlyArray<ConversionFeatureAssessment>;
+  readonly structuredData: ReadonlyArray<{
+    readonly schemaType: string;
+    readonly path: string;
+    readonly fieldName: string;
+    readonly claimedValue: string;
+    readonly confidence: "high" | "medium" | "low";
+  }>;
+}
+
 /** Minimal persistence seam. The canary supplies the real repository. */
 export interface AssessmentSink {
   /** True when this candidate already has a persisted assessment. */
@@ -98,6 +131,14 @@ export interface AssessmentSink {
     requests: number;
     downloadedBytes: number;
     processedBytes: number;
+  }): void;
+  /** Optional: persist page-level evidence for downstream qualification. */
+  recordPageEvidence?(evidence: PageEvidence): void;
+  /** Optional: persist a domain/business identity conflict for review. */
+  recordIdentityConflict?(input: {
+    assessmentId: string;
+    candidateKey: string;
+    observedNameCount: number;
   }): void;
 }
 
@@ -317,24 +358,42 @@ export async function runLiveWebsiteAssessment(input: {
       // Contacts, people, services and structured data stay public-unverified:
       // the extractors set candidateStatus/claimState and nothing here promotes
       // them. No verifier runs in this phase.
-      contactCount += extractContactInformation({ html, jsonLd, homepage }).length;
-      personCount += extractPersonCandidates({
+      const contacts = extractContactInformation({ html, jsonLd, homepage });
+      const people = extractPersonCandidates({
         html, jsonLd, knownBusinessNames: [candidate.expectedBusinessName],
-      }).length;
-      serviceCount += extractServiceEvidence({ html, jsonLd, niche: input.niche })
-        .filter((observation) => observation.state !== "unavailable").length;
-      structuredCount += jsonLd.organizationNames.length + jsonLd.people.length;
+      });
+      const services = extractServiceEvidence({ html, jsonLd, niche: input.niche })
+        .filter((observation) => observation.state !== "unavailable");
+      const structuredData = jsonLd.organizationNames.map((value) => ({
+        schemaType: "Organization", path: "organizationNames", fieldName: "name",
+        claimedValue: value.value, confidence: value.confidence,
+      }));
+      contactCount += contacts.length;
+      personCount += people.length;
+      serviceCount += services.length;
+      structuredCount += structuredData.length + jsonLd.people.length;
       const signals = extractConversionSignals({ html, homepage, validResponse: true });
       signalCount += signals.length;
+      let conversions: ReadonlyArray<ConversionFeatureAssessment> = [];
       if (page.kind === "homepage") {
         const identity = extractBusinessIdentity({ html, jsonLd });
         observedNames.push(...identity.names);
-        const features = assessConversionFeatures({
+        conversions = assessConversionFeatures({
           crawl, signals, browser: { status: "not_checked" },
           assessedAt, freshUntil: new Date(Date.parse(assessedAt) + 86_400_000).toISOString(),
         });
-        signalCount += features.filter((feature) => feature.status === "present").length;
+        signalCount += conversions.filter((feature) => feature.status === "present").length;
       }
+      input.sink.recordPageEvidence?.({
+        assessmentId, pageUrl: fetched.finalUrl, pageKind: page.kind,
+        contentChecksum: fetched.contentChecksum,
+        fetchedAt: fetched.fetchedAt ?? assessedAt, observedAt: assessedAt,
+        title: html.title?.value ?? null,
+        metaDescription: html.metaDescription?.value ?? null,
+        language: html.language?.value ?? null,
+        viewport: html.viewport?.value ?? null,
+        contacts, people, services, conversions, structuredData,
+      });
     }
 
     // Domain/business compatibility uses the existing identity rules. A conflict
@@ -344,6 +403,10 @@ export async function runLiveWebsiteAssessment(input: {
     if (reviewRequired) {
       identityReview += 1;
       blockedCounts.identity_review += 1;
+      // A mismatch is recorded as a conflict for review, never silently accepted.
+      input.sink.recordIdentityConflict?.({
+        assessmentId, candidateKey: candidate.candidateKey, observedNameCount: observedNames.length,
+      });
     } else {
       identityAgrees += 1;
     }

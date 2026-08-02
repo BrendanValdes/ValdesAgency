@@ -1,0 +1,314 @@
+import { existsSync, realpathSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { DEFAULT_LEAD_POLICY_ROOT } from "../src/lead-engine/config/lead-policy.js";
+import { isPathInside } from "../src/lead-engine/config/loader.js";
+import { NetworkPolicyAuthorizer } from "../src/lead-engine/config/network-capability.js";
+import { loadNicheConfigurations } from "../src/lead-engine/config/niches.js";
+import {
+  assessmentIdFor,
+  createAssessmentStore,
+} from "../src/lead-engine/assessment/assessment-store.js";
+import { qualifyAndRankBatch } from "../src/lead-engine/assessment/batch-runner.js";
+import {
+  createEphemeralWebsiteCanaryPolicy,
+  WEBSITE_HTTP_PROVIDER_ID,
+} from "../src/lead-engine/assessment/website-canary-policy.js";
+import {
+  runLiveWebsiteAssessment,
+  LIVE_WEBSITE_ASSESSMENT_VERSION,
+  type LiveWebsiteAssessmentLimits,
+} from "../src/lead-engine/assessment/live-website-assessment.js";
+import { WEBSITE_ASSESSMENT_POLICY_VERSION } from "../src/lead-engine/validation/website-assessment.js";
+import { WebsiteCrawler } from "../src/lead-engine/crawl/crawler.js";
+import { createDirectHttpFetcher } from "../src/lead-engine/crawl/fetchers/direct-http.js";
+import { validateCrawlLimits } from "../src/lead-engine/crawl/policies.js";
+import { discoverSuburbanPhoenixCandidates } from "./overture-suburban-candidates.js";
+
+/**
+ * Phase 5C bounded end-to-end batch canary.
+ *
+ * discovery → gate → website assessment → identity review → qualification →
+ * ranking → persisted internal calling queue.
+ *
+ * Everything is bounded, the queue is written only into a throwaway database
+ * under the OS temp directory, and the report is aggregate-only: no name,
+ * domain, phone, email, address, page text, HTML, or raw row is ever printed.
+ */
+
+export const BATCH_CANARY_LIMITS = Object.freeze({
+  targetCallableLeads: 10,
+  maxCells: 12,
+  maxDiscoveryCandidates: 50,
+  maxWebsitesAttempted: 15,
+  maxPagesPerBusiness: 3,
+  // The mandated 90-request total is split across the two live stages: bounded
+  // Overture discovery spends at most 30, so the crawl stage takes 60. That also
+  // keeps the crawl inside the ephemeral website policy's own hard rails.
+  maxTotalRequests: 90,
+  maxDiscoveryRequests: 30,
+  maxTotalCrawlRequests: 60,
+  // Mandated totals, split across the two live stages. Bounded Overture
+  // discovery already spends up to 32 MiB downloaded and 64 MiB processed, so
+  // the crawl stage takes the remaining half of each.
+  maxDownloadedBytes: 64 * 1024 * 1024,
+  maxProcessedBytes: 128 * 1024 * 1024,
+  maxCrawlDownloadedBytes: 32 * 1024 * 1024,
+  maxCrawlProcessedBytes: 64 * 1024 * 1024,
+  maxRuntimeMs: 180_000,
+  maxCrawlRuntimeMs: 120_000,
+  maxRetriesPerBusiness: 2,
+});
+
+export interface PoolBatchReport {
+  readonly ran: boolean;
+  readonly releaseId: string;
+  readonly discovery: Readonly<Record<string, unknown>>;
+  readonly websites: Readonly<Record<string, unknown>>;
+  readonly evidence: Readonly<Record<string, number>>;
+  readonly qualification: Readonly<Record<string, number>>;
+  readonly queue: Readonly<Record<string, unknown>>;
+  readonly usage: Readonly<Record<string, number>>;
+  readonly aggregateVerdict: string;
+  readonly safetyWarnings: ReadonlyArray<string>;
+}
+
+export function parseBatchCanaryArguments(
+  argv: ReadonlyArray<string>,
+  repositoryRoot: string,
+): { databasePath: string; enableLiveBatch: boolean } {
+  const values = new Map<string, string | true>();
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index] as string;
+    if (flag === "--confirm-live-batch" || flag === "--enable-live-batch") {
+      values.set(flag, true);
+      continue;
+    }
+    if (flag !== "--database") throw new Error(`Unknown batch canary argument: ${flag}`);
+    const value = argv[index + 1];
+    if (!value || value.startsWith("--")) throw new Error("Batch canary --database requires a value");
+    values.set(flag, value);
+    index += 1;
+  }
+  if (values.get("--confirm-live-batch") !== true) {
+    throw new Error("Live batch canary requires --confirm-live-batch");
+  }
+  const databaseValue = values.get("--database");
+  if (typeof databaseValue !== "string" || !path.isAbsolute(databaseValue)) {
+    throw new Error("Batch canary database must be an explicit absolute path");
+  }
+  const databasePath = path.resolve(databaseValue);
+  let parent: string;
+  try {
+    parent = realpathSync(path.dirname(databasePath));
+  } catch {
+    throw new Error("Batch canary database parent must already exist under the OS temp directory");
+  }
+  if (isPathInside(path.resolve(repositoryRoot), databasePath) ||
+    !isPathInside(realpathSync(os.tmpdir()), parent) ||
+    path.extname(databasePath) !== ".sqlite") {
+    throw new Error("Batch canary database must be a .sqlite file under the OS temp directory and outside the repository");
+  }
+  if (existsSync(databasePath)) throw new Error("Batch canary database path must not already exist");
+  return { databasePath, enableLiveBatch: values.get("--enable-live-batch") === true };
+}
+
+export async function runPoolBatchCanary(input: {
+  argv: ReadonlyArray<string>;
+  repositoryRoot: string;
+}): Promise<PoolBatchReport> {
+  const args = parseBatchCanaryArguments(input.argv, input.repositoryRoot);
+  const startedAt = Date.now();
+  const now = (): Date => new Date();
+  const empty = {
+    ran: false, releaseId: "not_resolved",
+    discovery: {}, websites: {}, evidence: {}, qualification: {}, queue: {},
+    usage: {}, aggregateVerdict: "blocked_live_batch_disabled",
+    safetyWarnings: ["live_batch_disabled_by_default"],
+  } satisfies PoolBatchReport;
+  if (!args.enableLiveBatch) return empty;
+
+  // Stage 1 — bounded live discovery over deterministic suburban cells.
+  const discovery = await discoverSuburbanPhoenixCandidates({
+    maxCells: BATCH_CANARY_LIMITS.maxCells,
+    targetWebsiteCandidates: BATCH_CANARY_LIMITS.targetCallableLeads,
+    maxAcceptedCandidates: BATCH_CANARY_LIMITS.maxDiscoveryCandidates,
+  });
+  const eligible = discovery.summary.eligibleWebsiteCandidates;
+
+  const limits: LiveWebsiteAssessmentLimits = {
+    maxBusinessesAttempted: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
+    maxWebsitesAssessed: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
+    maxPagesPerBusiness: BATCH_CANARY_LIMITS.maxPagesPerBusiness,
+    maxRequestsPerBusiness: 6,
+    maxTotalRequests: BATCH_CANARY_LIMITS.maxTotalCrawlRequests,
+    maxDownloadedBytes: BATCH_CANARY_LIMITS.maxCrawlDownloadedBytes,
+    maxProcessedBytes: BATCH_CANARY_LIMITS.maxCrawlProcessedBytes,
+    maxDurationMs: BATCH_CANARY_LIMITS.maxCrawlRuntimeMs,
+    maxRetriesPerBusiness: BATCH_CANARY_LIMITS.maxRetriesPerBusiness,
+  };
+
+  const policy = createEphemeralWebsiteCanaryPolicy({
+    checkedInConfigurationRoot: DEFAULT_LEAD_POLICY_ROOT,
+    maxRequests: limits.maxTotalRequests,
+    maxBytes: limits.maxDownloadedBytes,
+    maxDurationMs: limits.maxDurationMs,
+  });
+  let databaseCreated = false;
+  const contacted = new Set<string>();
+  try {
+    const runId = "pool-batch-canary";
+    const scopeId = "pool-batch-canary-scope";
+    const store = createAssessmentStore({
+      databasePath: args.databasePath,
+      repositoryRoot: input.repositoryRoot,
+      candidates: eligible,
+      now,
+    });
+    databaseCreated = true;
+    const niche = loadNicheConfigurations().get("pool_service");
+    if (!niche) throw new Error("Batch canary requires a configured pool_service niche");
+
+    const capability = new NetworkPolicyAuthorizer(policy.policy, { now: Date.now })
+      .issuePublicWebCapability({
+        providerId: WEBSITE_HTTP_PROVIDER_ID,
+        runId, assessmentId: scopeId, operation: "website_assessment",
+        maxRequests: limits.maxTotalRequests, maxBytes: limits.maxDownloadedBytes,
+        maxBytesPerRequest: 512 * 1024, maxRequestDurationMs: 15_000,
+        costBudgetMicroUsd: 0, ttlMs: limits.maxDurationMs,
+      });
+    const crawlLimits = validateCrawlLimits({
+      maxPages: limits.maxPagesPerBusiness,
+      maxSitemapFiles: 1, maxSitemapUrls: 20, maxRedirects: 3,
+      maxRetries: limits.maxRetriesPerBusiness,
+      maxCompressedBytes: 512 * 1024, maxDecompressedBytes: 1024 * 1024,
+      connectionTimeoutMs: 5_000, responseTimeoutMs: 10_000,
+      crawlDurationMs: 20_000, sameDomainConcurrency: 1,
+    });
+
+    // Stage 2 — bounded website assessment persisting the live evidence chain.
+    const websites = await runLiveWebsiteAssessment({
+      candidates: eligible,
+      limits, niche, now,
+      assessmentId: (candidate) => assessmentIdFor(runId, candidate),
+      createCrawler: (candidate) => {
+        contacted.add(candidate.candidateHost);
+        return new WebsiteCrawler({
+          fetcher: createDirectHttpFetcher({
+            capability, providerId: WEBSITE_HTTP_PROVIDER_ID, runId,
+            assessmentId: scopeId, operation: "website_assessment", limits: crawlLimits,
+          }),
+          limits: crawlLimits,
+          now,
+        });
+      },
+      sink: store.sink,
+    });
+
+    // Stage 3 — qualification and deterministic ranking over persisted evidence.
+    const evaluatedAt = new Date(now().getTime()).toISOString();
+    const assessments = store.assessmentBusinessIds()
+      .map((row) => ({ assessmentId: row.assessmentId, businessId: row.businessId }));
+    const queue = qualifyAndRankBatch({
+      database: store.database,
+      assessments,
+      runId,
+      evaluatedAt,
+      maximumCallable: BATCH_CANARY_LIMITS.targetCallableLeads,
+      maximumReview: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
+      coverageKeys: discovery.summary.perCell.map((cell) => cell.coverageCellSafeId),
+      signal: new AbortController().signal,
+    });
+
+    const evidence = store.evidenceCounts();
+    store.close();
+    return {
+      ran: true,
+      releaseId: discovery.releaseId,
+      discovery: {
+        cellsPlanned: discovery.summary.cellsPlanned,
+        cellsQueried: discovery.summary.cellsQueried,
+        rowsConsidered: discovery.rowsConsidered,
+        envelopesConsidered: discovery.summary.envelopesConsidered,
+        acceptedCandidates: discovery.summary.acceptedCandidates,
+        eligibleCandidates: eligible.length,
+        duplicatesAcrossCells: discovery.summary.duplicatesAcrossCells,
+        gateBlockedCounts: discovery.summary.gateBlockedCounts,
+        stopReason: discovery.summary.stopReason,
+      },
+      websites: {
+        attempted: websites.businessesAttempted,
+        assessed: websites.websitesAssessed,
+        identityReview: websites.identityReview,
+        blockedCounts: websites.blockedCounts,
+        duplicateAssessmentsSkipped: websites.duplicateAssessmentsSkipped,
+        pages: websites.pages,
+        opportunitySignals: websites.opportunitySignals,
+        publicContactCandidates: websites.publicContactCandidates,
+        publicPersonCandidates: websites.publicPersonCandidates,
+        stopReason: websites.stopReason,
+      },
+      evidence,
+      qualification: {
+        evaluated: queue.evaluated,
+        skippedAlreadyEvaluated: queue.skippedAlreadyEvaluated,
+        ...queue.qualificationCounts,
+      },
+      queue: {
+        callableQueueSize: queue.callableQueueSize,
+        reviewQueueSize: queue.reviewQueueSize,
+        notEligible: queue.notEligible,
+        priorityBands: queue.priorityBands,
+        state: queue.queueState,
+        snapshotPersisted: queue.snapshotId !== null,
+      },
+      usage: {
+        discoveryRequests: discovery.requests,
+        discoveryBytes: discovery.downloadedBytes,
+        websiteRequests: websites.requests,
+        websiteDownloadedBytes: websites.downloadedBytes,
+        websiteProcessedBytes: websites.processedBytes,
+        totalRequests: discovery.requests + websites.requests,
+        approvedWebsiteHostsContacted: contacted.size,
+        elapsedMs: Date.now() - startedAt,
+      },
+      aggregateVerdict: queue.callableQueueSize > 0 ? "completed" : "completed_no_callable_lead",
+      safetyWarnings: [],
+    };
+  } catch (error) {
+    return {
+      ...empty,
+      aggregateVerdict: "blocked_batch_policy",
+      safetyWarnings: [error instanceof Error ? error.name : "unknown_batch_error"],
+      usage: { elapsedMs: Date.now() - startedAt },
+    };
+  } finally {
+    policy.cleanup();
+    if (databaseCreated && existsSync(args.databasePath)) {
+      rmSync(args.databasePath, { force: true });
+      for (const suffix of ["-wal", "-shm"]) rmSync(`${args.databasePath}${suffix}`, { force: true });
+    }
+  }
+}
+
+async function main(): Promise<void> {
+  const report = await runPoolBatchCanary({
+    argv: process.argv.slice(2),
+    repositoryRoot: path.resolve(process.cwd(), ".."),
+  });
+  console.log(JSON.stringify(report));
+  if (!report.ran) process.exitCode = 2;
+}
+
+const entry = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : null;
+if (entry === import.meta.url) {
+  void main().catch((error: unknown) => {
+    console.error(JSON.stringify({
+      aggregateVerdict: "canary_rejected",
+      safetyWarnings: [error instanceof Error ? error.message : "unknown_batch_error"],
+      policyVersions: [WEBSITE_ASSESSMENT_POLICY_VERSION, LIVE_WEBSITE_ASSESSMENT_VERSION],
+    }));
+    process.exitCode = 1;
+  });
+}
