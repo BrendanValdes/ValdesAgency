@@ -40,10 +40,15 @@ export interface OvertureParquetColumnDescriptor {
   readonly startOffset: number;
   readonly endOffset: number;
   readonly hasStatistics: boolean;
+  // Decoded numeric min/max from column statistics, used only for geographic
+  // row-group pruning. Null when absent, non-numeric, or out of safe range.
+  readonly statMin: number | null;
+  readonly statMax: number | null;
 }
 
 export interface OvertureParquetRowGroupDescriptor {
   readonly index: number;
+  readonly startRow: number;
   readonly rowCount: number;
   readonly byteSize: number;
   readonly columns: ReadonlyArray<OvertureParquetColumnDescriptor>;
@@ -75,7 +80,12 @@ interface RawColumnMetaData {
   readonly total_uncompressed_size?: bigint | number;
   readonly data_page_offset?: bigint | number;
   readonly dictionary_page_offset?: bigint | number;
-  readonly statistics?: unknown;
+  readonly statistics?: {
+    readonly min_value?: unknown;
+    readonly max_value?: unknown;
+    readonly min?: unknown;
+    readonly max?: unknown;
+  };
 }
 interface RawColumnChunk {
   readonly meta_data?: RawColumnMetaData;
@@ -105,6 +115,19 @@ function boundedCount(value: bigint | number | undefined, detail: string): numbe
     invalid(`${detail} is not a bounded nonnegative integer`);
   }
   return asNumber;
+}
+
+// Decode a statistics min/max to a finite number for geographic pruning only.
+// Any non-numeric, non-finite, or out-of-safe-range value becomes null so the
+// pruner treats the group as unprunable rather than trusting a bad bound.
+function numericStat(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "bigint") {
+    return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(value)
+      : null;
+  }
+  return null;
 }
 
 function validateLimits(limits: OvertureParquetMetadataLimits): void {
@@ -140,12 +163,13 @@ export function validateOvertureParquetMetadata(
   if (rowGroups.length > limits.maxRowGroups) invalid("row-group count exceeds the configured maximum");
 
   const columnPaths = new Set<string>();
-  let rowGroupRowTotal = 0;
+  let cursorRow = 0;
   const descriptors: OvertureParquetRowGroupDescriptor[] = rowGroups.map((rowGroup, index) => {
     const groupRows = boundedCount(rowGroup.num_rows, `row group ${index} row count`);
     const byteSize = boundedCount(rowGroup.total_byte_size, `row group ${index} byte size`);
     if (byteSize > fileSize) invalid(`row group ${index} byte size exceeds the file`);
-    rowGroupRowTotal += groupRows;
+    const startRow = cursorRow;
+    cursorRow += groupRows;
 
     const columns = rowGroup.columns;
     if (!Array.isArray(columns) || columns.length === 0) invalid(`row group ${index} has no columns`);
@@ -179,6 +203,7 @@ export function validateOvertureParquetMetadata(
       const endOffset = startOffset + compressedBytes;
       if (endOffset > fileSize || endOffset < startOffset) invalid(`column ${path} extends past the file`);
 
+      const statistics = meta.statistics;
       columnPaths.add(path);
       return Object.freeze({
         path,
@@ -187,19 +212,22 @@ export function validateOvertureParquetMetadata(
         uncompressedBytes,
         startOffset,
         endOffset,
-        hasStatistics: meta.statistics !== undefined && meta.statistics !== null,
+        hasStatistics: statistics !== undefined && statistics !== null,
+        statMin: statistics ? numericStat(statistics.min_value ?? statistics.min) : null,
+        statMax: statistics ? numericStat(statistics.max_value ?? statistics.max) : null,
       });
     });
 
     return Object.freeze({
       index,
+      startRow,
       rowCount: groupRows,
       byteSize,
       columns: Object.freeze(columnDescriptors),
     });
   });
 
-  if (rowGroups.length > 0 && rowGroupRowTotal !== rowCount) {
+  if (rowGroups.length > 0 && cursorRow !== rowCount) {
     invalid("row-group row counts do not sum to the file row count");
   }
 
@@ -225,10 +253,17 @@ export function validateOvertureParquetMetadata(
  * through the capability-controlled range source. Fails closed on any malformed
  * or unsupported metadata before a row-group read can be planned.
  */
-export async function readOvertureParquetMetadata(
+export interface OvertureParquetFooter {
+  readonly metadata: OvertureParquetMetadata;
+  // Opaque validated hyparquet metadata, passed back to the row reader so the
+  // footer is parsed once. Never expose this outside the reader integration.
+  readonly raw: Awaited<ReturnType<typeof parquetMetadataAsync>>;
+}
+
+export async function readOvertureParquetFooter(
   source: CapabilityRangeSource,
   limits: OvertureParquetMetadataLimits,
-): Promise<OvertureParquetMetadata> {
+): Promise<OvertureParquetFooter> {
   validateLimits(limits);
   let raw: Awaited<ReturnType<typeof parquetMetadataAsync>>;
   try {
@@ -238,5 +273,12 @@ export async function readOvertureParquetMetadata(
     // Never echo the underlying parser message; it could reflect raw footer bytes.
     invalid("footer could not be parsed");
   }
-  return validateOvertureParquetMetadata(raw, source.byteLength, limits);
+  return { metadata: validateOvertureParquetMetadata(raw, source.byteLength, limits), raw };
+}
+
+export async function readOvertureParquetMetadata(
+  source: CapabilityRangeSource,
+  limits: OvertureParquetMetadataLimits,
+): Promise<OvertureParquetMetadata> {
+  return (await readOvertureParquetFooter(source, limits)).metadata;
 }

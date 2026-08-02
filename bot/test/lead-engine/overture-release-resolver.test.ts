@@ -122,6 +122,44 @@ describe("Overture official STAC release resolver", () => {
     expect(explicit.releaseId).toBe(olderRelease);
   });
 
+  it("resolves relative STAC link hrefs against their containing document", async () => {
+    // The official root catalog publishes child links as document-relative
+    // hrefs. Treating them as absolute drops every release candidate and the
+    // resolver reports release_missing against a perfectly valid catalog.
+    const release = SYNTHETIC_OVERTURE_RELEASE;
+    const routes = new Map<string, unknown>([
+      [OVERTURE_STAC_CATALOG_URL, {
+        ...rootCatalog([release]),
+        links: [{ rel: "child", href: `./${release}/catalog.json`, title: release }],
+      }],
+      [`https://stac.overturemaps.org/${release}/catalog.json`, {
+        ...releaseCatalog(release),
+        links: [{ rel: "child", href: "./collections/places.json", title: "places" }],
+      }],
+      [`https://stac.overturemaps.org/${release}/collections/places.json`, placesCollection(release)],
+    ]);
+    await expect(resolverFor(routes).resolve({
+      requestedRelease: "latest",
+      signal: new AbortController().signal,
+    })).resolves.toMatchObject({ releaseId: release });
+  });
+
+  it("rejects a relative child link that resolves off the approved catalog host", async () => {
+    // Resolution must not widen the destination set: a protocol-relative href
+    // still has to clear the host and path-template checks.
+    const release = SYNTHETIC_OVERTURE_RELEASE;
+    const routes = new Map<string, unknown>([
+      [OVERTURE_STAC_CATALOG_URL, {
+        ...rootCatalog([release]),
+        links: [{ rel: "child", href: `//stac.evil.example/${release}/catalog.json`, title: release }],
+      }],
+    ]);
+    await expect(resolverFor(routes).resolve({
+      requestedRelease: "latest",
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "asset_invalid" });
+  });
+
   it("orders same-day release revisions numerically and rejects noncanonical revisions", async () => {
     const ninth = "2026-07-23.9";
     const tenth = "2026-07-23.10";

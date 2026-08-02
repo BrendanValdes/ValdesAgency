@@ -2,18 +2,33 @@ import { existsSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { DEFAULT_LEAD_POLICY_ROOT } from "../src/lead-engine/config/lead-policy.js";
+import { DEFAULT_LEAD_POLICY_ROOT, type RuntimeLeadPolicy } from "../src/lead-engine/config/lead-policy.js";
 import { isPathInside } from "../src/lead-engine/config/loader.js";
+import { NetworkPolicyAuthorizer } from "../src/lead-engine/config/network-capability.js";
 import { planCoverage } from "../src/lead-engine/geography/coverage-planner.js";
-import type { GeographyTarget } from "../src/lead-engine/geography/types.js";
-import { createUnavailableOvertureAssetQueryEngine } from "../src/lead-engine/providers/overture/asset-query-engine.js";
+import type { CoverageCell, GeographyTarget } from "../src/lead-engine/geography/types.js";
+import type { DiscoveryProviderRequest } from "../src/lead-engine/providers/contracts.js";
+import { OverturePlacesLiveDiscoveryProvider } from "../src/lead-engine/providers/adapters/overture-places-live.js";
 import {
   OVERTURE_CANARY_HARD_LIMITS,
   OvertureBudgetTracker,
 } from "../src/lead-engine/providers/overture/budgets.js";
 import { createEphemeralOvertureCanaryPolicy } from "../src/lead-engine/providers/overture/canary-policy.js";
-import { validateOvertureReleaseId } from "../src/lead-engine/providers/overture/asset-validator.js";
 import {
+  OVERTURE_CATALOG_HOST,
+  validateOvertureReleaseId,
+} from "../src/lead-engine/providers/overture/asset-validator.js";
+import { createOfficialOvertureCatalogTransport } from "../src/lead-engine/providers/overture/catalog-transport.js";
+import { OverturePlacesError } from "../src/lead-engine/providers/overture/errors.js";
+import { createOverturePlacesQueryPlan } from "../src/lead-engine/providers/overture/query.js";
+import {
+  createOfficialOvertureRangeHttpTransport,
+  OVERTURE_RANGE_HEADER_OVERHEAD_BYTES,
+} from "../src/lead-engine/providers/overture/range-http-transport.js";
+import { OvertureReleaseResolver } from "../src/lead-engine/providers/overture/release-resolver.js";
+import { createSecureOvertureAssetQueryEngine } from "../src/lead-engine/providers/overture/secure-asset-query-engine.js";
+import {
+  OVERTURE_PLACES_PROVIDER_ID,
   OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
   OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
 } from "../src/lead-engine/providers/overture/types.js";
@@ -40,6 +55,9 @@ export interface OvertureCanaryArguments {
   readonly maxSeconds: number;
   readonly databasePath: string;
   readonly release: "latest" | string;
+  // Opt-in: wire the secure remote GeoParquet engine and attempt live reads.
+  // Absent by default so the checked-in canary stays blocked with no network.
+  readonly enableSecureEngine: boolean;
 }
 
 export interface OvertureCanaryReport {
@@ -83,8 +101,8 @@ export function parseOvertureCanaryArguments(
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index] as string;
-    if (flag === "--confirm-live-overture") {
-      if (values.has(flag)) throw new Error("Live Overture confirmation flag was repeated");
+    if (flag === "--confirm-live-overture" || flag === "--enable-secure-engine") {
+      if (values.has(flag)) throw new Error(`Overture canary flag was repeated: ${flag}`);
       values.set(flag, true);
       continue;
     }
@@ -139,6 +157,7 @@ export function parseOvertureCanaryArguments(
     maxSeconds,
     databasePath,
     release,
+    enableSecureEngine: values.get("--enable-secure-engine") === true,
   };
 }
 
@@ -179,35 +198,220 @@ export async function runOverturePlacesCanary(input: {
       startedAtMs: startedAt,
       now: input.now,
     });
-    const queryEngine = createUnavailableOvertureAssetQueryEngine();
-    if (!queryEngine.available) {
-      const snapshot = budget.snapshot();
-      return {
-        ran: false,
-        approvedDestinationsContacted: [],
-        releaseId: args.release === "latest" ? "not_resolved" : args.release,
-        schemaVersion: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
-        taxonomyMappingVersion: OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
-        coverageCellSafeId: cell.coverageKey,
-        requests: 0,
-        bytes: 0,
-        rowsConsidered: 0,
-        acceptedCount: 0,
-        rejectedCount: 0,
-        duplicateCount: 0,
-        reviewCount: 0,
-        elapsedMs: snapshot.elapsedMs,
-        budgetRemaining: snapshot.remaining,
-        aggregateVerdict: "blocked_secure_transport_unavailable",
-        safetyWarnings: ["secure_remote_geoparquet_transport_unavailable"],
-      };
+    if (args.enableSecureEngine) {
+      return await runSecureOverturePlacesCanary({
+        args,
+        policy: policy.policy,
+        cell,
+        budget,
+        now: input.now ?? Date.now,
+      });
     }
-    throw new Error("A secure remote GeoParquet engine exists but the controlled canary execution path is not implemented");
+    const snapshot = budget.snapshot();
+    return {
+      ran: false,
+      approvedDestinationsContacted: [],
+      releaseId: args.release === "latest" ? "not_resolved" : args.release,
+      schemaVersion: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
+      taxonomyMappingVersion: OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
+      coverageCellSafeId: cell.coverageKey,
+      requests: 0,
+      bytes: 0,
+      rowsConsidered: 0,
+      acceptedCount: 0,
+      rejectedCount: 0,
+      duplicateCount: 0,
+      reviewCount: 0,
+      elapsedMs: snapshot.elapsedMs,
+      budgetRemaining: snapshot.remaining,
+      aggregateVerdict: "blocked_secure_transport_unavailable",
+      safetyWarnings: ["secure_remote_geoparquet_transport_unavailable"],
+    };
   } finally {
     policy.cleanup();
     if (databaseWasCreated && existsSync(args.databasePath)) {
       rmSync(args.databasePath, { force: true });
     }
+  }
+}
+
+function verdictForCode(code: string): string {
+  const environment = ["cancelled", "catalog_transport_failed"];
+  const dataLayout = [
+    "catalog_invalid",
+    "catalog_oversized",
+    "release_missing",
+    "release_ambiguous",
+    "release_changed",
+    "schema_unsupported",
+    "schema_invalid",
+    "asset_invalid",
+    "overture_data_layout_unsupported",
+    "parquet_metadata_invalid",
+    "parquet_magic_invalid",
+    "asset_identity_unavailable",
+    "asset_identity_changed",
+    "result_invalid",
+    "query_invalid",
+  ];
+  if (environment.includes(code)) return "blocked_environment";
+  if (dataLayout.includes(code)) return "blocked_overture_data_layout";
+  if (code === "budget_exhausted") return "blocked_budget_exhausted";
+  return "blocked_canary_error";
+}
+
+/**
+ * Opt-in live path. Wires the secure remote GeoParquet engine behind an explicit
+ * flag and contacts only official Overture destinations. Emits aggregate counts
+ * only — never a business name, phone, email, website, address, or raw row. No
+ * database, cache, or export is written; the in-memory range cache is cleared by
+ * the engine. If the official layout cannot support bounded reads, the adapter
+ * fails closed and the verdict is blocked_overture_data_layout.
+ */
+async function runSecureOverturePlacesCanary(input: {
+  args: OvertureCanaryArguments;
+  policy: RuntimeLeadPolicy;
+  cell: CoverageCell;
+  budget: OvertureBudgetTracker;
+  now: () => number;
+}): Promise<OvertureCanaryReport> {
+  const { args, policy, cell, budget, now } = input;
+  const runId = "overture-phoenix-canary";
+  const assessmentId = "overture-phoenix-canary-scope";
+  const nowIso = (): string => new Date(now()).toISOString();
+  const durationMs = args.maxSeconds * 1_000;
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), durationMs);
+  const contacted = new Set<string>();
+
+  const baseReport = (snapshot = budget.snapshot()) => ({
+    approvedDestinationsContacted: [...contacted].sort(),
+    schemaVersion: OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION,
+    taxonomyMappingVersion: OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
+    coverageCellSafeId: cell.coverageKey,
+    requests: snapshot.consumed.stacRequests + snapshot.consumed.assetRequests,
+    bytes: snapshot.consumed.downloadedBytes,
+    rowsConsidered: snapshot.consumed.rowsRead,
+    elapsedMs: snapshot.elapsedMs,
+    budgetRemaining: snapshot.remaining,
+  });
+
+  try {
+    const authorizer = new NetworkPolicyAuthorizer(policy, { now });
+    const capability = authorizer.issuePublicWebCapability({
+      providerId: OVERTURE_PLACES_PROVIDER_ID,
+      runId,
+      assessmentId,
+      operation: "discovery",
+      maxRequests: OVERTURE_CANARY_HARD_LIMITS.maxStacRequests + OVERTURE_CANARY_HARD_LIMITS.maxAssetRequests,
+      maxBytes: args.maxBytes,
+      maxBytesPerRequest: args.maxBytes,
+      maxRequestDurationMs: durationMs,
+      costBudgetMicroUsd: 0,
+      ttlMs: durationMs,
+    });
+
+    const catalogTransport = createOfficialOvertureCatalogTransport({
+      capability,
+      providerId: OVERTURE_PLACES_PROVIDER_ID,
+      runId,
+      assessmentId,
+      maximumBytes: 512 * 1024,
+      maximumDurationMs: Math.min(durationMs, 30_000),
+      now: nowIso,
+    });
+    const resolver = new OvertureReleaseResolver({
+      transport: catalogTransport,
+      budget,
+      clock: { now: nowIso },
+    });
+    contacted.add(OVERTURE_CATALOG_HOST);
+    const release = await resolver.resolve({ requestedRelease: args.release, signal: controller.signal });
+
+    const plan = createOverturePlacesQueryPlan({
+      releaseId: release.releaseId,
+      coverageCell: cell,
+      maxRows: OVERTURE_CANARY_HARD_LIMITS.maxRowsRead,
+      maxAreaSquareKm: OVERTURE_CANARY_HARD_LIMITS.maxAreaSquareKm,
+    });
+    const rangeTransport = createOfficialOvertureRangeHttpTransport({
+      capability,
+      runId,
+      assessmentId,
+      maximumBodyBytesPerRequest: Math.max(
+        1,
+        Math.min(args.maxBytes - OVERTURE_RANGE_HEADER_OVERHEAD_BYTES - 1, 8 * 1024 * 1024),
+      ),
+      maximumDurationMs: Math.min(durationMs, 60_000),
+    });
+    const engine = createSecureOvertureAssetQueryEngine({
+      policy,
+      capability,
+      runId,
+      assessmentId,
+      transport: rangeTransport,
+      audit: { record: (event) => contacted.add(event.destinationHost) },
+      now: nowIso,
+    });
+    const provider = new OverturePlacesLiveDiscoveryProvider({
+      policy,
+      capability,
+      runId,
+      assessmentId,
+      release,
+      coverageCell: cell,
+      plan,
+      budget,
+      signal: controller.signal,
+      queryEngine: engine,
+    });
+
+    const request: DiscoveryProviderRequest = {
+      operation: "discovery",
+      correlationId: `${runId}:overture-phoenix-canary-query`,
+      queryId: "overture-phoenix-canary-query",
+      queryText: "overture pool service phoenix canary",
+      nicheId: "pool_service",
+      coverageKey: cell.coverageKey,
+      observedAt: nowIso(),
+      retrievedAt: nowIso(),
+    };
+    const batch = await provider.discover(request);
+    const audit = provider.audit();
+    const snapshot = budget.snapshot();
+    const failureCode = audit?.failureCode ?? null;
+    const failed = batch.status === "failed";
+    return {
+      ran: !failed,
+      ...baseReport(snapshot),
+      releaseId: release.releaseId,
+      schemaVersion: release.schemaVersion,
+      acceptedCount: audit?.acceptedCount ?? 0,
+      rejectedCount: audit?.rejectedCount ?? 0,
+      duplicateCount: audit?.duplicateCount ?? 0,
+      reviewCount: audit?.reviewCount ?? 0,
+      aggregateVerdict: failed ? verdictForCode(failureCode ?? "canary_error") : "completed",
+      safetyWarnings: failureCode ? [failureCode] : [],
+    };
+  } catch (error) {
+    const code = error instanceof OverturePlacesError ? error.code : "canary_error";
+    const verdict = error instanceof OverturePlacesError &&
+      ["unavailable", "timeout", "rate_limited"].includes(error.category)
+      ? "blocked_environment"
+      : verdictForCode(code);
+    return {
+      ran: false,
+      ...baseReport(),
+      releaseId: args.release === "latest" ? "not_resolved" : args.release,
+      acceptedCount: 0,
+      rejectedCount: 0,
+      duplicateCount: 0,
+      reviewCount: 0,
+      aggregateVerdict: verdict,
+      safetyWarnings: [code],
+    };
+  } finally {
+    clearTimeout(deadline);
   }
 }
 

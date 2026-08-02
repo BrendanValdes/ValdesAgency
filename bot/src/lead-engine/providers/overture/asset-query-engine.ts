@@ -9,8 +9,7 @@ export interface OvertureAssetQueryEngine {
   readonly available: boolean;
   readonly transportKind: "secure_remote_geoparquet" | "unavailable" | "synthetic_test";
   query(input: OvertureAssetQueryInput & {
-    readonly budget: Pick<OvertureBudgetTracker,
-      "reserveRequest" | "recordDownload" | "assertActive">;
+    readonly budget: OvertureBudgetTracker;
   }): Promise<OvertureAssetQueryResult>;
 }
 
@@ -19,6 +18,16 @@ const trustedEngines = new WeakSet<object>();
 function trusted<T extends OvertureAssetQueryEngine>(engine: T): T {
   trustedEngines.add(engine);
   return engine;
+}
+
+/**
+ * Register an externally constructed query engine (e.g. the secure remote
+ * GeoParquet engine) as trusted. Kept here so the trusted-engine WeakSet stays
+ * private to this module while still allowing the concrete engine to live in its
+ * own file.
+ */
+export function trustOvertureAssetQueryEngine<T extends OvertureAssetQueryEngine>(engine: T): T {
+  return trusted(engine);
 }
 
 export function assertTrustedOvertureAssetQueryEngine(

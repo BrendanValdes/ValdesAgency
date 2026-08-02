@@ -74,35 +74,49 @@ function strictJson(response: OvertureCatalogResponse): unknown {
   }
 }
 
-function releaseFromLink(link: z.infer<typeof linkSchema>): string | null {
-  if (link.rel !== "child") return null;
-  let url: URL;
+/**
+ * STAC link hrefs are routinely relative to the document that contains them, so
+ * they must be resolved against that document's URL before matching or
+ * validating. Resolution cannot widen the approved destination set:
+ * validateOvertureCatalogUrl still pins the host and the exact path templates.
+ */
+function resolveLinkHref(href: string, baseUrl: string): URL | null {
   try {
-    url = new URL(link.href);
+    return new URL(href, baseUrl);
   } catch {
     return null;
   }
+}
+
+function releaseFromLink(
+  link: z.infer<typeof linkSchema>,
+  baseUrl: string,
+): { releaseId: string; href: string } | null {
+  if (link.rel !== "child") return null;
+  const url = resolveLinkHref(link.href, baseUrl);
+  if (!url) return null;
   const match = url.pathname.match(/^\/(\d{4}-\d{2}-\d{2}\.\d+)\/catalog\.json$/);
-  return match?.[1] ?? null;
+  return match ? { releaseId: match[1] as string, href: url.href } : null;
 }
 
 function chooseRelease(
   links: ReadonlyArray<z.infer<typeof linkSchema>>,
   requestedRelease: "latest" | string,
+  baseUrl: string,
 ): { releaseId: string; url: string } {
   const candidates = new Map<string, string>();
   for (const link of links) {
-    const releaseId = releaseFromLink(link);
-    if (!releaseId) continue;
-    validateOvertureReleaseId(releaseId);
-    const url = validateOvertureCatalogUrl(link.href, releaseId);
-    const existing = candidates.get(releaseId);
+    const resolved = releaseFromLink(link, baseUrl);
+    if (!resolved) continue;
+    validateOvertureReleaseId(resolved.releaseId);
+    const url = validateOvertureCatalogUrl(resolved.href, resolved.releaseId);
+    const existing = candidates.get(resolved.releaseId);
     if (existing && existing !== url) {
       throw overtureFailure("release_ambiguous", "Overture catalog contains conflicting links for one release", {
         category: "schema_validation_failed",
       });
     }
-    candidates.set(releaseId, url);
+    candidates.set(resolved.releaseId, url);
   }
   const releaseId = requestedRelease === "latest"
     ? [...candidates.keys()].sort((left, right) => {
@@ -200,7 +214,7 @@ export class OvertureReleaseResolver {
         category: "schema_validation_failed",
       });
     }
-    const selected = chooseRelease(root.data.links, requestedRelease);
+    const selected = chooseRelease(root.data.links, requestedRelease, rootResponse.url);
     const releaseResponse = await this.#get(selected.url, selected.releaseId, input.signal);
     const releaseCatalog = catalogSchema.safeParse(strictJson(releaseResponse));
     if (!releaseCatalog.success || releaseCatalog.data.id !== selected.releaseId) {
@@ -208,16 +222,17 @@ export class OvertureReleaseResolver {
         category: "schema_validation_failed",
       });
     }
-    const collectionLinks = releaseCatalog.data.links.filter((link) =>
-      link.rel === "child" && link.href.endsWith("/collections/places.json")
-    );
+    const collectionLinks = releaseCatalog.data.links
+      .filter((link) => link.rel === "child")
+      .map((link) => resolveLinkHref(link.href, releaseResponse.url))
+      .filter((url): url is URL => url !== null && url.pathname.endsWith("/collections/places.json"));
     if (collectionLinks.length !== 1) {
       throw overtureFailure("catalog_invalid", "Overture release must contain exactly one Places collection", {
         category: "schema_validation_failed",
       });
     }
     const collectionUrl = validateOvertureCatalogUrl(
-      (collectionLinks[0] as z.infer<typeof linkSchema>).href,
+      (collectionLinks[0] as URL).href,
       selected.releaseId,
     );
     const collectionResponse = await this.#get(collectionUrl, selected.releaseId, input.signal);

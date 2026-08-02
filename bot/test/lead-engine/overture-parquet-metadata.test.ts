@@ -11,6 +11,7 @@ import {
   validateOvertureParquetMetadata,
   type OvertureParquetMetadataLimits,
 } from "../../src/lead-engine/providers/overture/parquet-metadata.js";
+import { createHyparquetOvertureParquetReader } from "../../src/lead-engine/providers/overture/secure-asset-query-engine.js";
 import {
   SYNTHETIC_OVERTURE_ASSET,
   SYNTHETIC_OVERTURE_RELEASE_PIN,
@@ -219,6 +220,33 @@ describe("Overture Parquet metadata reader over the capability range source", ()
       cleanup();
     }
   });
+
+  it("production reader reads only the requested columns through the injected source", async () => {
+    const { source, cleanup } = await open(fixtureBytes);
+    try {
+      const reader = createHyparquetOvertureParquetReader();
+      const footer = await reader.readMetadata({
+        source,
+        limits: { maxRows: 1_000, maxRowGroups: 64, maxColumnsPerRowGroup: 64 },
+        signal: new AbortController().signal,
+      });
+      const requested = footer.metadata.columnPaths.slice(0, 1);
+      const rows = await reader.readColumns({
+        footer,
+        source,
+        columns: requested,
+        rowStart: 0,
+        rowEnd: Math.min(1, footer.metadata.rowCount),
+        signal: new AbortController().signal,
+      });
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(Object.keys(row)).toEqual(requested);
+      }
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 describe("Overture Parquet parser containment", () => {
@@ -248,5 +276,6 @@ describe("Overture Parquet parser containment", () => {
     expect(overtureSource).not.toMatch(/python|pyarrow|\.py\b/i);
     // The Parquet parser is only ever fed the injected capability range source.
     expect(overtureSource).toMatch(/parquetMetadataAsync\(source\)/);
+    expect(overtureSource).toMatch(/file: input\.source/);
   });
 });

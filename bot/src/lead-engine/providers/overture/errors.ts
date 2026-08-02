@@ -40,7 +40,11 @@ export type OverturePlacesErrorCode =
   | "asset_identity_changed"
   // Parquet container safety validated at the transport boundary.
   | "parquet_magic_invalid"
-  | "parquet_metadata_invalid";
+  | "parquet_metadata_invalid"
+  // The official asset layout cannot support safe bounded row-group pruning or
+  // projection within the canary budget; the reader fails closed rather than
+  // scanning the asset.
+  | "overture_data_layout_unsupported";
 
 export class OverturePlacesError extends Error {
   readonly code: OverturePlacesErrorCode;
