@@ -16,7 +16,31 @@ export type OverturePlacesErrorCode =
   | "budget_exhausted"
   | "cancelled"
   | "result_invalid"
-  | "secure_remote_geoparquet_transport_unavailable";
+  | "secure_remote_geoparquet_transport_unavailable"
+  // Secure capability-controlled byte-range transport (Phase 5A.1). Every code
+  // below is a deterministic, caller- or server-side protocol violation and is
+  // therefore non-retryable by default (see OverturePlacesError.retryable);
+  // range_status_invalid is the sole exception and sets retryable explicitly at
+  // its throw site for 429/5xx.
+  | "range_transport_untrusted"
+  | "range_invalid"
+  | "range_oversized"
+  | "range_headers_oversized"
+  | "range_status_invalid"
+  | "range_compressed"
+  | "range_transfer_invalid"
+  | "range_multipart_rejected"
+  | "range_length_mismatch"
+  | "range_cache_capacity_exceeded"
+  | "content_range_invalid"
+  | "content_range_mismatch"
+  // Stable asset-identity binding across ranged reads and retries.
+  | "asset_identity_invalid"
+  | "asset_identity_unavailable"
+  | "asset_identity_changed"
+  // Parquet container safety validated at the transport boundary.
+  | "parquet_magic_invalid"
+  | "parquet_metadata_invalid";
 
 export class OverturePlacesError extends Error {
   readonly code: OverturePlacesErrorCode;

@@ -27,10 +27,18 @@ describe("cumulative Overture live budgets", () => {
     expect(() => asset.reserveRequest("asset", 10)).toThrow("request budget");
 
     const bytes = syntheticBudget({ maxDownloadedBytes: 100 });
-    bytes.reserveRequest("asset", 100);
-    bytes.recordDownload(50);
+    const reserved = bytes.reserveRequest("asset", 40);
+    // Actual bytes may never exceed the amount reserved for the request.
+    expect(() => bytes.recordDownload(41, reserved)).toThrow("reservation");
+    bytes.recordDownload(40, reserved);
+    // A reconciled reservation cannot be reused.
+    expect(() => bytes.recordDownload(1, reserved)).toThrow("reconciled");
+    // The byte ceiling counts actual downloads plus any outstanding reservation.
+    const big = bytes.reserveRequest("asset", 60);
     expect(() => bytes.reserveRequest("asset", 1)).toThrow("byte budget");
-    expect(() => bytes.recordDownload(51)).toThrow("reservations");
+    bytes.recordDownload(60, big);
+    // Once the full 100 bytes are spent, no further reservation fits.
+    expect(() => bytes.reserveRequest("asset", 1)).toThrow("byte budget");
   });
 
   it("enforces processed-byte, row, candidate, geographic-area, and retry limits", () => {

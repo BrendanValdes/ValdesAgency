@@ -20,6 +20,8 @@
     "@resvg/resvg-js": "^2.6.2",
     "better-sqlite3": "^12.4.1",
     "discord.js": "^14.16.3",
+    "fzstd": "0.1.1",
+    "hyparquet": "1.26.2",
     "jpeg-js": "^0.4.4",
     "node-cron": "^3.0.3",
     "satori": "^0.26.0",

@@ -3,6 +3,8 @@ import { overtureFailure } from "./errors.js";
 export interface OvertureBudgetLimits {
   readonly maxStacRequests: number;
   readonly maxAssetRequests: number;
+  readonly maxAssetsInspected: number;
+  readonly maxRowGroupsInspected: number;
   readonly maxDownloadedBytes: number;
   readonly maxProcessedBytes: number;
   readonly maxRowsRead: number;
@@ -16,6 +18,8 @@ export interface OvertureBudgetLimits {
 export interface OvertureBudgetUsage {
   readonly stacRequests: number;
   readonly assetRequests: number;
+  readonly assetsInspected: number;
+  readonly rowGroupsInspected: number;
   readonly reservedDownloadedBytes: number;
   readonly downloadedBytes: number;
   readonly processedBytes: number;
@@ -32,9 +36,24 @@ export interface OvertureBudgetSnapshot {
   readonly elapsedMs: number;
 }
 
+export interface OvertureRequestReservation {
+  readonly kind: "stac" | "asset";
+  readonly maximumBytes: number;
+  readonly sequence: number;
+}
+
+interface ReservationState {
+  readonly owner: OvertureBudgetTracker;
+  active: boolean;
+}
+
+const reservationStates = new WeakMap<object, ReservationState>();
+
 const OVERTURE_BUDGET_USAGE_KEYS = Object.freeze([
   "stacRequests",
   "assetRequests",
+  "assetsInspected",
+  "rowGroupsInspected",
   "reservedDownloadedBytes",
   "downloadedBytes",
   "processedBytes",
@@ -46,7 +65,9 @@ const OVERTURE_BUDGET_USAGE_KEYS = Object.freeze([
 
 export const OVERTURE_CANARY_HARD_LIMITS: OvertureBudgetLimits = Object.freeze({
   maxStacRequests: 4,
-  maxAssetRequests: 8,
+  maxAssetRequests: 12,
+  maxAssetsInspected: 2,
+  maxRowGroupsInspected: 64,
   maxDownloadedBytes: 32 * 1024 * 1024,
   maxProcessedBytes: 64 * 1024 * 1024,
   maxRowsRead: 100,
@@ -67,6 +88,8 @@ function boundedInteger(name: string, value: number, maximum: number): number {
 function validateLimits(limits: OvertureBudgetLimits): OvertureBudgetLimits {
   boundedInteger("STAC request budget", limits.maxStacRequests, 8);
   boundedInteger("asset request budget", limits.maxAssetRequests, 32);
+  boundedInteger("asset inspection budget", limits.maxAssetsInspected, 16);
+  boundedInteger("row-group inspection budget", limits.maxRowGroupsInspected, 1_024);
   boundedInteger("download byte budget", limits.maxDownloadedBytes, 256 * 1024 * 1024);
   boundedInteger("processed byte budget", limits.maxProcessedBytes, 512 * 1024 * 1024);
   boundedInteger("row budget", limits.maxRowsRead, 10_000);
@@ -94,7 +117,7 @@ function validateUsage(usage: OvertureBudgetUsage): OvertureBudgetUsage {
   }
   if (usage.costMicroUsd !== 0) throw new Error("Persisted Overture cost must remain zero");
   if (usage.downloadedBytes > usage.reservedDownloadedBytes) {
-    throw new Error("Downloaded bytes cannot exceed conservative byte reservations");
+    throw new Error("Downloaded bytes cannot exceed cumulative byte reservations");
   }
   return Object.freeze({ ...usage });
 }
@@ -103,6 +126,8 @@ function emptyUsage(): OvertureBudgetUsage {
   return {
     stacRequests: 0,
     assetRequests: 0,
+    assetsInspected: 0,
+    rowGroupsInspected: 0,
     reservedDownloadedBytes: 0,
     downloadedBytes: 0,
     processedBytes: 0,
@@ -119,6 +144,8 @@ export class OvertureBudgetTracker {
   readonly #now: () => number;
   readonly #onChange: (snapshot: OvertureBudgetSnapshot) => void;
   #usage: OvertureBudgetUsage;
+  #outstandingDownloadedBytes = 0;
+  readonly #pendingReservations: OvertureRequestReservation[] = [];
 
   constructor(input: {
     limits: OvertureBudgetLimits;
@@ -149,7 +176,9 @@ export class OvertureBudgetTracker {
     const usage = this.#usage;
     if (usage.stacRequests > this.#limits.maxStacRequests ||
       usage.assetRequests > this.#limits.maxAssetRequests ||
-      usage.reservedDownloadedBytes > this.#limits.maxDownloadedBytes ||
+      usage.assetsInspected > this.#limits.maxAssetsInspected ||
+      usage.rowGroupsInspected > this.#limits.maxRowGroupsInspected ||
+      usage.downloadedBytes > this.#limits.maxDownloadedBytes ||
       usage.processedBytes > this.#limits.maxProcessedBytes ||
       usage.rowsRead > this.#limits.maxRowsRead ||
       usage.candidates > this.#limits.maxCandidates ||
@@ -163,29 +192,85 @@ export class OvertureBudgetTracker {
     this.#onChange(this.snapshot());
   }
 
-  reserveRequest(kind: "stac" | "asset", maximumBytes: number): void {
+  reserveRequest(kind: "stac" | "asset", maximumBytes: number): OvertureRequestReservation {
     this.#assertRuntime();
     boundedInteger("request byte reservation", maximumBytes, this.#limits.maxDownloadedBytes);
     const requestKey = kind === "stac" ? "stacRequests" : "assetRequests";
     const maximum = kind === "stac" ? this.#limits.maxStacRequests : this.#limits.maxAssetRequests;
     if (this.#usage[requestKey] >= maximum) this.#blocked(`${kind} request budget is exhausted`);
-    if (this.#usage.reservedDownloadedBytes + maximumBytes > this.#limits.maxDownloadedBytes) {
+    if (this.#usage.downloadedBytes + this.#outstandingDownloadedBytes + maximumBytes >
+      this.#limits.maxDownloadedBytes) {
       this.#blocked("Overture download byte budget is exhausted");
     }
+    const reservation: OvertureRequestReservation = Object.freeze({
+      kind,
+      maximumBytes,
+      sequence: this.#usage.stacRequests + this.#usage.assetRequests + 1,
+    });
     this.#usage = {
       ...this.#usage,
       [requestKey]: this.#usage[requestKey] + 1,
       reservedDownloadedBytes: this.#usage.reservedDownloadedBytes + maximumBytes,
     };
+    this.#outstandingDownloadedBytes += maximumBytes;
+    reservationStates.set(reservation, { owner: this, active: true });
+    this.#pendingReservations.push(reservation);
+    this.#changed();
+    return reservation;
+  }
+
+  recordDownload(
+    actualBytes: number,
+    reservation: OvertureRequestReservation | undefined = undefined,
+  ): void {
+    boundedInteger("downloaded bytes", actualBytes, this.#limits.maxDownloadedBytes);
+    const selected = reservation ?? this.#pendingReservations.find((candidate) =>
+      reservationStates.get(candidate)?.active
+    );
+    if (!selected) this.#blocked("Downloaded bytes have no active request reservation");
+    const state = reservationStates.get(selected);
+    if (!state || state.owner !== this || !state.active) {
+      this.#blocked("Overture request reservation is invalid or already reconciled");
+    }
+    if (actualBytes > selected.maximumBytes) {
+      this.#blocked("Actual Overture bytes exceed their request reservation");
+    }
+    if (this.#usage.downloadedBytes + actualBytes > this.#limits.maxDownloadedBytes) {
+      this.#blocked("Overture download byte budget is exhausted");
+    }
+    state.active = false;
+    this.#outstandingDownloadedBytes -= selected.maximumBytes;
+    this.#usage = { ...this.#usage, downloadedBytes: this.#usage.downloadedBytes + actualBytes };
     this.#changed();
   }
 
-  recordDownload(actualBytes: number): void {
-    boundedInteger("downloaded bytes", actualBytes, this.#limits.maxDownloadedBytes);
-    if (this.#usage.downloadedBytes + actualBytes > this.#usage.reservedDownloadedBytes) {
-      this.#blocked("Actual Overture bytes exceed their request reservations");
+  releaseRequest(reservation: OvertureRequestReservation): void {
+    const state = reservationStates.get(reservation);
+    if (!state || state.owner !== this || !state.active) {
+      this.#blocked("Overture request reservation is invalid or already reconciled");
     }
-    this.#usage = { ...this.#usage, downloadedBytes: this.#usage.downloadedBytes + actualBytes };
+    state.active = false;
+    this.#outstandingDownloadedBytes -= reservation.maximumBytes;
+    this.#changed();
+  }
+
+  recordAssetInspection(count = 1): void {
+    this.#assertRuntime();
+    boundedInteger("asset inspection count", count, this.#limits.maxAssetsInspected);
+    if (this.#usage.assetsInspected + count > this.#limits.maxAssetsInspected) {
+      this.#blocked("Overture asset inspection budget is exhausted");
+    }
+    this.#usage = { ...this.#usage, assetsInspected: this.#usage.assetsInspected + count };
+    this.#changed();
+  }
+
+  recordRowGroupInspection(count: number): void {
+    this.#assertRuntime();
+    boundedInteger("row-group inspection count", count, this.#limits.maxRowGroupsInspected);
+    if (this.#usage.rowGroupsInspected + count > this.#limits.maxRowGroupsInspected) {
+      this.#blocked("Overture row-group inspection budget is exhausted");
+    }
+    this.#usage = { ...this.#usage, rowGroupsInspected: this.#usage.rowGroupsInspected + count };
     this.#changed();
   }
 
@@ -245,7 +330,15 @@ export class OvertureBudgetTracker {
       remaining: {
         maxStacRequests: Math.max(0, this.#limits.maxStacRequests - this.#usage.stacRequests),
         maxAssetRequests: Math.max(0, this.#limits.maxAssetRequests - this.#usage.assetRequests),
-        maxDownloadedBytes: Math.max(0, this.#limits.maxDownloadedBytes - this.#usage.reservedDownloadedBytes),
+        maxAssetsInspected: Math.max(0, this.#limits.maxAssetsInspected - this.#usage.assetsInspected),
+        maxRowGroupsInspected: Math.max(
+          0,
+          this.#limits.maxRowGroupsInspected - this.#usage.rowGroupsInspected,
+        ),
+        maxDownloadedBytes: Math.max(
+          0,
+          this.#limits.maxDownloadedBytes - this.#usage.downloadedBytes - this.#outstandingDownloadedBytes,
+        ),
         maxProcessedBytes: Math.max(0, this.#limits.maxProcessedBytes - this.#usage.processedBytes),
         maxRowsRead: Math.max(0, this.#limits.maxRowsRead - this.#usage.rowsRead),
         maxCandidates: Math.max(0, this.#limits.maxCandidates - this.#usage.candidates),

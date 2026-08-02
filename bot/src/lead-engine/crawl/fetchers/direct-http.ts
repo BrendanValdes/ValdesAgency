@@ -140,6 +140,14 @@ const productionTransport: PinnedHttpTransport = {
   },
 };
 
+/**
+ * Low-level pinned transport for narrowly scoped protocol adapters that apply
+ * their own capability, destination, response, and budget policy.
+ */
+export function createProductionPinnedHttpTransport(): PinnedHttpTransport {
+  return productionTransport;
+}
+
 const testLoopbackResolver: DnsResolver = {
   async resolve(hostname) {
     const family = isIP(hostname);

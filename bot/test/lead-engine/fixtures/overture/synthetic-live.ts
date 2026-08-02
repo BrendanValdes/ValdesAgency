@@ -103,6 +103,8 @@ export function syntheticQueryPlan(
 export const SYNTHETIC_OVERTURE_BUDGET_LIMITS: OvertureBudgetLimits = Object.freeze({
   maxStacRequests: 4,
   maxAssetRequests: 16,
+  maxAssetsInspected: 4,
+  maxRowGroupsInspected: 64,
   maxDownloadedBytes: 16 * 1024 * 1024,
   maxProcessedBytes: 32 * 1024 * 1024,
   maxRowsRead: 100,
