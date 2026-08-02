@@ -16,6 +16,7 @@ import { normalizeWebUrl, UrlSafetyError } from "../crawl/url-safety.js";
 export type CandidateBlockReason =
   | "not_accepted"
   | "review_disposition"
+  | "supporting_disposition"
   | "not_operating"
   | "no_observed_website"
   | "unsafe_candidate_url"
@@ -43,6 +44,7 @@ function emptyCounts(): Record<CandidateBlockReason, number> {
   return {
     not_accepted: 0,
     review_disposition: 0,
+    supporting_disposition: 0,
     not_operating: 0,
     no_observed_website: 0,
     unsafe_candidate_url: 0,
@@ -93,10 +95,15 @@ export function selectAssessableCandidates(
       blockedCounts.not_accepted += 1;
       continue;
     }
-    // A "review" classification is explicitly not an accepted candidate for
-    // crawling; it stays queued for human review instead.
+    // Only a strong pool-service classification is admissible. "review" stays
+    // queued for a human; "supporting" is an adjacent signal, not a contractor.
+    // Neither is ever crawled to increase yield.
     if (observation.categoryDisposition === "review") {
       blockedCounts.review_disposition += 1;
+      continue;
+    }
+    if (observation.categoryDisposition !== "strong") {
+      blockedCounts.supporting_disposition += 1;
       continue;
     }
     // Closed or unknown-status places are stale for outreach purposes.

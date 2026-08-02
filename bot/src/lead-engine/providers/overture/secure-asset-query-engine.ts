@@ -238,6 +238,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
   readonly #maxCoalescedSpanBytes: number;
   readonly #candidateTarget: number | null;
   readonly #isCandidate: (row: Record<string, unknown>) => boolean;
+  readonly #retainOnlyCandidates: boolean;
 
   constructor(input: {
     policy: RuntimeLeadPolicy;
@@ -254,6 +255,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     maxCoalescedSpanBytes: number;
     candidateTarget: number | null;
     isCandidate: (row: Record<string, unknown>) => boolean;
+    retainOnlyCandidates: boolean;
   }) {
     this.#policy = input.policy;
     this.#capability = input.capability;
@@ -269,6 +271,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     this.#maxCoalescedSpanBytes = input.maxCoalescedSpanBytes;
     this.#candidateTarget = input.candidateTarget;
     this.#isCandidate = input.isCandidate;
+    this.#retainOnlyCandidates = input.retainOnlyCandidates;
   }
 
   async query(
@@ -443,8 +446,9 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
               }
               seenIds.add(id);
             }
-            records.push(row);
-            if (!this.#isCandidate(row)) continue;
+            const isCandidate = this.#isCandidate(row);
+            if (isCandidate || !this.#retainOnlyCandidates) records.push(row);
+            if (!isCandidate) continue;
             candidateCount += 1;
             // Enforce the candidate target inside the group as well as between
             // groups, so a single dense group cannot overshoot the hard ceiling.
@@ -512,6 +516,12 @@ export function createSecureOvertureAssetQueryEngine(input: {
    */
   candidateTarget?: number | null;
   isCandidate?: (row: Record<string, unknown>) => boolean;
+  /**
+   * When true, only rows the predicate accepts are returned. Used by targeted
+   * runs that must not materialise off-target records at all; the default
+   * returns every in-bounds row so broad discovery is unchanged.
+   */
+  retainOnlyCandidates?: boolean;
 }): OvertureAssetQueryEngine {
   assertRuntimeLeadPolicy(input.policy);
   const provider = requireProviderPolicy(input.policy, OVERTURE_PLACES_PROVIDER_ID);
@@ -563,5 +573,6 @@ export function createSecureOvertureAssetQueryEngine(input: {
     maxCoalescedSpanBytes,
     candidateTarget,
     isCandidate: input.isCandidate ?? (() => true),
+    retainOnlyCandidates: input.retainOnlyCandidates ?? false,
   }));
 }

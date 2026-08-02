@@ -307,6 +307,7 @@ async function runEngine(input: {
   budget?: OvertureBudgetTracker;
   signal?: AbortSignal;
   rangeTotal?: number;
+  retainOnlyCandidates?: boolean;
 }) {
   const live = syntheticLivePolicy();
   const calls: ReaderCall[] = [];
@@ -322,6 +323,7 @@ async function runEngine(input: {
       now: () => "2026-08-01T12:00:00.000Z",
       ...(input.candidateTarget === undefined ? {} : { candidateTarget: input.candidateTarget }),
       ...(input.isCandidate ? { isCandidate: input.isCandidate } : {}),
+      ...(input.retainOnlyCandidates === undefined ? {} : { retainOnlyCandidates: input.retainOnlyCandidates }),
     });
     const result = await engine.query({
       release: SYNTHETIC_OVERTURE_RELEASE_PIN,
@@ -464,6 +466,22 @@ describe("secure Overture asset query engine", () => {
     } finally {
       live.cleanup();
     }
+  });
+
+  it("retains only predicate-matching rows when targeted retention is enabled", async () => {
+    const metadata = craftMetadata([{ rows: 2, projectedBytes: 500, extent: INSIDE }]);
+    const rows = () => [place("wanted", -112.07, 33.45), place("unwanted", -112.06, 33.46)];
+    const keep = (row: Record<string, unknown>) => String((row as { id: string }).id) === "wanted";
+
+    const broad = await runEngine({ metadata, rows, maxRows: 100, isCandidate: keep });
+    // Default behaviour is unchanged: every in-bounds row is still returned.
+    expect(broad.result.records).toHaveLength(2);
+
+    const targeted = await runEngine({
+      metadata, rows, maxRows: 100, isCandidate: keep, retainOnlyCandidates: true,
+    });
+    expect(targeted.result.records).toHaveLength(1);
+    expect((targeted.result.records[0] as { id: string }).id).toBe("wanted");
   });
 
   it("fails closed with overture_data_layout_unsupported when a required column is absent", async () => {

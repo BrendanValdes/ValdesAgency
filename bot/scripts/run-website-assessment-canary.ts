@@ -332,9 +332,10 @@ export async function runWebsiteAssessmentCanary(input: {
 
 async function main(): Promise<void> {
   const repositoryRoot = path.resolve(process.cwd(), "..");
-  // Discovery envelopes come from the Phase 5A.2 bounded Overture canary path.
-  const { discoverAcceptedPhoenixCandidates } = await import("./overture-accepted-candidates.js");
-  const envelopes = await discoverAcceptedPhoenixCandidates();
+  // Discovery envelopes come from the Phase 5A.3 bounded suburban traversal,
+  // which yields strong-category contractors rather than downtown facilities.
+  const { discoverSuburbanPhoenixCandidates } = await import("./overture-suburban-candidates.js");
+  const envelopes = (await discoverSuburbanPhoenixCandidates()).envelopes;
   const report = await runWebsiteAssessmentCanary({
     argv: process.argv.slice(2),
     repositoryRoot,
