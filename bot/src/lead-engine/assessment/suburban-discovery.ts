@@ -52,6 +52,15 @@ const SUBURBAN_CENTERS: ReadonlyArray<{ label: string; longitude: number; latitu
     { label: "East Mesa residential", longitude: -111.700, latitude: 33.415 },
     { label: "West Chandler residential", longitude: -111.923, latitude: 33.302 },
     { label: "Gilbert south residential", longitude: -111.760, latitude: 33.279 },
+    { label: "Mesa north residential", longitude: -111.831, latitude: 33.470 },
+    { label: "Chandler south residential", longitude: -111.841, latitude: 33.248 },
+    { label: "Scottsdale central residential", longitude: -111.921, latitude: 33.494 },
+    { label: "Glendale west residential", longitude: -112.259, latitude: 33.539 },
+    { label: "Peoria south residential", longitude: -112.238, latitude: 33.581 },
+    { label: "Tempe south residential", longitude: -111.936, latitude: 33.351 },
+    { label: "Mesa southeast residential", longitude: -111.700, latitude: 33.360 },
+    { label: "Surprise south residential", longitude: -112.368, latitude: 33.575 },
+    { label: "Buckeye residential", longitude: -112.558, latitude: 33.430 },
   ]);
 
 export function suburbanPhoenixTargets(): ReadonlyArray<GeographyTarget> {

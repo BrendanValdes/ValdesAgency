@@ -103,6 +103,14 @@ export interface OvertureAssetQueryResult {
   readonly rowGroupsRead: number;
   readonly duplicateRowsSkipped: number;
   readonly stopReason: OvertureTraversalStopReason;
+  /** Rows read through the cheap early-filter projection. */
+  readonly rowsScanned: number;
+  /** Rows decoded through the full candidate projection. */
+  readonly rowsMaterialised: number;
+  /** Row groups skipped by the early filter before full materialisation. */
+  readonly earlyFilteredGroups: number;
+  /** Row groups skipped using column statistics, before any row was read. */
+  readonly statisticsPrunedGroups: number;
 }
 
 export interface OvertureAssetQueryInput {

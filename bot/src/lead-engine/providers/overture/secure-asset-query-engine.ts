@@ -239,6 +239,9 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
   readonly #candidateTarget: number | null;
   readonly #isCandidate: (row: Record<string, unknown>) => boolean;
   readonly #retainOnlyCandidates: boolean;
+  readonly #earlyFilterColumns: ReadonlyArray<string>;
+  readonly #earlyFilterAccepts: ((row: Record<string, unknown>) => boolean) | null;
+  readonly #earlyFilterValues: ReadonlyArray<string>;
 
   constructor(input: {
     policy: RuntimeLeadPolicy;
@@ -256,6 +259,9 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     candidateTarget: number | null;
     isCandidate: (row: Record<string, unknown>) => boolean;
     retainOnlyCandidates: boolean;
+    earlyFilterColumns: ReadonlyArray<string>;
+    earlyFilterAccepts: ((row: Record<string, unknown>) => boolean) | null;
+    earlyFilterValues: ReadonlyArray<string>;
   }) {
     this.#policy = input.policy;
     this.#capability = input.capability;
@@ -272,6 +278,9 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     this.#candidateTarget = input.candidateTarget;
     this.#isCandidate = input.isCandidate;
     this.#retainOnlyCandidates = input.retainOnlyCandidates;
+    this.#earlyFilterColumns = input.earlyFilterColumns;
+    this.#earlyFilterAccepts = input.earlyFilterAccepts;
+    this.#earlyFilterValues = input.earlyFilterValues;
   }
 
   async query(
@@ -305,6 +314,10 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     let rowGroupsSelected = 0;
     let rowGroupsRead = 0;
     let duplicateRowsSkipped = 0;
+    let rowsScanned = 0;
+    let rowsMaterialised = 0;
+    let earlyFilteredGroups = 0;
+    let statisticsPrunedGroups = 0;
     let candidateCount = 0;
     let stopReason: OvertureTraversalStopReason = "no_relevant_row_groups_remaining";
     let halted = false;
@@ -369,6 +382,16 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
         const uncompressedByIndex = new Map(
           spatialPlans.map((group) => [group.index, group.projectedUncompressedBytes]),
         );
+        const filterSpanByIndex = new Map(
+          footer.metadata.rowGroups.map((rowGroup) => {
+            const probeColumns = rowGroup.columns.filter((entry) =>
+              this.#earlyFilterColumns.includes(topLevel(entry.path)));
+            if (probeColumns.length === 0) return [rowGroup.index, null];
+            const start = Math.min(...probeColumns.map((entry) => entry.startOffset));
+            const end = Math.max(...probeColumns.map((entry) => entry.endOffset));
+            return [rowGroup.index, [start, end] as const];
+          }),
+        );
         const spanByIndex = new Map(
           spatialPlans.map((group) => [group.index, [group.projectedStartOffset, group.projectedEndOffset] as const]),
         );
@@ -394,8 +417,27 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
           if (area <= 0) return 1;
           return (overlapWidth * overlapHeight) / area;
         };
-        const ordered = [...selection.selected].sort((left, right) =>
-          relevance(right.index) - relevance(left.index) || left.index - right.index);
+        // Statistics pruning: skip a group outright when the recorded min/max of
+        // the filter column excludes every accepted value. Absent or undecodable
+        // statistics keep the group, so this can never prune a real match.
+        const statisticsAllows = (index: number): boolean => {
+          const statsColumn = this.#earlyFilterColumns[0];
+          if (!statsColumn || this.#earlyFilterValues.length === 0) return true;
+          const column = footer.metadata.rowGroups[index]?.columns
+            .find((entry) => entry.path === statsColumn);
+          const minimum = column?.statMinText ?? null;
+          const maximum = column?.statMaxText ?? null;
+          if (minimum === null || maximum === null || minimum > maximum) return true;
+          return this.#earlyFilterValues.some((value) => value >= minimum && value <= maximum);
+        };
+        const ordered = [...selection.selected]
+          .filter((group) => {
+            if (statisticsAllows(group.index)) return true;
+            statisticsPrunedGroups += 1;
+            return false;
+          })
+          .sort((left, right) =>
+            relevance(right.index) - relevance(left.index) || left.index - right.index);
         for (const group of ordered) {
           const plannedSpan = spanByIndex.get(group.index);
           const groupHalt = haltReason(
@@ -418,6 +460,41 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
           // This lowers the request count for identical bytes; it does not widen
           // any byte, capability, or destination limit.
           const span = spanByIndex.get(group.index);
+
+          // Phase 1 — early column-projection filter. Read only the filter
+          // column for this group. Groups with no accepted value never have
+          // their full projection downloaded or decoded.
+          if (this.#earlyFilterColumns.length > 0 && this.#earlyFilterAccepts) {
+            const filterSpan = filterSpanByIndex.get(group.index);
+            if (filterSpan && filterSpan[1] > filterSpan[0] &&
+              filterSpan[1] - filterSpan[0] <= this.#maxCoalescedSpanBytes) {
+              await source.slice(filterSpan[0], filterSpan[1]);
+            }
+            const probe = await this.#reader.readColumns({
+              footer, source, columns: this.#earlyFilterColumns,
+              rowStart: group.startRow, rowEnd: group.startRow + toRead, signal,
+            });
+            rowsScanned += Math.min(probe.length, toRead);
+            const accepts = this.#earlyFilterAccepts;
+            const columns = this.#earlyFilterColumns;
+            const window = probe.slice(0, toRead);
+            // Safe fallback: if the probe produced no usable value for any
+            // filter column, the filter is not informative for this group and
+            // the group is materialised in full. Skipping here would be a false
+            // negative, which the filter must never introduce.
+            const readable = window.some((row) =>
+              columns.some((column) => row[column] !== undefined && row[column] !== null));
+            const matched = !readable || window.some((row) => accepts(row));
+            if (!matched) {
+              earlyFilteredGroups += 1;
+              rowGroupsRead += 1;
+              // Scanned rows still count against the row budget; the expensive
+              // full-projection read is what was avoided.
+              rowsRead += Math.min(probe.length, toRead);
+              continue;
+            }
+          }
+
           if (span && span[1] > span[0] && span[1] - span[0] <= this.#maxCoalescedSpanBytes) {
             await source.slice(span[0], span[1]);
           }
@@ -429,6 +506,8 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
             rowEnd: group.startRow + toRead,
             signal,
           });
+          rowsMaterialised += Math.min(rows.length, toRead);
+          if (this.#earlyFilterColumns.length === 0) rowsScanned += Math.min(rows.length, toRead);
           const decoded = Math.min(rows.length, toRead);
           rowsRead += decoded;
           rowGroupsRead += 1;
@@ -479,6 +558,10 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
       rowGroupsRead,
       duplicateRowsSkipped,
       stopReason,
+      rowsScanned,
+      rowsMaterialised,
+      earlyFilteredGroups,
+      statisticsPrunedGroups,
     };
   }
 
@@ -522,6 +605,22 @@ export function createSecureOvertureAssetQueryEngine(input: {
    * returns every in-bounds row so broad discovery is unchanged.
    */
   retainOnlyCandidates?: boolean;
+  /**
+   * Optional early filter. When set, each row group is first read with ONLY this
+   * column projected; the full projection is materialised only for groups that
+   * contain an accepted value. This is client-side early column-projection
+   * filtering, not provider-side predicate pushdown: Overture serves static
+   * Parquet over byte ranges and evaluates nothing server side.
+   */
+  earlyFilterColumns?: ReadonlyArray<string>;
+  earlyFilterAccepts?: (row: Record<string, unknown>) => boolean;
+  /**
+   * Exact accepted values, used only for statistics-based row-group pruning. A
+   * group is skipped without reading a row when every accepted value falls
+   * outside the group's recorded [min, max]. Missing or undecodable statistics
+   * always keep the group, so pruning can never cause a false negative.
+   */
+  earlyFilterValues?: ReadonlyArray<string>;
 }): OvertureAssetQueryEngine {
   assertRuntimeLeadPolicy(input.policy);
   const provider = requireProviderPolicy(input.policy, OVERTURE_PLACES_PROVIDER_ID);
@@ -574,5 +673,8 @@ export function createSecureOvertureAssetQueryEngine(input: {
     candidateTarget,
     isCandidate: input.isCandidate ?? (() => true),
     retainOnlyCandidates: input.retainOnlyCandidates ?? false,
+    earlyFilterColumns: Object.freeze([...(input.earlyFilterColumns ?? [])]),
+    earlyFilterAccepts: input.earlyFilterAccepts ?? null,
+    earlyFilterValues: Object.freeze([...(input.earlyFilterValues ?? [])]),
   }));
 }

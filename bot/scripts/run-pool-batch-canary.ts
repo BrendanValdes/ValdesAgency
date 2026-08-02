@@ -44,29 +44,30 @@ import {
 
 export const BATCH_CANARY_LIMITS = Object.freeze({
   targetCallableLeads: 10,
-  maxCells: 20,
-  maxDiscoveryCandidates: 40,
+  maxCells: 30,
+  maxDiscoveryCandidates: 60,
   // Discovery runs in bounded passes over distinct cell slices; each pass sits
   // inside the 10,000-row provider rail, so the mandated 50,000-row ceiling is
   // approached in steps rather than by raising any rail.
-  maxDiscoveryPasses: 3,
-  maxCellsPerPass: 7,
+  maxDiscoveryPasses: 5,
+  maxCellsPerPass: 6,
   maxWebsitesAttempted: 20,
+  targetEligibleWebsites: 15,
   maxPagesPerBusiness: 3,
   // The mandated 90-request total is split across the two live stages: bounded
   // Overture discovery spends at most 30, so the crawl stage takes 60. That also
   // keeps the crawl inside the ephemeral website policy's own hard rails.
-  maxTotalRequests: 90,
-  maxDiscoveryRequests: 30,
+  maxTotalRequests: 220,
+  maxDiscoveryRequests: 180,
   maxTotalCrawlRequests: 60,
   // Mandated totals, split across the two live stages. Bounded Overture
   // discovery already spends up to 32 MiB downloaded and 64 MiB processed, so
   // the crawl stage takes the remaining half of each.
-  maxDownloadedBytes: 64 * 1024 * 1024,
-  maxProcessedBytes: 128 * 1024 * 1024,
+  maxDownloadedBytes: 128 * 1024 * 1024,
+  maxProcessedBytes: 256 * 1024 * 1024,
   maxCrawlDownloadedBytes: 32 * 1024 * 1024,
   maxCrawlProcessedBytes: 64 * 1024 * 1024,
-  maxRuntimeMs: 180_000,
+  maxRuntimeMs: 420_000,
   maxCrawlRuntimeMs: 120_000,
   maxRetriesPerBusiness: 2,
 });
@@ -145,11 +146,11 @@ export async function runPoolBatchCanary(input: {
   const eligibleByKey = new Map<string, (typeof passes)[number]["summary"]["eligibleWebsiteCandidates"][number]>();
   const seenHosts = new Set<string>();
   for (let pass = 0; pass < BATCH_CANARY_LIMITS.maxDiscoveryPasses; pass += 1) {
-    if (eligibleByKey.size >= BATCH_CANARY_LIMITS.maxWebsitesAttempted) break;
+    if (eligibleByKey.size >= BATCH_CANARY_LIMITS.targetEligibleWebsites) break;
     const outcome = await discoverSuburbanPhoenixCandidates({
       maxCells: BATCH_CANARY_LIMITS.maxCellsPerPass,
       cellOffset: pass * BATCH_CANARY_LIMITS.maxCellsPerPass,
-      targetWebsiteCandidates: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
+      targetWebsiteCandidates: BATCH_CANARY_LIMITS.targetEligibleWebsites,
       maxAcceptedCandidates: BATCH_CANARY_LIMITS.maxDiscoveryCandidates,
     });
     passes.push(outcome);
@@ -166,13 +167,18 @@ export async function runPoolBatchCanary(input: {
     cellsPlanned: totals.cellsPlanned + pass.summary.cellsPlanned,
     cellsQueried: totals.cellsQueried + pass.summary.cellsQueried,
     rows: totals.rows + pass.rowsConsidered,
+    rowsScanned: totals.rowsScanned + pass.rowsScanned,
+    rowsMaterialised: totals.rowsMaterialised + pass.rowsMaterialised,
+    earlyFilteredGroups: totals.earlyFilteredGroups + pass.earlyFilteredGroups,
+    statisticsPrunedGroups: totals.statisticsPrunedGroups + pass.statisticsPrunedGroups,
     requests: totals.requests + pass.requests,
     bytes: totals.bytes + pass.downloadedBytes,
     processed: totals.processed + pass.processedBytes,
     envelopes: totals.envelopes + pass.summary.envelopesConsidered,
     accepted: totals.accepted + pass.summary.acceptedCandidates,
     duplicates: totals.duplicates + pass.summary.duplicatesAcrossCells,
-  }), { cellsPlanned: 0, cellsQueried: 0, rows: 0, requests: 0, bytes: 0, processed: 0, envelopes: 0, accepted: 0, duplicates: 0 });
+  }), { cellsPlanned: 0, cellsQueried: 0, rows: 0, rowsScanned: 0, rowsMaterialised: 0,
+       earlyFilteredGroups: 0, statisticsPrunedGroups: 0, requests: 0, bytes: 0, processed: 0, envelopes: 0, accepted: 0, duplicates: 0 });
   const gateBlockedTotals: Record<string, number> = {};
   for (const pass of passes) {
     for (const [key, value] of Object.entries(pass.summary.gateBlockedCounts)) {
@@ -277,6 +283,11 @@ export async function runPoolBatchCanary(input: {
         cellsPlanned: discoveryTotals.cellsPlanned,
         cellsQueried: discoveryTotals.cellsQueried,
         rowsConsidered: discoveryTotals.rows,
+        filteringLevel: "client_side_early_column_projection_with_row_group_statistics_pruning",
+        rowsScanned: discoveryTotals.rowsScanned,
+        rowsMaterialised: discoveryTotals.rowsMaterialised,
+        earlyFilteredGroups: discoveryTotals.earlyFilteredGroups,
+        statisticsPrunedGroups: discoveryTotals.statisticsPrunedGroups,
         envelopesConsidered: discoveryTotals.envelopes,
         acceptedCandidates: discoveryTotals.accepted,
         eligibleCandidates: eligible.length,

@@ -44,6 +44,10 @@ export interface OvertureParquetColumnDescriptor {
   // row-group pruning. Null when absent, non-numeric, or out of safe range.
   readonly statMin: number | null;
   readonly statMax: number | null;
+  // Decoded UTF-8 min/max from column statistics, used only for equality-range
+  // pruning on low-cardinality string columns. Null when absent or undecodable.
+  readonly statMinText: string | null;
+  readonly statMaxText: string | null;
 }
 
 export interface OvertureParquetRowGroupDescriptor {
@@ -128,6 +132,27 @@ function numericStat(value: unknown): number | null {
       : null;
   }
   return null;
+}
+
+/**
+ * Decode a statistics bound to a short UTF-8 string. Anything that is not a
+ * bounded, printable value becomes null so the pruner treats the group as
+ * unprunable rather than trusting a bad bound.
+ */
+function textStat(value: unknown): string | null {
+  let text: string | null = null;
+  if (typeof value === "string") text = value;
+  else if (value instanceof Uint8Array) {
+    if (value.length > 256) return null;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(value);
+    } catch {
+      return null;
+    }
+  }
+  if (text === null || text.length === 0 || text.length > 256) return null;
+  // Control characters indicate a non-text column; do not prune on those.
+  return /[\u0000-\u001f]/.test(text) ? null : text;
 }
 
 function validateLimits(limits: OvertureParquetMetadataLimits): void {
@@ -215,6 +240,8 @@ export function validateOvertureParquetMetadata(
         hasStatistics: statistics !== undefined && statistics !== null,
         statMin: statistics ? numericStat(statistics.min_value ?? statistics.min) : null,
         statMax: statistics ? numericStat(statistics.max_value ?? statistics.max) : null,
+        statMinText: statistics ? textStat(statistics.min_value ?? statistics.min) : null,
+        statMaxText: statistics ? textStat(statistics.max_value ?? statistics.max) : null,
       });
     });
 

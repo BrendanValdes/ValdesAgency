@@ -62,6 +62,10 @@ export interface OverturePlacesAdapterAudit {
   readonly rowGroupsRead: number;
   readonly duplicateRowsSkipped: number;
   readonly traversalStopReason: OvertureTraversalStopReason | null;
+  readonly rowsScanned: number;
+  readonly rowsMaterialised: number;
+  readonly earlyFilteredGroups: number;
+  readonly statisticsPrunedGroups: number;
 }
 
 function primaryName(record: OverturePlaceRecord): string | null {
@@ -349,6 +353,10 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         rowGroupsRead: result.rowGroupsRead,
         duplicateRowsSkipped: result.duplicateRowsSkipped,
         traversalStopReason: result.stopReason,
+        rowsScanned: result.rowsScanned,
+        rowsMaterialised: result.rowsMaterialised,
+        earlyFilteredGroups: result.earlyFilteredGroups,
+        statisticsPrunedGroups: result.statisticsPrunedGroups,
       });
       return { status, envelopes };
     } catch (error) {
@@ -369,6 +377,10 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         rowGroupsRead: 0,
         duplicateRowsSkipped: 0,
         traversalStopReason: null,
+        rowsScanned: 0,
+        rowsMaterialised: 0,
+        earlyFilteredGroups: 0,
+        statisticsPrunedGroups: 0,
       });
       return { status: "failed", envelopes: [envelope] };
     }

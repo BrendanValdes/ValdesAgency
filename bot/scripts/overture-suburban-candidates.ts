@@ -24,7 +24,10 @@ import {
 import { OvertureReleaseResolver } from "../src/lead-engine/providers/overture/release-resolver.js";
 import { createSecureOvertureAssetQueryEngine } from "../src/lead-engine/providers/overture/secure-asset-query-engine.js";
 import { overturePlaceRecordSchema } from "../src/lead-engine/providers/overture/schema.js";
-import { classifyOverturePoolCategory } from "../src/lead-engine/providers/overture/taxonomy.js";
+import {
+  classifyOverturePoolCategory,
+  OVERTURE_POOL_SERVICE_TAXONOMY_V1,
+} from "../src/lead-engine/providers/overture/taxonomy.js";
 import { OVERTURE_PLACES_PROVIDER_ID } from "../src/lead-engine/providers/overture/types.js";
 import type {
   DiscoveryProviderRequest,
@@ -68,6 +71,34 @@ export const SUBURBAN_TARGET_WEBSITE_CANDIDATES = 3;
  * excluded "excluded"/"missing" would treat every unrelated business as a
  * candidate and stop the traversal before it ever reached a contractor.
  */
+/**
+ * Accepted values for the early category filter: exactly the validated strong
+ * mapping. Review categories such as hot_tub_and_pool_store, plus supporting,
+ * facility, retail, and unknown categories, are never accepted here.
+ */
+const STRONG_CATEGORY_VALUES: ReadonlyArray<string> =
+  Object.freeze([...OVERTURE_POOL_SERVICE_TAXONOMY_V1.strong]);
+const STRONG_CATEGORY_SET = new Set<string>(STRONG_CATEGORY_VALUES);
+
+/**
+ * Early filter predicate over the minimum projection the classifier needs.
+ * basic_category alone is not sufficient: the strong signal frequently lives in
+ * taxonomy.primary, so probing only basic_category prunes real matches.
+ */
+function acceptsStrongCategory(row: Record<string, unknown>): boolean {
+  const basic = row.basic_category;
+  if (typeof basic === "string" && STRONG_CATEGORY_SET.has(basic)) return true;
+  const taxonomy = row.taxonomy as
+    | { primary?: unknown; hierarchy?: unknown; alternates?: unknown } | null | undefined;
+  if (!taxonomy) return false;
+  const values = [
+    taxonomy.primary,
+    ...(Array.isArray(taxonomy.hierarchy) ? taxonomy.hierarchy : []),
+    ...(Array.isArray(taxonomy.alternates) ? taxonomy.alternates : []),
+  ];
+  return values.some((value) => typeof value === "string" && STRONG_CATEGORY_SET.has(value));
+}
+
 function isStrongPoolServiceCandidate(row: Record<string, unknown>): boolean {
   const parsed = overturePlaceRecordSchema.safeParse(row);
   if (!parsed.success) return false;
@@ -93,6 +124,10 @@ export interface SuburbanDiscoveryOutcome {
   readonly downloadedBytes: number;
   readonly processedBytes: number;
   readonly rowsConsidered: number;
+  readonly rowsScanned: number;
+  readonly rowsMaterialised: number;
+  readonly earlyFilteredGroups: number;
+  readonly statisticsPrunedGroups: number;
   readonly budgetRemaining: Readonly<Record<string, number>>;
   readonly destinationsContacted: ReadonlyArray<string>;
   readonly elapsedMs: number;
@@ -122,6 +157,9 @@ export async function discoverSuburbanPhoenixCandidates(options: {
   const deadline = setTimeout(() => controller.abort(), limits.maxRuntimeMs);
   const contacted = new Set<string>();
   const collected: ProviderEnvelope<NormalizedDiscoveryResult>[] = [];
+  const efficiency = {
+    rowsScanned: 0, rowsMaterialised: 0, earlyFilteredGroups: 0, statisticsPrunedGroups: 0,
+  };
   try {
     const cells = planSuburbanCells({
       configurationVersion: policy.policy.schemaVersion,
@@ -216,6 +254,12 @@ export async function discoverSuburbanPhoenixCandidates(options: {
           // Off-target rows are never materialised, so review-grade places
           // cannot consume the accepted-candidate budget or reach the gate.
           retainOnlyCandidates: true,
+          // Client-side early column-projection filtering: only basic_category
+          // is read per group first, and the full projection is materialised
+          // only for groups that contain a strong value.
+          earlyFilterColumns: ["basic_category", "taxonomy"],
+          earlyFilterAccepts: acceptsStrongCategory,
+          earlyFilterValues: STRONG_CATEGORY_VALUES,
         });
         const provider = new OverturePlacesLiveDiscoveryProvider({
           policy: policy.policy,
@@ -240,6 +284,13 @@ export async function discoverSuburbanPhoenixCandidates(options: {
           retrievedAt: nowIso(),
         };
         const batch = await provider.discover(request);
+        const audit = provider.audit();
+        if (audit) {
+          efficiency.rowsScanned += audit.rowsScanned;
+          efficiency.rowsMaterialised += audit.rowsMaterialised;
+          efficiency.earlyFilteredGroups += audit.earlyFilteredGroups;
+          efficiency.statisticsPrunedGroups += audit.statisticsPrunedGroups;
+        }
         collected.push(...batch.envelopes);
         return batch.envelopes;
       },
@@ -254,6 +305,10 @@ export async function discoverSuburbanPhoenixCandidates(options: {
       downloadedBytes: snapshot.consumed.downloadedBytes,
       processedBytes: snapshot.consumed.processedBytes,
       rowsConsidered: snapshot.consumed.rowsRead,
+      rowsScanned: efficiency.rowsScanned,
+      rowsMaterialised: efficiency.rowsMaterialised,
+      earlyFilteredGroups: efficiency.earlyFilteredGroups,
+      statisticsPrunedGroups: efficiency.statisticsPrunedGroups,
       budgetRemaining: snapshot.remaining,
       destinationsContacted: Object.freeze([...contacted].sort()),
       elapsedMs: Date.now() - startedAt,
