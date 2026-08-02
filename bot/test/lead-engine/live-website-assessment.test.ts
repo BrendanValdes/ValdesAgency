@@ -50,7 +50,7 @@ function envelope(overrides: {
       releaseId: "2026-07-22.0",
       featureVersion: 1,
       schemaVersion: "1.0.0",
-      taxonomyMappingVersion: "overture_pool_service_taxonomy_v1",
+      taxonomyMappingVersion: "overture_pool_service_taxonomy_v2",
       basicCategory: "pool_cleaning_service",
       taxonomyPrimary: "pool_cleaning_service",
       taxonomyHierarchy: [],

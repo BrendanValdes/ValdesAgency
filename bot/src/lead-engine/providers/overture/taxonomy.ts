@@ -7,7 +7,18 @@ import {
   OVERTURE_TAXONOMY_ARTIFACT_VERSION,
 } from "./types.js";
 
+/**
+ * v2 adds the identifiers the official Overture places taxonomy actually
+ * publishes, verified against release 2026-07-22.0 over 30,000 decoded rows in
+ * the Phoenix metro: the service category is `pool_cleaning` and the retailer is
+ * `hot_tub_and_pool_store`. The v1 values were assumed rather than observed and
+ * never matched a single record. They are retained because other regions and
+ * releases may still use them, and dropping a mapped value would silently
+ * reclassify anything that does.
+ */
 export const OVERTURE_SUPPORTED_TAXONOMY_FIXTURE = Object.freeze([
+  "pool_cleaning",
+  "hot_tub_and_pool_store",
   "pool_cleaning_service",
   "pool_maintenance_service",
   "swimming_pool_contractor",
@@ -27,6 +38,8 @@ export const OVERTURE_POOL_SERVICE_TAXONOMY_V1 = Object.freeze({
   version: OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
   taxonomyArtifactVersion: OVERTURE_TAXONOMY_ARTIFACT_VERSION,
   strong: Object.freeze([
+    // Observed identifier for a pool cleaning service in official Overture data.
+    "pool_cleaning",
     "pool_cleaning_service",
     "pool_maintenance_service",
     "swimming_pool_contractor",
@@ -37,6 +50,9 @@ export const OVERTURE_POOL_SERVICE_TAXONOMY_V1 = Object.freeze({
     "hot_tub_repair_service",
   ]),
   review: Object.freeze([
+    // Observed identifier for a pool/spa supply retailer — retail, not a
+    // contractor, so it stays in review exactly like the assumed value did.
+    "hot_tub_and_pool_store",
     "swimming_pool_supply_store",
     "swimming_pool",
     "public_swimming_pool",

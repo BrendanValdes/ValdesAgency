@@ -205,7 +205,7 @@ describe("Overture release/query lineage persistence", () => {
         adapterVersion: "overture-places-live-1.0.0",
         releaseId: SYNTHETIC_OVERTURE_RELEASE_PIN.releaseId,
         schemaVersion: SYNTHETIC_OVERTURE_RELEASE_PIN.schemaVersion,
-        taxonomyMappingVersion: "overture_pool_service_taxonomy_v1",
+        taxonomyMappingVersion: "overture_pool_service_taxonomy_v2",
         coverageKey: plan.coverageKey,
         queryFingerprint: plan.fingerprint,
         assetIds: SYNTHETIC_OVERTURE_RELEASE_PIN.assets.map((asset) => asset.assetId),

@@ -4,7 +4,7 @@ export const OVERTURE_PLACES_PROVIDER_ID = "overture_places_live" as const;
 export const OVERTURE_PLACES_ADAPTER_VERSION = "overture-places-live-1.0.0" as const;
 export const OVERTURE_PLACES_SCHEMA_CONTRACT_VERSION = "1.0.0" as const;
 export const OVERTURE_POOL_TAXONOMY_MAPPING_VERSION =
-  "overture_pool_service_taxonomy_v1" as const;
+  "overture_pool_service_taxonomy_v2" as const;
 export const OVERTURE_TAXONOMY_ARTIFACT_VERSION =
   "overture-places-taxonomy-contract-1.0.0" as const;
 export const OVERTURE_THEME = "places" as const;

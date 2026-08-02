@@ -49,7 +49,7 @@ function envelopeFor(input: {
       releaseId: "2026-07-22.0",
       featureVersion: 1,
       schemaVersion: "1.0.0",
-      taxonomyMappingVersion: "overture_pool_service_taxonomy_v1",
+      taxonomyMappingVersion: "overture_pool_service_taxonomy_v2",
       basicCategory: input.category,
       taxonomyPrimary: input.category,
       taxonomyHierarchy: [],
