@@ -26,6 +26,7 @@ import {
   POOL_SERVICE_MARKET_WINDOW_VERSION,
 } from "../src/lead-engine/assessment/market-windows.js";
 import { WebsiteCrawler } from "../src/lead-engine/crawl/crawler.js";
+import { salesFitFromComponentScores } from "../src/lead-engine/ranking/sales-fit.js";
 import { createDirectHttpFetcher } from "../src/lead-engine/crawl/fetchers/direct-http.js";
 import { validateCrawlLimits } from "../src/lead-engine/crawl/policies.js";
 import { discoverSuburbanPhoenixCandidates } from "./overture-suburban-candidates.js";
@@ -475,6 +476,12 @@ export interface AssessmentStageResult {
   }>;
   /** Rows written to the private CSV. */
   readonly rowCount: number;
+  /**
+   * The rows themselves, so a caller running this stage once per market can
+   * assemble one combined private CSV without re-parsing the per-market files.
+   * Same values that were just written; nothing is recomputed for the caller.
+   */
+  readonly rows: ReadonlyArray<ExportRow>;
 }
 
 /**
@@ -627,18 +634,7 @@ export async function assessQualifyAndExport(input: {
 
     // Stage 4 — durable private exports. Written 0600, never echoed to the terminal.
     const rows = exportRows(store, input.marketByKey);
-    const header = [
-      "lead_id", "business_name", "website", "observed_phone", "market",
-      "score", "result", "queue_disposition", "priority_score", "priority_band",
-      "reason_codes", "missing_flags",
-    ].join(",");
-    const csv = [header, ...rows.map((row) => [
-      csvCell(row.leadId), csvCell(row.businessName), csvCell(row.website),
-      csvCell(row.observedPhone), csvCell(row.market), csvCell(row.score),
-      csvCell(row.result), csvCell(row.queueDisposition), csvCell(row.priorityScore),
-      csvCell(row.priorityBand), csvCell(row.reasonCodes.join("|")),
-      csvCell(row.missingFlags.join("|")),
-    ].join(","))].join("\n");
+    const csv = [EXPORT_CSV_HEADER, ...rows.map(exportCsvRow)].join("\n");
     writeFileSync(paths.csvPath, `${csv}\n`, { mode: 0o600 });
     chmodSync(paths.csvPath, 0o600);
 
@@ -675,6 +671,7 @@ export async function assessQualifyAndExport(input: {
         pages: crawlPages,
       }),
       rowCount: rows.length,
+      rows,
     });
   } finally {
     if (store !== null && store.database.open) store.close();
@@ -694,6 +691,40 @@ export interface ExportRow {
   readonly priorityBand: string;
   readonly reasonCodes: ReadonlyArray<string>;
   readonly missingFlags: ReadonlyArray<string>;
+  /**
+   * Non-blocking call-prioritization hint, derived from the rule outcomes the
+   * qualifier already persisted. It orders a callable list; it never shortens
+   * one. `queueDisposition`, `score`, `result`, and `priorityBand` above are
+   * produced upstream and are not affected by any value below.
+   */
+  readonly salesFitScore: number;
+  readonly salesFitBand: string;
+  readonly salesFitReasons: ReadonlyArray<string>;
+}
+
+/**
+ * Column order for the private CSV, shared so a combined multi-market export
+ * cannot drift from the per-market one.
+ */
+export const EXPORT_CSV_COLUMNS: ReadonlyArray<string> = Object.freeze([
+  "lead_id", "business_name", "website", "observed_phone", "market",
+  "score", "result", "queue_disposition", "priority_score", "priority_band",
+  "reason_codes", "missing_flags",
+  "sales_fit_score", "sales_fit_band", "sales_fit_reasons",
+]);
+
+export const EXPORT_CSV_HEADER = EXPORT_CSV_COLUMNS.join(",");
+
+export function exportCsvRow(row: ExportRow): string {
+  return [
+    csvCell(row.leadId), csvCell(row.businessName), csvCell(row.website),
+    csvCell(row.observedPhone), csvCell(row.market), csvCell(row.score),
+    csvCell(row.result), csvCell(row.queueDisposition), csvCell(row.priorityScore),
+    csvCell(row.priorityBand), csvCell(row.reasonCodes.join("|")),
+    csvCell(row.missingFlags.join("|")),
+    csvCell(row.salesFitScore), csvCell(row.salesFitBand),
+    csvCell(row.salesFitReasons.join("|")),
+  ].join(",");
 }
 
 /**
@@ -715,6 +746,7 @@ export function exportRows(
     SELECT b.id AS businessId, b.canonical_name AS businessName,
            a.canonical_homepage_url AS canonicalUrl, a.source_website_url AS sourceUrl,
            q.total_score AS score, q.icp_result AS result, q.missing_information_json AS missingJson,
+           q.component_scores_json AS componentScoresJson,
            e.disposition AS disposition, e.priority_score AS priorityScore,
            e.priority_band AS priorityBand, e.reason_codes_json AS reasonJson
     FROM businesses b
@@ -726,6 +758,7 @@ export function exportRows(
     businessId: string; businessName: string;
     canonicalUrl: string | null; sourceUrl: string;
     score: number | null; result: string | null; missingJson: string | null;
+    componentScoresJson: string | null;
     disposition: string | null; priorityScore: number | null;
     priorityBand: string | null; reasonJson: string | null;
   }>;
@@ -736,20 +769,28 @@ export function exportRows(
     WHERE a.business_id = ? AND o.contact_kind = 'phone'
     ORDER BY o.id LIMIT 1
   `);
-  return rows.map((row) => ({
-    leadId: row.businessId,
-    businessName: row.businessName,
-    website: row.canonicalUrl ?? row.sourceUrl,
-    observedPhone: (phone.get(row.businessId) as { value: string } | undefined)?.value ?? "",
-    market: marketByBusiness.get(row.businessId) ?? "unknown_market",
-    score: row.score ?? 0,
-    result: row.result ?? "not_evaluated",
-    queueDisposition: row.disposition ?? "not_queued",
-    priorityScore: row.priorityScore,
-    priorityBand: row.priorityBand ?? "",
-    reasonCodes: row.reasonJson ? JSON.parse(row.reasonJson) as string[] : [],
-    missingFlags: row.missingJson ? JSON.parse(row.missingJson) as string[] : [],
-  }));
+  return rows.map((row) => {
+    // Derived from the persisted evaluation only. A lead with no evaluation row
+    // reads `unscored`, never a zero that could be mistaken for a poor fit.
+    const salesFit = salesFitFromComponentScores(row.componentScoresJson);
+    return {
+      leadId: row.businessId,
+      businessName: row.businessName,
+      website: row.canonicalUrl ?? row.sourceUrl,
+      observedPhone: (phone.get(row.businessId) as { value: string } | undefined)?.value ?? "",
+      market: marketByBusiness.get(row.businessId) ?? "unknown_market",
+      score: row.score ?? 0,
+      result: row.result ?? "not_evaluated",
+      queueDisposition: row.disposition ?? "not_queued",
+      priorityScore: row.priorityScore,
+      priorityBand: row.priorityBand ?? "",
+      reasonCodes: row.reasonJson ? JSON.parse(row.reasonJson) as string[] : [],
+      missingFlags: row.missingJson ? JSON.parse(row.missingJson) as string[] : [],
+      salesFitScore: salesFit.score,
+      salesFitBand: salesFit.band,
+      salesFitReasons: salesFit.reasons,
+    };
+  });
 }
 
 export { marketIdForLabel };
