@@ -1,5 +1,6 @@
 import type { NormalizedDiscoveryResult, ProviderEnvelope } from "../providers/contracts.js";
 import { normalizeWebUrl, UrlSafetyError } from "../crawl/url-safety.js";
+import type { ProvenanceSourceClass } from "../domain/provenance.js";
 
 /**
  * Phase 5B admission gate.
@@ -22,6 +23,21 @@ export type CandidateBlockReason =
   | "unsafe_candidate_url"
   | "duplicate_candidate";
 
+/**
+ * A provider-observed postal location, exactly as the discovery provider stated
+ * it. Every field is required by the normalized discovery schema, so this is
+ * only ever populated from a value the provider actually supplied — an absent or
+ * unparsable address yields `null` rather than a guessed locality.
+ */
+export interface ProviderObservedLocation {
+  readonly line1: string | null;
+  readonly city: string;
+  readonly region: string;
+  readonly postalCode: string | null;
+  /** ISO 3166-1 alpha-2, uppercased. */
+  readonly countryCode: string;
+}
+
 export interface EligibleCandidate {
   /** Stable key derived from the provider place id, used for dedupe and ids. */
   readonly candidateKey: string;
@@ -35,6 +51,29 @@ export interface EligibleCandidate {
   readonly expectedLocality: string | null;
   /** Provider-observed public phones, used only for identity corroboration. */
   readonly expectedPhones: ReadonlyArray<string>;
+  /**
+   * Coverage cell this candidate was actually discovered in, when discovery
+   * traversed cells. Pure scope lineage: it records *where we looked*, never a
+   * business claim, and no qualification rule reads it.
+   */
+  readonly discoveredCoverageKey?: string | null;
+  /**
+   * Provider-observed category identifiers for this place, carried verbatim.
+   *
+   * Discovery already reads these to decide admissibility; the assessment stage
+   * needs them too so the unchanged service-fit rules can see a
+   * `provider_category` basis. They are an OBSERVATION from the discovery
+   * provider, never a verification and never a website claim.
+   */
+  readonly providerCategories?: ReadonlyArray<string>;
+  /**
+   * Provenance of the provider observations above and of `providerLocation`.
+   * Taken from the discovery envelope, so a fixture stays a fixture and a public
+   * dataset stays a public dataset.
+   */
+  readonly providerSourceClass?: ProvenanceSourceClass;
+  /** Provider-observed postal location, or null when the provider gave none. */
+  readonly providerLocation?: ProviderObservedLocation | null;
 }
 
 export interface CandidateGateOutcome {
@@ -60,8 +99,13 @@ function emptyCounts(): Record<CandidateBlockReason, number> {
  * Resolve an observed domain string to a safe absolute https URL, or null.
  * Reuses the crawler's own URL safety rules so the gate cannot admit anything
  * the fetcher would refuse.
+ *
+ * Exported so a discovery source that does not produce provider envelopes still
+ * admits candidate URLs through these exact rules rather than its own copy of
+ * them. A second implementation is how the two paths would eventually disagree
+ * about what is safe to fetch.
  */
-function safeCandidateUrl(observed: string): URL | null {
+export function safeCandidateUrl(observed: string): URL | null {
   const trimmed = observed.trim();
   if (!trimmed) return null;
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -78,6 +122,30 @@ function safeCandidateUrl(observed: string): URL | null {
     if (error instanceof UrlSafetyError || error instanceof TypeError) return null;
     throw error;
   }
+}
+
+/**
+ * The provider's own postal location, or null.
+ *
+ * Returns null unless the provider supplied a non-empty locality, region, and a
+ * two-letter country code. Nothing is inferred from the coverage cell, the
+ * candidate host, or the expected market: a place the provider left blank stays
+ * blank, and is later scored as a missing location rather than an in-scope one.
+ */
+export function providerObservedLocation(
+  address: NormalizedDiscoveryResult["address"],
+): ProviderObservedLocation | null {
+  const city = address.city.trim();
+  const region = address.region.trim();
+  const countryCode = address.countryCode.trim().toUpperCase();
+  if (!city || !region || countryCode.length !== 2) return null;
+  return Object.freeze({
+    line1: address.line1?.trim() || null,
+    city,
+    region,
+    postalCode: address.postalCode?.trim() || null,
+    countryCode,
+  });
 }
 
 export function selectAssessableCandidates(
@@ -142,6 +210,14 @@ export function selectAssessableCandidates(
       releaseId: observation.releaseId,
       expectedLocality: result.address.city,
       expectedPhones: Object.freeze([...result.phones]),
+      // Provider observations carried forward unchanged, with the envelope's own
+      // provenance. Discovery already read these; dropping them here is what
+      // left the assessment stage with no provider-category or location evidence.
+      providerCategories: Object.freeze([...new Set(
+        result.categories.map((category) => category.trim()).filter(Boolean),
+      )].sort()),
+      providerSourceClass: envelope.sourceClass,
+      providerLocation: providerObservedLocation(result.address),
     });
   }
 
