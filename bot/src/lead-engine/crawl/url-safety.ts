@@ -177,6 +177,36 @@ export function sameSite(left: string | URL, right: string | URL): boolean {
   return leftUrl.protocol === rightUrl.protocol && leftUrl.host === rightUrl.host;
 }
 
+/**
+ * `sameSite`, tolerating exactly one difference: a leading `www.` label present
+ * on one host and absent from the other.
+ *
+ * Both hosts still pass the full `normalizeWebUrl` gate, so scheme, credential,
+ * hostname, IP-literal, and port rules are unchanged, and the protocol must
+ * still match exactly. The comparison is a literal `www.` prefix test against
+ * the *whole* other host — including its port — so it accepts only the apex/www
+ * pair for one registrable name and nothing else:
+ *
+ *   www.example.com  vs example.com      → true  (the only tolerated shape)
+ *   foo.example.com  vs example.com      → false (arbitrary subdomain)
+ *   www.foo.example.com vs example.com   → false
+ *   www1.example.com vs example.com      → false
+ *   www.example.com  vs example.org      → false
+ *   https://www.example.com vs http://example.com → false (protocol differs)
+ *
+ * Use this only where an approved host's own www alias is the same site. It is
+ * not a general subdomain allowance and must never be used to widen a fetch
+ * target, a DNS/IP pin, or a redirect-hop revalidation.
+ */
+export function sameSiteAllowingWwwAlias(left: string | URL, right: string | URL): boolean {
+  const leftUrl = new URL(normalizeWebUrl(left));
+  const rightUrl = new URL(normalizeWebUrl(right));
+  if (leftUrl.protocol !== rightUrl.protocol) return false;
+  return leftUrl.host === rightUrl.host
+    || leftUrl.host === `www.${rightUrl.host}`
+    || rightUrl.host === `www.${leftUrl.host}`;
+}
+
 export function canonicalHomepage(input: string | URL): string {
   const url = new URL(normalizeWebUrl(input));
   url.pathname = "/";

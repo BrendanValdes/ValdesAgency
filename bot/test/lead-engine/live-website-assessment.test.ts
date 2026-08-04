@@ -16,6 +16,7 @@ import {
   runWebsiteAssessmentCanary,
   WEBSITE_CANARY_HARD_LIMITS,
 } from "../../scripts/run-website-assessment-canary.js";
+import { sameSiteAllowingWwwAlias } from "../../src/lead-engine/crawl/url-safety.js";
 import type { CrawlPage, CrawlResult, RobotsDecision } from "../../src/lead-engine/crawl/types.js";
 import type {
   NormalizedDiscoveryResult,
@@ -303,6 +304,46 @@ describe("Phase 5B bounded live website assessment", () => {
     expect(sink.records[0]).toMatchObject({ status: "blocked" });
   });
 
+  it("accepts an apex/www canonicalisation redirect in either direction", async () => {
+    // Apex candidate that canonicalises onto its own www host.
+    const toWww = await run({
+      candidates: [candidate()],
+      crawl: () => crawlResult({ pages: [page({ finalUrl: `https://www.${HOST}/` })] }),
+    });
+    expect(toWww.summary.blockedCounts.redirect_off_domain).toBe(0);
+    expect(toWww.sink.records[0]).toMatchObject({ status: "complete" });
+
+    // www candidate that canonicalises onto its own apex host.
+    const toApex = await run({
+      candidates: [candidate({ candidateUrl: `https://www.${HOST}/`, candidateHost: `www.${HOST}` })],
+      crawl: () => crawlResult({ pages: [page({ url: `https://www.${HOST}/`, finalUrl: HOMEPAGE })] }),
+    });
+    expect(toApex.summary.blockedCounts.redirect_off_domain).toBe(0);
+    expect(toApex.sink.records[0]).toMatchObject({ status: "complete" });
+  });
+
+  it("still blocks a redirect onto any host that is not the approved apex/www pair", async () => {
+    for (const finalUrl of [
+      // An arbitrary subdomain is not the same site, even under the same apex.
+      `https://foo.${HOST}/`,
+      `https://www.foo.${HOST}/`,
+      // A www-lookalike label is not the www alias.
+      `https://www1.${HOST}/`,
+      `https://wwwexample-pool-co.invalid/`,
+      // An unrelated domain, and the www alias of an unrelated domain.
+      "https://other-domain.invalid/landing",
+      "https://www.other-domain.invalid/",
+    ]) {
+      const { summary, sink } = await run({
+        candidates: [candidate()],
+        crawl: () => crawlResult({ pages: [page({ finalUrl })] }),
+      });
+      expect(summary.blockedCounts.redirect_off_domain).toBe(1);
+      expect(summary.websitesAssessed).toBe(0);
+      expect(sink.records[0]).toMatchObject({ status: "blocked" });
+    }
+  });
+
   it("records a robots denial without assessing", async () => {
     const { summary, sink } = await run({
       candidates: [candidate()],
@@ -502,5 +543,56 @@ describe("Phase 5B canary surface", () => {
       maxDurationMs: 60_000,
       maxRetriesPerBusiness: 1,
     });
+  });
+});
+
+// --- www-alias same-site semantics -------------------------------------------
+
+describe("sameSiteAllowingWwwAlias", () => {
+  it("accepts only an exact leading-www difference", () => {
+    for (const [left, right] of [
+      ["https://example.invalid/", "https://example.invalid/"],
+      ["https://www.example.invalid/", "https://example.invalid/"],
+      ["https://example.invalid/", "https://www.example.invalid/"],
+      // Path, query, and case never matter; the host comparison is normalised.
+      ["https://WWW.Example.invalid/contact?x=1", "https://example.invalid/"],
+      // The www alias of a deeper host is still just that host's own alias.
+      ["https://www.shop.example.invalid/", "https://shop.example.invalid/"],
+    ] as const) {
+      expect(sameSiteAllowingWwwAlias(left, right)).toBe(true);
+    }
+  });
+
+  it("rejects arbitrary subdomains, www lookalikes, other domains, and other protocols", () => {
+    for (const [left, right] of [
+      // The requirement that motivated the change must not widen past www.
+      ["https://foo.example.invalid/", "https://example.invalid/"],
+      ["https://example.invalid/", "https://foo.example.invalid/"],
+      ["https://www.foo.example.invalid/", "https://example.invalid/"],
+      // Labels that merely start with "www".
+      ["https://www1.example.invalid/", "https://example.invalid/"],
+      ["https://wwwexample.invalid/", "https://example.invalid/"],
+      // Unrelated registrable names, including via the www alias.
+      ["https://www.other.invalid/", "https://example.invalid/"],
+      ["https://www.example.invalid/", "https://example.test/"],
+      // A suffix match is not a label match.
+      ["https://notexample.invalid/", "https://example.invalid/"],
+      // Protocol must still agree exactly, alias or not.
+      ["http://www.example.invalid/", "https://example.invalid/"],
+      ["http://example.invalid/", "https://example.invalid/"],
+    ] as const) {
+      expect(sameSiteAllowingWwwAlias(left, right)).toBe(false);
+    }
+  });
+
+  it("keeps rejecting URLs the safety gate refuses", () => {
+    for (const [left, right] of [
+      ["https://127.0.0.1/", "https://example.invalid/"],
+      ["https://user:pass@example.invalid/", "https://example.invalid/"],
+      ["https://www.example.invalid:8443/", "https://example.invalid/"],
+      ["not a url", "https://example.invalid/"],
+    ] as const) {
+      expect(() => sameSiteAllowingWwwAlias(left, right)).toThrow();
+    }
   });
 });

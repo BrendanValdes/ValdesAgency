@@ -13,8 +13,12 @@ import { extractHtml } from "../extraction/html.js";
 import { extractJsonLd } from "../extraction/json-ld.js";
 import { extractPersonCandidates } from "../extraction/people.js";
 import { extractServiceEvidence } from "../extraction/services.js";
+import {
+  assessBusinessOperationalEvidence,
+  type OperationalEvidence,
+} from "../validation/business-operational.js";
 import { assessConversionFeatures, WEBSITE_ASSESSMENT_POLICY_VERSION } from "../validation/website-assessment.js";
-import { sameSite } from "../crawl/url-safety.js";
+import { sameSiteAllowingWwwAlias } from "../crawl/url-safety.js";
 import type { CrawlPage, CrawlResult, PageKind } from "../crawl/types.js";
 import type { ContactObservation } from "../extraction/contact.js";
 import type { PersonEvidenceCandidate } from "../extraction/people.js";
@@ -25,6 +29,43 @@ import type { EvidenceValue } from "../crawl/types.js";
 import type { EligibleCandidate } from "./candidate-gate.js";
 
 export const LIVE_WEBSITE_ASSESSMENT_VERSION = "live-website-assessment-1.0.0";
+
+/**
+ * The only operational facts this phase persists.
+ *
+ * Both are directly observed properties of the homepage fetch that the crawler
+ * already establishes. Every other kind the operational assessor can produce —
+ * identity agreement, contact consistency, parked, placeholder, closed, moved,
+ * different-business redirect, content unavailable — stays unpersisted here, so
+ * this change cannot reach an identity rule or a hard disqualifier.
+ */
+export const PERSISTED_OPERATIONAL_KINDS = Object.freeze([
+  "homepage_usable",
+  "https_works",
+] as const);
+
+/**
+ * Directly and affirmatively observed successful homepage facts, or nothing.
+ *
+ * `assessBusinessOperationalEvidence` is the existing production producer for
+ * these kinds; it reads only `crawl.pages[0]`, which the crawler always fills
+ * with the homepage, so a failed secondary page can neither fabricate nor erase
+ * a confirmed homepage or HTTPS observation. Only `positive` survives the
+ * filter: blocked, unavailable, negative, and unknown statuses persist nothing.
+ */
+export function persistableOperationalEvidence(input: {
+  expectedBusinessName: string;
+  crawl: CrawlResult;
+}): OperationalEvidence[] {
+  if (input.crawl.robots.status !== "allowed") return [];
+  const allowed = new Set<string>(PERSISTED_OPERATIONAL_KINDS);
+  return assessBusinessOperationalEvidence({
+    expectedBusinessName: input.expectedBusinessName,
+    crawl: input.crawl,
+    // Identity is corroborated separately and must not leak into legitimacy here.
+    identity: null,
+  }).evidence.filter((item) => allowed.has(item.kind) && item.status === "positive");
+}
 
 /**
  * Phase 5B bounded live website assessment.
@@ -152,6 +193,17 @@ export interface AssessmentSink {
     assessmentId: string;
     candidateKey: string;
     observedNameCount: number;
+  }): void;
+  /**
+   * Optional: persist directly observed successful operational facts as internal
+   * crawl evidence. Never a verification, never a corroborating source class.
+   */
+  recordOperationalEvidence?(input: {
+    assessmentId: string;
+    candidateKey: string;
+    observations: ReadonlyArray<OperationalEvidence>;
+    sourceUrl: string;
+    observedAt: string;
   }): void;
 }
 
@@ -315,13 +367,17 @@ export async function runLiveWebsiteAssessment(input: {
       continue;
     }
 
-    // Every usable page must still be on the approved candidate host. The
-    // fetcher revalidates each redirect hop; this is the final destination check.
+    // Every usable page must still be on the approved candidate host, or on that
+    // host's own www alias — an apex/www canonicalisation redirect is the same
+    // site, and rejecting it discarded half of the measured Phoenix pilot. No
+    // other subdomain and no protocol change is accepted. The fetcher still
+    // revalidates every redirect hop (DNS/IP pin, protocol, port, hop limit,
+    // loop protection); this is only the final destination check.
     const usablePages = crawl.pages.filter((page) => page.html !== null && page.fetch?.ok === true);
     const offDomain = usablePages.some((page) => {
       const finalUrl = page.fetch?.ok ? page.fetch.finalUrl : page.url;
       try {
-        return !sameSite(finalUrl, candidate.candidateUrl);
+        return !sameSiteAllowingWwwAlias(finalUrl, candidate.candidateUrl);
       } catch {
         return true;
       }
@@ -351,6 +407,18 @@ export async function runLiveWebsiteAssessment(input: {
     }
 
     const homepage = crawl.canonicalHomepage ?? candidate.candidateUrl;
+    // Reached only for an allowed, on-domain crawl with at least one usable page.
+    // A failed secondary page leaves a confirmed homepage observation intact.
+    const operationalObservations = persistableOperationalEvidence({
+      expectedBusinessName: candidate.expectedBusinessName,
+      crawl,
+    });
+    if (operationalObservations.length > 0) {
+      input.sink.recordOperationalEvidence?.({
+        assessmentId, candidateKey: candidate.candidateKey,
+        observations: operationalObservations, sourceUrl: homepage, observedAt: assessedAt,
+      });
+    }
     let contactCount = 0;
     let personCount = 0;
     let serviceCount = 0;
@@ -362,6 +430,11 @@ export async function runLiveWebsiteAssessment(input: {
     const observedLocalities: string[] = [];
     const observedServiceAreas: string[] = [];
     const serviceLanguageRuleIds = new Set<string>();
+    // Provider categories describe the business, not any one page, so they are
+    // extracted exactly once per candidate — on the first usable page — rather
+    // than re-derived for every page. That keeps a multi-page crawl from
+    // multiplying one provider observation into several service-fit facts.
+    let providerCategoriesExtracted = false;
 
     for (const page of usablePages) {
       const fetched = page.fetch;
@@ -382,8 +455,17 @@ export async function runLiveWebsiteAssessment(input: {
       const people = extractPersonCandidates({
         html, jsonLd, knownBusinessNames: [candidate.expectedBusinessName],
       });
-      const services = extractServiceEvidence({ html, jsonLd, niche: input.niche })
-        .filter((observation) => observation.state !== "unavailable");
+      const providerCategories = providerCategoriesExtracted
+        ? []
+        : candidate.providerCategories ?? [];
+      providerCategoriesExtracted = true;
+      const services = extractServiceEvidence({
+        html, jsonLd, niche: input.niche,
+        providerCategories,
+        // The discovery envelope's own class, so provider evidence is never
+        // relabelled as a website claim. No verification field is set anywhere.
+        ...(candidate.providerSourceClass ? { providerSourceClass: candidate.providerSourceClass } : {}),
+      }).filter((observation) => observation.state !== "unavailable");
       structuredOrganizationNames.push(...jsonLd.organizationNames.map((value) => value.value));
       observedPhones.push(...contacts.filter((entry) => entry.kind === "phone")
         .map((entry) => entry.displayedValue));
@@ -400,7 +482,11 @@ export async function runLiveWebsiteAssessment(input: {
       const serviceLanguage = evaluateServiceLanguage(pageText);
       for (const hit of serviceLanguage.hits) serviceLanguageRuleIds.add(hit.ruleId);
       const structuredData = jsonLd.organizationNames.map((value) => ({
-        schemaType: "Organization", path: "organizationNames", fieldName: "name",
+        // Canonical persisted field name. The qualification reader selects
+        // structured business data by an explicit allow-list that contains
+        // `organization_name`; the previous generic "name" never matched, so
+        // every live Organization JSON-LD observation was persisted but unread.
+        schemaType: "Organization", path: "organizationNames", fieldName: "organization_name",
         claimedValue: value.value, confidence: value.confidence,
       }));
       contactCount += contacts.length;
