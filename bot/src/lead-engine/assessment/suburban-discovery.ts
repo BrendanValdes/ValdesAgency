@@ -1,5 +1,5 @@
 import { planCoverage } from "../geography/coverage-planner.js";
-import type { CoverageCell, GeographyTarget } from "../geography/types.js";
+import type { CoverageCell, CoverageManifest, GeographyTarget } from "../geography/types.js";
 import type { NormalizedDiscoveryResult, ProviderEnvelope } from "../providers/contracts.js";
 import {
   selectAssessableCandidates,
@@ -84,13 +84,13 @@ export function suburbanPhoenixTargets(): ReadonlyArray<GeographyTarget> {
  * same targets always produce the same sequence. Only the first `maxCells` are
  * considered.
  */
-export function planSuburbanCells(input: {
+export function planSuburbanCoverage(input: {
   configurationVersion: string;
   queryVersion: string;
   maxCells: number;
   /** Skip this many cells, so successive bounded passes cover distinct slices. */
   cellOffset?: number;
-}): ReadonlyArray<CoverageCell> {
+}): CoverageManifest {
   if (!Number.isSafeInteger(input.maxCells) || input.maxCells < 1 || input.maxCells > 24) {
     throw new Error("Suburban cell budget must be an integer between 1 and 24");
   }
@@ -107,7 +107,23 @@ export function planSuburbanCells(input: {
     resultCap: 100,
     maxDepth: 0,
   });
-  return Object.freeze(manifest.cells.slice(offset, offset + input.maxCells));
+  // The slice is the only thing a bounded pass narrows; every other manifest
+  // field stays exactly what the planner produced, so the persisted manifest
+  // describes the real plan.
+  return Object.freeze({
+    ...manifest,
+    cells: Object.freeze(manifest.cells.slice(offset, offset + input.maxCells)),
+  });
+}
+
+/** Convenience view over {@link planSuburbanCoverage} for callers that only need cells. */
+export function planSuburbanCells(input: {
+  configurationVersion: string;
+  queryVersion: string;
+  maxCells: number;
+  cellOffset?: number;
+}): ReadonlyArray<CoverageCell> {
+  return planSuburbanCoverage(input).cells;
 }
 
 export type SuburbanStopReason =
@@ -227,7 +243,10 @@ export async function discoverSuburbanWebsiteCandidates(input: {
       }
       seenKeys.add(candidate.candidateKey);
       seenHosts.add(candidate.candidateHost);
-      eligible.push(candidate);
+      // Carry the cell this candidate was actually found in. Dedupe above keeps
+      // the first cell that produced it, so an overlapping edge cannot rewrite a
+      // candidate's origin.
+      eligible.push({ ...candidate, discoveredCoverageKey: cell.coverageKey });
       cellEligible += 1;
       if (eligible.length >= limits.targetWebsiteCandidates) break;
     }

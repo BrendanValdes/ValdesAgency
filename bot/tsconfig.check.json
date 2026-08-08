@@ -1,0 +1,11 @@
+{
+  "// purpose": "Type-check everything, including scripts/ and test/. The build tsconfig deliberately compiles only src/** into dist/, which meant script and test type errors were never caught by `tsc --noEmit`. This config emits nothing and exists purely for verification.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "scripts/**/*", "test/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

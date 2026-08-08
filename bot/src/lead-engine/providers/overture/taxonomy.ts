@@ -65,6 +65,112 @@ export const OVERTURE_POOL_SERVICE_TAXONOMY_V1 = Object.freeze({
   ]),
 });
 
+export const OVERTURE_POOL_SERVICE_CALIBRATION_VERSION =
+  "overture_pool_service_category_calibration_v1" as const;
+
+/**
+ * Why each admissible Overture identifier does or does not earn service-fit
+ * credit.
+ *
+ * Discovery admissibility (`OVERTURE_POOL_SERVICE_TAXONOMY_V1`) and service-fit
+ * credit are deliberately different questions. An identifier can be worth
+ * crawling while still being too ambiguous to assert "this is a pool-service
+ * operator" on the strength of a dataset field alone. This table records that
+ * second decision explicitly, so the configured category vocabulary is derived
+ * from a reviewable rationale rather than hand-maintained in two places.
+ *
+ * `serviceFit: false` never blocks discovery: the candidate is still crawled and
+ * its own website can supply service evidence through the normal extraction path.
+ */
+export const OVERTURE_POOL_SERVICE_CATEGORY_CALIBRATION: ReadonlyArray<Readonly<{
+  identifier: string;
+  disposition: "strong" | "supporting" | "review" | "excluded";
+  serviceFit: boolean;
+  rationale: string;
+}>> = Object.freeze([
+  Object.freeze({
+    identifier: "pool_cleaning", disposition: "strong", serviceFit: true,
+    rationale: "The identifier official Overture data actually uses for a recurring pool cleaning service. Confirmed against release 2026-07-22.0 over 30,000 decoded Phoenix-metro rows.",
+  }),
+  Object.freeze({
+    identifier: "pool_cleaning_service", disposition: "strong", serviceFit: true,
+    rationale: "Unambiguous cleaning-service identifier; same semantics as pool_cleaning with an explicit service suffix.",
+  }),
+  Object.freeze({
+    identifier: "pool_maintenance_service", disposition: "strong", serviceFit: true,
+    rationale: "Unambiguous recurring maintenance identifier.",
+  }),
+  Object.freeze({
+    identifier: "swimming_pool_repair_service", disposition: "strong", serviceFit: true,
+    rationale: "Unambiguous repair-service identifier; already carried by the v1 vocabulary.",
+  }),
+  Object.freeze({
+    identifier: "swimming_pool_contractor", disposition: "strong", serviceFit: false,
+    rationale: "Ambiguous between a new-pool builder and a service contractor. Still crawled, but earns no category credit without service evidence from the business's own site.",
+  }),
+  Object.freeze({
+    identifier: "pool_and_spa_service", disposition: "supporting", serviceFit: false,
+    rationale: "Spa-adjacent and supporting-tier; not a strong pool-service assertion on its own.",
+  }),
+  Object.freeze({
+    identifier: "hot_tub_repair_service", disposition: "supporting", serviceFit: false,
+    rationale: "Hot-tub work is adjacent, not pool service.",
+  }),
+  Object.freeze({
+    identifier: "hot_tub_and_pool_store", disposition: "review", serviceFit: false,
+    rationale: "Retail. Never a contractor.",
+  }),
+  Object.freeze({
+    identifier: "swimming_pool_supply_store", disposition: "review", serviceFit: false,
+    rationale: "Retail. Never a contractor.",
+  }),
+  Object.freeze({
+    identifier: "swimming_pool", disposition: "review", serviceFit: false,
+    rationale: "A pool as a place, not a business that services pools.",
+  }),
+  Object.freeze({
+    identifier: "public_swimming_pool", disposition: "review", serviceFit: false,
+    rationale: "A municipal or public facility, not a business that services pools.",
+  }),
+  Object.freeze({
+    identifier: "recreation_center", disposition: "review", serviceFit: false,
+    rationale: "Generic recreation business.",
+  }),
+  Object.freeze({
+    identifier: "water_park", disposition: "excluded", serviceFit: false,
+    rationale: "Facility, already excluded from discovery.",
+  }),
+  Object.freeze({
+    identifier: "fountain_contractor", disposition: "excluded", serviceFit: false,
+    rationale: "Different trade, already excluded from discovery.",
+  }),
+  Object.freeze({
+    identifier: "pond_contractor", disposition: "excluded", serviceFit: false,
+    rationale: "Different trade, already excluded from discovery.",
+  }),
+]);
+
+/**
+ * Identifiers that may earn service-fit credit, sorted and deduplicated.
+ *
+ * This is the single source the pool-service niche configuration and the ICP
+ * category vocabulary are checked against, so the two can never silently drift
+ * apart again — which is exactly the defect that made every live lead read
+ * `missing:niche.relevant_category`.
+ */
+export function poolServiceFitCategories(): ReadonlyArray<string> {
+  return Object.freeze([...new Set(OVERTURE_POOL_SERVICE_CATEGORY_CALIBRATION
+    .filter((entry) => entry.serviceFit)
+    .map((entry) => entry.identifier))].sort());
+}
+
+/** Admissible-but-not-service-fit identifiers, for exclusion assertions. */
+export function poolServiceExcludedFromServiceFit(): ReadonlyArray<string> {
+  return Object.freeze([...new Set(OVERTURE_POOL_SERVICE_CATEGORY_CALIBRATION
+    .filter((entry) => !entry.serviceFit)
+    .map((entry) => entry.identifier))].sort());
+}
+
 function normalized(values: ReadonlyArray<string | null>): string[] {
   return [...new Set(values
     .filter((value): value is string => typeof value === "string")

@@ -14,6 +14,7 @@ import {
   type CapabilityRangeSource,
   type OvertureRangeAuditEvent,
 } from "./capability-range-source.js";
+import type { OvertureAssetSession } from "./asset-session.js";
 import {
   trustOvertureAssetQueryEngine,
   type OvertureAssetQueryEngine,
@@ -45,6 +46,7 @@ import {
   type ValidatedOvertureAsset,
 } from "./types.js";
 import type { OvertureBudgetSnapshot, OvertureBudgetTracker } from "./budgets.js";
+import type { OvertureCandidateFunnel } from "./types.js";
 
 export const OVERTURE_SECURE_ENGINE_VERSION = "overture-secure-geoparquet-engine-1.0.0";
 
@@ -242,6 +244,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
   readonly #earlyFilterColumns: ReadonlyArray<string>;
   readonly #earlyFilterAccepts: ((row: Record<string, unknown>) => boolean) | null;
   readonly #earlyFilterValues: ReadonlyArray<string>;
+  readonly #session: OvertureAssetSession | null;
 
   constructor(input: {
     policy: RuntimeLeadPolicy;
@@ -262,6 +265,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     earlyFilterColumns: ReadonlyArray<string>;
     earlyFilterAccepts: ((row: Record<string, unknown>) => boolean) | null;
     earlyFilterValues: ReadonlyArray<string>;
+    session: OvertureAssetSession | null;
   }) {
     this.#policy = input.policy;
     this.#capability = input.capability;
@@ -281,6 +285,7 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     this.#earlyFilterColumns = input.earlyFilterColumns;
     this.#earlyFilterAccepts = input.earlyFilterAccepts;
     this.#earlyFilterValues = input.earlyFilterValues;
+    this.#session = input.session;
   }
 
   async query(
@@ -321,6 +326,13 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
     let candidateCount = 0;
     let stopReason: OvertureTraversalStopReason = "no_relevant_row_groups_remaining";
     let halted = false;
+    // Candidate funnel. Counts only, so every stage is safe to report verbatim.
+    let decodedRows = 0;
+    let rejectedOutsideCell = 0;
+    let rejectedByCategory = 0;
+    let rangeHits = 0;
+    let rangeMisses = 0;
+    let assetHandleReused = false;
 
     // A traversal stops only for an explicit bounded reason. An empty row group
     // is never one of them: the next relevant group is still read.
@@ -349,22 +361,49 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
         break;
       }
       budget.assertActive();
-      const source = await createCapabilityRangeSource({
-        policy: this.#policy,
-        capability: this.#capability,
-        runId: this.#runId,
-        assessmentId: this.#assessmentId,
-        release,
-        asset,
-        budget,
-        signal,
-        transport: this.#transport,
-        ...(this.#audit ? { audit: this.#audit } : {}),
-        now: this.#now,
-      });
+      // Range reads are counted here so cache effectiveness is observable. The
+      // audit sink still receives every event; this only tallies them.
+      const countingAudit = {
+        record: (event: OvertureRangeAuditEvent) => {
+          if (event.outcome === "cache_hit") rangeHits += 1;
+          else if (event.outcome === "success") rangeMisses += 1;
+          this.#audit?.record(event);
+        },
+      };
+      const openAsset = async (): Promise<{
+        source: CapabilityRangeSource; footer: OvertureParquetFooter;
+      }> => {
+        const opened = await createCapabilityRangeSource({
+          policy: this.#policy,
+          capability: this.#capability,
+          runId: this.#runId,
+          assessmentId: this.#assessmentId,
+          release,
+          asset,
+          budget,
+          signal,
+          transport: this.#transport,
+          audit: countingAudit,
+          now: this.#now,
+          ...(this.#session ? { maxCacheEntries: 256 } : {}),
+        });
+        const openedFooter = await this.#reader.readMetadata({
+          source: opened, limits: METADATA_LIMITS, signal,
+        });
+        return { source: opened, footer: openedFooter };
+      };
+      const sessionKey = `${release.releaseId}:${asset.assetId}`;
+      const beforeReuses = this.#session?.metrics().handleReuses ?? 0;
+      const handle = this.#session
+        ? await this.#session.acquire(sessionKey, { budget, signal }, openAsset)
+        : await openAsset();
+      if (this.#session && this.#session.metrics().handleReuses > beforeReuses) {
+        assetHandleReused = true;
+      }
+      const source = handle.source;
       assetsUsed.push(asset);
       try {
-        const footer = await this.#reader.readMetadata({ source, limits: METADATA_LIMITS, signal });
+        const footer = handle.footer;
         requireSelectedColumnsPresent(footer.metadata, selectedColumns);
         const spatialPlans = buildSpatialPlans(footer.metadata, selectedColumnSet);
         const remaining = this.#pruningBudget(budget.snapshot());
@@ -516,7 +555,11 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
             ? Math.round(groupUncompressed * (decoded / group.rowCount))
             : 0;
           for (const row of rows.slice(0, decoded)) {
-            if (!pointInBounds(row, bounds)) continue;
+            decodedRows += 1;
+            if (!pointInBounds(row, bounds)) {
+              rejectedOutsideCell += 1;
+              continue;
+            }
             const id = typeof row.id === "string" ? row.id : null;
             if (id !== null) {
               if (seenIds.has(id)) {
@@ -527,7 +570,10 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
             }
             const isCandidate = this.#isCandidate(row);
             if (isCandidate || !this.#retainOnlyCandidates) records.push(row);
-            if (!isCandidate) continue;
+            if (!isCandidate) {
+              rejectedByCategory += 1;
+              continue;
+            }
             candidateCount += 1;
             // Enforce the candidate target inside the group as well as between
             // groups, so a single dense group cannot overshoot the hard ceiling.
@@ -540,7 +586,10 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
           if (halted) break;
         }
       } finally {
-        source.clearCache();
+        // A session owns the handle's lifetime and clears it at the end of the
+        // pass. Clearing here would throw away the very bytes the next cell of
+        // the same pass is about to ask for again.
+        if (!this.#session) source.clearCache();
       }
       if (halted) break;
     }
@@ -562,6 +611,14 @@ class SecureOvertureAssetQueryEngine implements OvertureAssetQueryEngine {
       rowsMaterialised,
       earlyFilteredGroups,
       statisticsPrunedGroups,
+      funnel: Object.freeze({
+        decodedRows,
+        rejectedOutsideCell,
+        rejectedDuplicateId: duplicateRowsSkipped,
+        rejectedByCategory,
+        acceptedCandidates: candidateCount,
+      }) satisfies OvertureCandidateFunnel,
+      cache: Object.freeze({ rangeHits, rangeMisses, assetHandleReused }),
     };
   }
 
@@ -621,6 +678,12 @@ export function createSecureOvertureAssetQueryEngine(input: {
    * always keep the group, so pruning can never cause a false negative.
    */
   earlyFilterValues?: ReadonlyArray<string>;
+  /**
+   * Optional per-pass asset session. When supplied, the pinned asset's identity,
+   * footer, and bounded byte cache are opened once and reused across every
+   * coverage cell of the pass instead of being rebuilt per cell.
+   */
+  session?: OvertureAssetSession;
 }): OvertureAssetQueryEngine {
   assertRuntimeLeadPolicy(input.policy);
   const provider = requireProviderPolicy(input.policy, OVERTURE_PLACES_PROVIDER_ID);
@@ -676,5 +739,6 @@ export function createSecureOvertureAssetQueryEngine(input: {
     earlyFilterColumns: Object.freeze([...(input.earlyFilterColumns ?? [])]),
     earlyFilterAccepts: input.earlyFilterAccepts ?? null,
     earlyFilterValues: Object.freeze([...(input.earlyFilterValues ?? [])]),
+    session: input.session ?? null,
   }));
 }

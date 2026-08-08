@@ -1,3 +1,7 @@
+import {
+  DISCOVERY_COVERAGE_SCHEME,
+  discoveryCoverageKeyOf,
+} from "../geography/coverage-keys.js";
 import type { SqliteDatabase } from "../db/database.js";
 import { withTransaction } from "../db/transaction.js";
 import type { PoolServiceQualificationResult } from "../qualification/types.js";
@@ -192,7 +196,7 @@ export function createCallingQueueRepository(
         FROM icp_qualification_evaluations q
         JOIN businesses b ON b.id = q.business_id
         LEFT JOIN website_assessments a ON a.id = q.assessment_id
-        WHERE q.niche_id = 'pool_service' AND q.model_version = ?
+        WHERE q.model_version = ?
           AND NOT EXISTS (
             SELECT 1 FROM icp_qualification_evaluations newer
             WHERE newer.supersedes_evaluation_id = q.id
@@ -224,10 +228,31 @@ export function createCallingQueueRepository(
         const persistedQualification = qualificationResult(row);
         const root = identities.find(row.business_id);
         const retained = retainedByRoot.get(root) as EvaluationRow;
-        const coverageKeys = (database.prepare(`
-          SELECT r.source_id FROM icp_qualification_evidence_references r
-          WHERE r.evaluation_id = ? AND r.source_table = 'coverage_cells' ORDER BY r.source_id
-        `).all(row.id) as Array<{ source_id: string }>).map((item) => item.source_id);
+        // Coverage lineage has two sources and both are required.
+        //
+        // Qualification cites a coverage cell only through the
+        // hard.outside_selected_geography rule, so a lead that is *inside* its
+        // market cites none. Reading that source alone left coverageKeys empty
+        // for every eligible lead, which made this scope check fail closed and
+        // classified them outside_queue_scope before contact-route evaluation.
+        //
+        // The second source is the coverage cell discovery actually found the
+        // business in, persisted as a business identifier. Both are unioned, so
+        // previously-cited coverage still applies and nothing is defaulted
+        // in-scope: a business with neither still yields an empty set and stays
+        // out of scope.
+        const coverageKeys = [...new Set([
+          ...(database.prepare(`
+            SELECT r.source_id FROM icp_qualification_evidence_references r
+            WHERE r.evaluation_id = ? AND r.source_table = 'coverage_cells' ORDER BY r.source_id
+          `).all(row.id) as Array<{ source_id: string }>).map((item) => item.source_id),
+          ...(database.prepare(`
+            SELECT value FROM business_identifiers
+            WHERE business_id = ? AND scheme = ? ORDER BY id
+          `).all(row.business_id, DISCOVERY_COVERAGE_SCHEME) as Array<{ value: string }>)
+            .map((item) => discoveryCoverageKeyOf(item.value))
+            .filter((key): key is string => key !== null),
+        ])].sort();
         const geographies = database.prepare(`
           SELECT upper(country_code) AS countryCode,
                  upper(country_code || '-' || region) AS subdivisionCode

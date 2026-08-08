@@ -1,21 +1,26 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAssessmentStore } from "../../src/lead-engine/assessment/assessment-store.js";
 import { qualifyAndRankBatch } from "../../src/lead-engine/assessment/batch-runner.js";
 import {
+  persistableOperationalEvidence,
   runLiveWebsiteAssessment,
   type LiveWebsiteAssessmentLimits,
 } from "../../src/lead-engine/assessment/live-website-assessment.js";
+import { createQualificationRepository } from "../../src/lead-engine/qualification/repository.js";
 import {
+  cleanupBatchDatabase,
   parseBatchCanaryArguments,
   runPoolBatchCanary,
   BATCH_CANARY_LIMITS,
 } from "../../scripts/run-pool-batch-canary.js";
 import type { EligibleCandidate } from "../../src/lead-engine/assessment/candidate-gate.js";
 import type { CrawlPage, CrawlResult, RobotsDecision } from "../../src/lead-engine/crawl/types.js";
+import type { SqliteDatabase } from "../../src/lead-engine/db/database.js";
+import type { PoolServiceQualificationResult } from "../../src/lead-engine/qualification/types.js";
 
 const REPO_ROOT = path.resolve(process.cwd(), "..");
 const temporaryRoots: string[] = [];
@@ -73,7 +78,7 @@ function richHtml(name: string): string {
 function crawlFor(entry: EligibleCandidate, html: string): CrawlResult {
   const body = html;
   const page: CrawlPage = {
-    url: entry.candidateUrl, kind: "homepage", inspectionStatus: "inspected",
+    url: entry.candidateUrl, kind: "homepage", inspectionStatus: "successful",
     fetch: {
       ok: true, requestedUrl: entry.candidateUrl, finalUrl: entry.candidateUrl, status: 200,
       contentType: "text/html", body, compressedBytes: 2_000, decompressedBytes: 4_000,
@@ -108,9 +113,85 @@ const LIMITS: LiveWebsiteAssessmentLimits = {
   maxDurationMs: 60_000, maxRetriesPerBusiness: 1,
 };
 
+/**
+ * Crawl shapes for the operational-evidence rules. Unlike `crawlFor` these use
+ * the `successful` inspection status the production crawler actually emits, so
+ * the operational assessor sees a real homepage observation.
+ */
+function operationalCrawl(entry: EligibleCandidate, options: {
+  homepage?: "successful" | "failed" | "unavailable";
+  robots?: RobotsDecision["status"];
+  secondaryFailure?: boolean;
+} = {}): CrawlResult {
+  const homepageStatus = options.homepage ?? "successful";
+  const usable = homepageStatus === "successful";
+  const body = richHtml(entry.expectedBusinessName);
+  const pages: CrawlPage[] = [{
+    url: entry.candidateUrl, kind: "homepage", inspectionStatus: homepageStatus,
+    fetch: usable ? {
+      ok: true, requestedUrl: entry.candidateUrl, finalUrl: entry.candidateUrl, status: 200,
+      contentType: "text/html", body, compressedBytes: 2_000, decompressedBytes: 4_000,
+      contentChecksum: createHash("sha256").update(body).digest("hex"),
+      etag: null, lastModified: null, redirectHistory: [],
+      fetchedAt: "2026-08-02T00:00:00.000Z", attempts: 1,
+    } : null,
+    html: usable ? body : null,
+  }];
+  if (options.secondaryFailure) {
+    // A secondary page that could not be read at all. The homepage observation
+    // above stays confirmed.
+    pages.push({
+      url: `${entry.candidateUrl}contact`, kind: "contact",
+      inspectionStatus: "failed", fetch: null, html: null,
+    });
+  }
+  const decision: RobotsDecision = {
+    ...robots(), origin: entry.candidateUrl, status: options.robots ?? "allowed",
+  };
+  return {
+    requestedUrl: entry.candidateUrl, sourceClass: "public_business_website",
+    canonicalHomepage: entry.candidateUrl,
+    startedAt: "2026-08-02T00:00:00.000Z", completedAt: "2026-08-02T00:00:01.000Z",
+    pages, robots: decision, robotsDecisions: [decision],
+    complete: usable && !options.secondaryFailure, timedOut: false,
+  };
+}
+
+interface OperationalRow {
+  field_name: string;
+  claimed_value: string | null;
+  claim_state: string;
+  source_class: string;
+  external_verification_state: string;
+  human_review_state: string;
+  verification_dimension: string | null;
+  verifier_id: string | null;
+  verification_result: string | null;
+  expires_at: string | null;
+}
+
+function operationalRows(database: SqliteDatabase): OperationalRow[] {
+  return database.prepare(`
+    SELECT field_name, claimed_value, claim_state, source_class,
+           external_verification_state, human_review_state, verification_dimension,
+           verifier_id, verification_result, expires_at
+    FROM evidence WHERE field_name LIKE 'operational:%' ORDER BY field_name
+  `).all() as OperationalRow[];
+}
+
+const VERIFICATION_ONLY_RULES = [
+  "contact.phone_reachability_verified",
+  "contact.email_deliverability_verified",
+  "person.employment_verified",
+  "person.owner_relationship_verified",
+  "person.decision_authority_verified",
+  "person.human_confirmation",
+] as const;
+
 async function runPipeline(input: {
   candidates: EligibleCandidate[];
   html?: (entry: EligibleCandidate) => string;
+  crawl?: (entry: EligibleCandidate) => CrawlResult;
   databasePath?: string;
   signal?: AbortSignal;
 }) {
@@ -125,7 +206,8 @@ async function runPipeline(input: {
     now: () => new Date("2026-08-02T00:00:00.000Z"),
     assessmentId: (entry) => `wa_${entry.candidateKey}`,
     createCrawler: (entry) => ({
-      crawl: async () => crawlFor(entry, input.html?.(entry) ?? richHtml(entry.expectedBusinessName)),
+      crawl: async () => input.crawl?.(entry)
+        ?? crawlFor(entry, input.html?.(entry) ?? richHtml(entry.expectedBusinessName)),
     }),
     sink: store.sink,
     ...(input.signal ? { signal: input.signal } : {}),
@@ -269,6 +351,154 @@ describe("Phase 5C live-evidence pipeline", () => {
   });
 });
 
+describe("operational crawl evidence", () => {
+  const points = (result: PoolServiceQualificationResult, ruleId: string): number => {
+    const outcome = result.componentScores
+      .flatMap((component) => component.outcomes)
+      .find((entry) => entry.ruleId === ruleId);
+    if (!outcome) throw new Error(`Missing rule outcome: ${ruleId}`);
+    return outcome.points;
+  };
+  const evaluate = async (
+    entry: EligibleCandidate,
+    build: (candidateEntry: EligibleCandidate) => CrawlResult,
+    databasePath?: string,
+  ) => {
+    const run = await runPipeline({
+      candidates: [entry], crawl: build,
+      ...(databasePath ? { databasePath } : {}),
+    });
+    // Read back through the real qualification repository, not the in-memory result.
+    const businessId = run.store.businessIdFor(entry.candidateKey);
+    const result = createQualificationRepository(run.store.database)
+      .getLatestForBusiness(businessId);
+    return { run, result, businessId };
+  };
+
+  it("persists both facts from a directly observed successful homepage", async () => {
+    const { run, result } = await evaluate(candidate(20), (entry) => operationalCrawl(entry));
+    const rows = operationalRows(run.store.database);
+    expect(rows.map((row) => row.field_name)).toEqual([
+      "operational:homepage_usable", "operational:https_works",
+    ]);
+    expect(rows[0]?.claimed_value).toBe("successful");
+    expect(rows[1]?.claimed_value).toBe("https:");
+    expect(run.evidence.operational).toBe(2);
+    // The rows reach the scorer through the real repository and input assembly.
+    expect(result).not.toBeNull();
+    expect(points(result as PoolServiceQualificationResult, "legitimacy.homepage_usable")).toBe(5);
+    expect(points(result as PoolServiceQualificationResult, "legitimacy.https_observed")).toBe(2);
+    run.store.close();
+  });
+
+  it("caps the combined operational credit at the existing seven points", async () => {
+    const { run, result } = await evaluate(candidate(21), (entry) => operationalCrawl(entry));
+    const scored = result as PoolServiceQualificationResult;
+    const combined = points(scored, "legitimacy.homepage_usable") +
+      points(scored, "legitimacy.https_observed");
+    expect(combined).toBe(7);
+    const legitimacy = scored.componentScores
+      .find((component) => component.component === "business_legitimacy");
+    // Unchanged component ceiling: nothing here creates a parallel scoring path.
+    expect(legitimacy?.maximumPoints).toBe(15);
+    expect(legitimacy?.points).toBeLessThanOrEqual(15);
+    expect(scored.overallScore).toBeLessThanOrEqual(100);
+    run.store.close();
+  });
+
+  it("writes nothing when robots denies the crawl", async () => {
+    const { run, result } = await evaluate(candidate(22), (entry) =>
+      operationalCrawl(entry, { robots: "denied" }));
+    expect(operationalRows(run.store.database)).toEqual([]);
+    expect(run.evidence.operational).toBe(0);
+    expect(points(result as PoolServiceQualificationResult, "legitimacy.homepage_usable")).toBe(0);
+    expect(points(result as PoolServiceQualificationResult, "legitimacy.https_observed")).toBe(0);
+    run.store.close();
+  });
+
+  it("writes nothing when the homepage failed or was unavailable", async () => {
+    for (const [index, homepage] of (["failed", "unavailable"] as const).entries()) {
+      const { run, result } = await evaluate(candidate(23 + index), (entry) =>
+        operationalCrawl(entry, { homepage }));
+      expect(operationalRows(run.store.database)).toEqual([]);
+      expect(run.evidence.operational).toBe(0);
+      expect(points(result as PoolServiceQualificationResult, "legitimacy.homepage_usable")).toBe(0);
+      expect(points(result as PoolServiceQualificationResult, "legitimacy.https_observed")).toBe(0);
+      run.store.close();
+    }
+    // The producer itself refuses non-successful and robots-denied observations,
+    // independently of where the pipeline happens to stop.
+    const entry = candidate(25);
+    for (const options of [
+      { homepage: "failed" as const }, { homepage: "unavailable" as const },
+      { robots: "denied" as const }, { robots: "unavailable" as const },
+    ]) {
+      expect(persistableOperationalEvidence({
+        expectedBusinessName: entry.expectedBusinessName,
+        crawl: operationalCrawl(entry, options),
+      })).toEqual([]);
+    }
+  });
+
+  it("keeps a confirmed homepage when a secondary page failed", async () => {
+    const { run, result } = await evaluate(candidate(26), (entry) =>
+      operationalCrawl(entry, { secondaryFailure: true }));
+    const scored = result as PoolServiceQualificationResult;
+    // The crawl is incomplete, yet the homepage fact is neither erased nor faked.
+    const assessment = run.store.database
+      .prepare("SELECT status FROM website_assessments LIMIT 1").get() as { status: string };
+    expect(assessment.status).toBe("partial");
+    expect(operationalRows(run.store.database).map((row) => row.field_name)).toEqual([
+      "operational:homepage_usable", "operational:https_works",
+    ]);
+    expect(points(scored, "legitimacy.homepage_usable")).toBe(5);
+    expect(points(scored, "legitimacy.https_observed")).toBe(2);
+    run.store.close();
+  });
+
+  it("does not duplicate evidence or points when the batch is reprocessed", async () => {
+    const databasePath = temporaryDatabase();
+    const entry = candidate(27);
+    const first = await evaluate(entry, (target) => operationalCrawl(target), databasePath);
+    const firstScore = (first.result as PoolServiceQualificationResult).overallScore;
+    expect(operationalRows(first.run.store.database)).toHaveLength(2);
+    first.run.store.close();
+
+    const second = await evaluate(entry, (target) => operationalCrawl(target), databasePath);
+    expect(second.run.websites.duplicateAssessmentsSkipped).toBe(1);
+    expect(operationalRows(second.run.store.database)).toHaveLength(2);
+    expect((second.result as PoolServiceQualificationResult).overallScore).toBe(firstScore);
+    const evaluations = second.run.store.database
+      .prepare("SELECT COUNT(*) AS total FROM icp_qualification_evaluations").get() as { total: number };
+    expect(evaluations.total).toBe(1);
+    second.run.store.close();
+  });
+
+  it("never counts as verification, human confirmation, or a second source class", async () => {
+    const { run, result } = await evaluate(candidate(28), (entry) => operationalCrawl(entry));
+    const scored = result as PoolServiceQualificationResult;
+    for (const row of operationalRows(run.store.database)) {
+      expect(row.claim_state).toBe("observed");
+      expect(row.source_class).toBe("public_business_website");
+      expect(row.external_verification_state).toBe("unassessed");
+      expect(row.human_review_state).toBe("unreviewed");
+      expect(row.verification_dimension).toBeNull();
+      expect(row.verifier_id).toBeNull();
+      expect(row.verification_result).toBeNull();
+      expect(row.expires_at).toBeNull();
+    }
+    // Every verification-gated rule stays unsatisfied.
+    for (const ruleId of VERIFICATION_ONLY_RULES) expect(points(scored, ruleId)).toBe(0);
+    expect(scored.confidence.usedAsVerification).toBe(false);
+    // No independent corroborating source class was introduced.
+    expect(points(scored, "quality.corroborated_sources")).toBe(0);
+    expect(scored.evidenceQuality.sourceClasses).toEqual(["public_business_website"]);
+    expect(scored.componentScores
+      .find((component) => component.component === "decision_maker_evidence")?.points).toBe(0);
+    run.store.close();
+  });
+});
+
 describe("Phase 5C batch canary surface", () => {
   it("keeps the live batch disabled by default and does no network work", async () => {
     const report = await runPoolBatchCanary({
@@ -292,6 +522,75 @@ describe("Phase 5C batch canary surface", () => {
     expect(() => parseBatchCanaryArguments(
       ["--confirm-live-batch", "--database", path.join(REPO_ROOT, "inside.sqlite")], REPO_ROOT,
     )).toThrow("temp directory");
+  });
+
+  it("defaults database retention to false and only enables it on the explicit flag", () => {
+    const database = temporaryDatabase();
+    expect(parseBatchCanaryArguments(["--confirm-live-batch", "--database", database], REPO_ROOT)
+      .retainDatabase).toBe(false);
+    expect(parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", database], REPO_ROOT,
+    ).retainDatabase).toBe(true);
+    // Retention is diagnosis-only and never implies a live batch.
+    expect(parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", database], REPO_ROOT,
+    ).enableLiveBatch).toBe(false);
+  });
+
+  it("keeps every path containment protection while retention is requested", () => {
+    const database = temporaryDatabase();
+    // The flag must not smuggle a path past any existing guard.
+    expect(() => parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", path.join(REPO_ROOT, "inside.sqlite")],
+      REPO_ROOT,
+    )).toThrow("temp directory");
+    expect(() => parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", path.join(os.homedir(), "outside.sqlite")],
+      REPO_ROOT,
+    )).toThrow("temp directory");
+    expect(() => parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", `${path.dirname(database)}/batch.db`],
+      REPO_ROOT,
+    )).toThrow("temp directory");
+    expect(() => parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", "relative.sqlite"], REPO_ROOT,
+    )).toThrow("absolute path");
+    expect(() => parseBatchCanaryArguments(
+      ["--retain-database", "--database", database], REPO_ROOT,
+    )).toThrow("confirm");
+    writeFileSync(database, "");
+    expect(() => parseBatchCanaryArguments(
+      ["--confirm-live-batch", "--retain-database", "--database", database], REPO_ROOT,
+    )).toThrow("must not already exist");
+  });
+
+  it("removes the database and its SQLite companions by default", () => {
+    const database = temporaryDatabase();
+    const companions = [`${database}-wal`, `${database}-shm`];
+    for (const file of [database, ...companions]) writeFileSync(file, "");
+    expect(cleanupBatchDatabase(database, false)).toBe(false);
+    for (const file of [database, ...companions]) expect(existsSync(file)).toBe(false);
+  });
+
+  it("preserves the database and its SQLite companions when retention is enabled", () => {
+    const database = temporaryDatabase();
+    const companions = [`${database}-wal`, `${database}-shm`];
+    for (const file of [database, ...companions]) writeFileSync(file, "");
+    expect(cleanupBatchDatabase(database, true)).toBe(true);
+    for (const file of [database, ...companions]) expect(existsSync(file)).toBe(true);
+  });
+
+  it("wires the parsed retention flag into the cleanup performed in finally", () => {
+    // The finally block is only reachable after live discovery creates the store,
+    // so the wiring itself is asserted against the production source rather than
+    // by injecting a seam into the batch orchestration.
+    const source = readFileSync(
+      path.join(process.cwd(), "scripts/run-pool-batch-canary.ts"), "utf8",
+    );
+    expect(source).toContain("cleanupBatchDatabase(args.databasePath, args.retainDatabase)");
+    expect(source).toContain("if (store !== null && store.database.open) store.close();");
+    // Deletion stays inside the helper, so no second removal path can drift.
+    expect(source.match(/rmSync\(/g) ?? []).toHaveLength(2);
   });
 
   it("pins the mandated bounded batch budgets", () => {

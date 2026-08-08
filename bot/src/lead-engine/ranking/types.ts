@@ -1,4 +1,8 @@
-import type { IcpQualificationResult, PoolServiceQualificationResult } from "../qualification/types.js";
+import type {
+  IcpQualificationResult,
+  PoolServiceQualificationResult,
+  SupportedQualificationNiche,
+} from "../qualification/types.js";
 
 export const QUEUE_DISPOSITIONS = [
   "callable",
@@ -23,7 +27,7 @@ export type QueueScope =
 export interface CallingQueueConstraints {
   readonly queueVersion: "calling_queue_v1";
   readonly rankingModelVersion: "pool_service_ranking_v1";
-  readonly niche: "pool_service";
+  readonly niche: SupportedQualificationNiche;
   readonly scope: QueueScope;
   readonly maximumCallable: number;
   readonly maximumReview: number;

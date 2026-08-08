@@ -42,6 +42,8 @@ export const ICP_SCORE_COMPONENTS = [
 
 export type IcpScoreComponent = (typeof ICP_SCORE_COMPONENTS)[number];
 
+export type SupportedQualificationNiche = "pool_service" | "foundation_waterproofing";
+
 export type QualificationFactState =
   | "positive"
   | "negative"
@@ -217,7 +219,7 @@ export interface PoolServiceQualificationResult {
   readonly evaluationId: string;
   readonly supersedesEvaluationId: string | null;
   readonly modelVersion: string;
-  readonly niche: "pool_service";
+  readonly niche: SupportedQualificationNiche;
   readonly businessId: string;
   readonly runId: string | null;
   readonly evaluatedAt: string;

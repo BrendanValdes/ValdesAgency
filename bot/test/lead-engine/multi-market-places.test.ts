@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   combinedCsv,
+  googleQueriesForNiche,
   marketQuery,
   MULTI_MARKET_BUDGETS,
   newDedupeState,
@@ -178,6 +179,31 @@ describe("parseMultiMarketArguments", () => {
     expect(parsed.maxGoogleRequests).toBe(10);
     expect(parsed.maxAssessedCandidates).toBe(400);
     expect(parsed.enableLiveRun).toBe(false);
+    expect(parsed.nicheId).toBe("pool_service");
+    expect(parsed.queriesPerCity).toBe(5);
+  });
+
+  it("accepts the foundation-waterproofing CLI identifier and its six queries", () => {
+    const parsed = parseMultiMarketArguments([
+      ...baseArgs,
+      "--niche",
+      "foundation-waterproofing",
+    ]);
+    expect(parsed.nicheId).toBe("foundation_waterproofing");
+    expect(parsed.queriesPerCity).toBe(6);
+    expect(googleQueriesForNiche(parsed.nicheId)).toEqual([
+      "foundation repair",
+      "basement waterproofing",
+      "crawl space repair",
+      "foundation contractor",
+      "structural foundation repair",
+      "foundation waterproofing",
+    ]);
+  });
+
+  it("rejects any unsupported niche identifier", () => {
+    expect(() => parseMultiMarketArguments([...baseArgs, "--niche", "plumbing"]))
+      .toThrow(/Unsupported niche/);
   });
 
   it("sets enableLiveRun from --enable-live-run", () => {
@@ -299,6 +325,12 @@ describe("planMarketCell", () => {
     expect(cell.bounds).toEqual(market().bounds);
     expect(cell.countryCode).toBe("US");
     expect(cell.subdivisionCode).toBe("AZ");
+  });
+
+  it("carries foundation-waterproofing into coverage lineage", () => {
+    const { manifest } = planMarketCell(market(), "foundation_waterproofing");
+    expect(manifest.nicheId).toBe("foundation_waterproofing");
+    expect(manifest.queryVersion).toBe("foundation-waterproofing-places-1.0.0");
   });
 });
 

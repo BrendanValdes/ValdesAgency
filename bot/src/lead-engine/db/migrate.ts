@@ -103,14 +103,30 @@ export function migrateDatabase(
   const appliedVersions = new Set(applied.map((migration) => migration.version));
   for (const migration of migrations) {
     if (appliedVersions.has(migration.version)) continue;
-    withTransaction(database, () => {
-      database.exec(migration.sql);
-      database
-        .prepare(
-          "INSERT INTO migration_history (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
-        )
-        .run(migration.version, migration.name, migration.checksum, now());
-    });
+
+    const disableForeignKeys = migration.version === 11;
+    if (disableForeignKeys) database.exec("PRAGMA foreign_keys = OFF");
+
+    try {
+      withTransaction(database, () => {
+        database.exec(migration.sql);
+
+        if (disableForeignKeys) {
+          const violations = database.prepare("PRAGMA foreign_key_check").all();
+          if (violations.length > 0) {
+            throw new Error("Migration 011 produced foreign-key violations");
+          }
+        }
+
+        database
+          .prepare(
+            "INSERT INTO migration_history (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
+          )
+          .run(migration.version, migration.name, migration.checksum, now());
+      });
+    } finally {
+      if (disableForeignKeys) database.exec("PRAGMA foreign_keys = ON");
+    }
   }
 
   return getMigrationHistory(database);

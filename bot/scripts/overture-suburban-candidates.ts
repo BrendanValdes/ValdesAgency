@@ -1,9 +1,9 @@
 import { DEFAULT_LEAD_POLICY_ROOT } from "../src/lead-engine/config/lead-policy.js";
 import { NetworkPolicyAuthorizer } from "../src/lead-engine/config/network-capability.js";
-import type { BoundingArea, CoverageCell } from "../src/lead-engine/geography/types.js";
+import type { BoundingArea, CoverageCell, CoverageManifest } from "../src/lead-engine/geography/types.js";
 import {
   discoverSuburbanWebsiteCandidates,
-  planSuburbanCells,
+  planSuburbanCoverage,
   type SuburbanDiscoverySummary,
 } from "../src/lead-engine/assessment/suburban-discovery.js";
 import { OverturePlacesLiveDiscoveryProvider } from "../src/lead-engine/providers/adapters/overture-places-live.js";
@@ -23,6 +23,10 @@ import {
 } from "../src/lead-engine/providers/overture/range-http-transport.js";
 import { OvertureReleaseResolver } from "../src/lead-engine/providers/overture/release-resolver.js";
 import { createSecureOvertureAssetQueryEngine } from "../src/lead-engine/providers/overture/secure-asset-query-engine.js";
+import {
+  createOvertureAssetSession,
+  type OvertureAssetSession,
+} from "../src/lead-engine/providers/overture/asset-session.js";
 import { overturePlaceRecordSchema } from "../src/lead-engine/providers/overture/schema.js";
 import {
   classifyOverturePoolCategory,
@@ -116,8 +120,59 @@ function unionBounds(cells: ReadonlyArray<CoverageCell>): BoundingArea {
   return { west, south, east, north };
 }
 
+/**
+ * Per-pass discovery economics.
+ *
+ * Everything is a count, a byte total, or a ratio, so the whole block is safe to
+ * print. It exists to answer one question directly: what did each eligible
+ * candidate cost, and which stage of the funnel destroyed the rest.
+ */
+export interface SuburbanDiscoveryMetrics {
+  readonly cellsQueried: number;
+  readonly requests: number;
+  readonly downloadedBytes: number;
+  readonly processedBytes: number;
+  readonly budgetConsumed: Readonly<Record<string, number>>;
+  readonly budgetRemaining: Readonly<Record<string, number>>;
+  readonly rowsScanned: number;
+  readonly rowsMaterialised: number;
+  readonly rowGroupsSelected: number;
+  readonly rowGroupsRead: number;
+  readonly earlyFilteredGroups: number;
+  readonly statisticsPrunedGroups: number;
+  /** Row-level funnel summed across the pass's cells. */
+  readonly decodedRows: number;
+  readonly rejectedOutsideCell: number;
+  readonly rejectedDuplicateId: number;
+  readonly rejectedByCategory: number;
+  readonly acceptedCandidates: number;
+  /** Gate outcomes, i.e. candidates before and after admissibility. */
+  readonly envelopesConsidered: number;
+  readonly gateEligible: number;
+  readonly duplicatesAcrossCells: number;
+  readonly eligibleAfterDedupe: number;
+  /** Byte-range cache effectiveness, the measure of duplicate IO removed. */
+  readonly rangeCacheHits: number;
+  readonly rangeCacheMisses: number;
+  readonly assetHandleReuses: number;
+  readonly sessionCacheBytes: number;
+  /** Cost per eligible candidate. Infinity is reported as null. */
+  readonly requestsPerEligible: number | null;
+  readonly downloadedBytesPerEligible: number | null;
+  readonly rowsScannedPerEligible: number | null;
+  /** Observed provider category identifiers, keyed `disposition:identifier`. */
+  readonly observedCategories: Readonly<Record<string, number>>;
+}
+
 export interface SuburbanDiscoveryOutcome {
   readonly summary: SuburbanDiscoverySummary;
+  readonly metrics: SuburbanDiscoveryMetrics;
+  /**
+   * The coverage manifest this pass actually planned. Carried out of discovery so
+   * the batch can persist the market it searched; it holds cell geometry and
+   * labels only, never a business value.
+   */
+  readonly coverage: CoverageManifest;
   readonly envelopes: ReadonlyArray<ProviderEnvelope<NormalizedDiscoveryResult>>;
   readonly releaseId: string;
   readonly requests: number;
@@ -138,13 +193,25 @@ export async function discoverSuburbanPhoenixCandidates(options: {
   targetWebsiteCandidates?: number;
   maxAcceptedCandidates?: number;
   cellOffset?: number;
+  /**
+   * Coverage to traverse instead of the default suburban Phoenix plan. Lets a
+   * multi-market batch reuse this bounded traversal verbatim — same policy,
+   * capability, release pin, budget, session, engine, provider, and admission
+   * gate — while supplying its own planner windows.
+   */
+  coverage?: CoverageManifest;
+  /** Per-cell row ceiling, still bounded by OVERTURE_MAX_PLAN_ROWS. */
+  budgetLimits?: Partial<OvertureBudgetLimits>;
 } = {}): Promise<SuburbanDiscoveryOutcome> {
   const maxCells = options.maxCells ?? SUBURBAN_MAX_CELLS;
   const targetWebsiteCandidates = options.targetWebsiteCandidates ?? SUBURBAN_TARGET_WEBSITE_CANDIDATES;
   const limits: OvertureBudgetLimits = {
     ...SUBURBAN_CANARY_LIMITS,
+    // One shared asset handle per pass, so a single inspection covers every cell.
+    // Kept at the cell count when no session-aware caller overrides it.
     maxAssetsInspected: Math.min(16, Math.max(1, maxCells)),
     maxCandidates: options.maxAcceptedCandidates ?? SUBURBAN_CANARY_LIMITS.maxCandidates,
+    ...options.budgetLimits,
   };
   const startedAt = Date.now();
   const policy = createEphemeralOvertureCanaryPolicy({
@@ -159,17 +226,29 @@ export async function discoverSuburbanPhoenixCandidates(options: {
   const collected: ProviderEnvelope<NormalizedDiscoveryResult>[] = [];
   const efficiency = {
     rowsScanned: 0, rowsMaterialised: 0, earlyFilteredGroups: 0, statisticsPrunedGroups: 0,
+    rowGroupsSelected: 0, rowGroupsRead: 0,
+    decodedRows: 0, rejectedOutsideCell: 0, rejectedDuplicateId: 0,
+    rejectedByCategory: 0, acceptedCandidates: 0,
+    rangeCacheHits: 0, rangeCacheMisses: 0,
   };
+  const observedCategories: Record<string, number> = {};
+  // Hoisted so the finally block can zero the cache on the failure path too.
+  let session: OvertureAssetSession | null = null;
   try {
-    const cells = planSuburbanCells({
+    const coverage = options.coverage ?? planSuburbanCoverage({
       configurationVersion: policy.policy.schemaVersion,
       queryVersion: "overture-suburban-canary-1.0.0",
       maxCells,
       cellOffset: options.cellOffset ?? 0,
     });
+    const cells = coverage.cells;
     if (cells.length === 0) throw new Error("Suburban discovery planned no coverage cells");
 
     const budget = new OvertureBudgetTracker({ limits });
+    // Scoped to this pass: same budget tracker, same abort signal. The session
+    // refuses to serve a handle across a different scope, so it can never charge
+    // the wrong budget or outlive a cancellation.
+    session = createOvertureAssetSession({ budget, signal: controller.signal });
     const nowIso = (): string => new Date().toISOString();
     const runId = "overture-suburban-canary";
     const assessmentId = "overture-suburban-canary-scope";
@@ -247,6 +326,10 @@ export async function discoverSuburbanPhoenixCandidates(options: {
           runId,
           assessmentId,
           transport: rangeTransport,
+          // One asset handle, footer, and bounded byte cache for the whole pass.
+          // Every cell reads the same pinned asset, so reopening it per cell was
+          // paying repeatedly for identical immutable bytes.
+          ...(session ? { session } : {}),
           audit: { record: (event) => contacted.add(event.destinationHost) },
           now: nowIso,
           candidateTarget: targetWebsiteCandidates,
@@ -290,6 +373,18 @@ export async function discoverSuburbanPhoenixCandidates(options: {
           efficiency.rowsMaterialised += audit.rowsMaterialised;
           efficiency.earlyFilteredGroups += audit.earlyFilteredGroups;
           efficiency.statisticsPrunedGroups += audit.statisticsPrunedGroups;
+          efficiency.rowGroupsSelected += audit.rowGroupsSelected;
+          efficiency.rowGroupsRead += audit.rowGroupsRead;
+          efficiency.decodedRows += audit.funnel?.decodedRows ?? 0;
+          efficiency.rejectedOutsideCell += audit.funnel?.rejectedOutsideCell ?? 0;
+          efficiency.rejectedDuplicateId += audit.funnel?.rejectedDuplicateId ?? 0;
+          efficiency.rejectedByCategory += audit.funnel?.rejectedByCategory ?? 0;
+          efficiency.acceptedCandidates += audit.funnel?.acceptedCandidates ?? 0;
+          efficiency.rangeCacheHits += audit.cache?.rangeHits ?? 0;
+          efficiency.rangeCacheMisses += audit.cache?.rangeMisses ?? 0;
+          for (const [key, count] of Object.entries(audit.observedCategories)) {
+            observedCategories[key] = (observedCategories[key] ?? 0) + count;
+          }
         }
         collected.push(...batch.envelopes);
         return batch.envelopes;
@@ -297,8 +392,47 @@ export async function discoverSuburbanPhoenixCandidates(options: {
     });
 
     const snapshot = budget.snapshot();
+    const sessionMetrics = session.metrics();
+    const eligibleCount = summary.eligibleWebsiteCandidates.length;
+    const perEligible = (value: number): number | null =>
+      eligibleCount > 0 ? Number((value / eligibleCount).toFixed(2)) : null;
+    const metrics: SuburbanDiscoveryMetrics = Object.freeze({
+      cellsQueried: summary.cellsQueried,
+      requests: snapshot.consumed.stacRequests + snapshot.consumed.assetRequests,
+      downloadedBytes: snapshot.consumed.downloadedBytes,
+      processedBytes: snapshot.consumed.processedBytes,
+      budgetConsumed: Object.freeze({ ...snapshot.consumed }),
+      budgetRemaining: Object.freeze({ ...snapshot.remaining }),
+      rowsScanned: efficiency.rowsScanned,
+      rowsMaterialised: efficiency.rowsMaterialised,
+      rowGroupsSelected: efficiency.rowGroupsSelected,
+      rowGroupsRead: efficiency.rowGroupsRead,
+      earlyFilteredGroups: efficiency.earlyFilteredGroups,
+      statisticsPrunedGroups: efficiency.statisticsPrunedGroups,
+      decodedRows: efficiency.decodedRows,
+      rejectedOutsideCell: efficiency.rejectedOutsideCell,
+      rejectedDuplicateId: efficiency.rejectedDuplicateId,
+      rejectedByCategory: efficiency.rejectedByCategory,
+      acceptedCandidates: efficiency.acceptedCandidates,
+      envelopesConsidered: summary.envelopesConsidered,
+      gateEligible: summary.acceptedCandidates,
+      duplicatesAcrossCells: summary.duplicatesAcrossCells,
+      eligibleAfterDedupe: eligibleCount,
+      rangeCacheHits: efficiency.rangeCacheHits,
+      rangeCacheMisses: efficiency.rangeCacheMisses,
+      assetHandleReuses: sessionMetrics.handleReuses,
+      sessionCacheBytes: sessionMetrics.cacheBytes,
+      requestsPerEligible: perEligible(
+        snapshot.consumed.stacRequests + snapshot.consumed.assetRequests,
+      ),
+      downloadedBytesPerEligible: perEligible(snapshot.consumed.downloadedBytes),
+      rowsScannedPerEligible: perEligible(efficiency.rowsScanned),
+      observedCategories: Object.freeze({ ...observedCategories }),
+    });
     return {
       summary,
+      metrics,
+      coverage,
       envelopes: Object.freeze(collected),
       releaseId: release.releaseId,
       requests: snapshot.consumed.stacRequests + snapshot.consumed.assetRequests,
@@ -309,12 +443,14 @@ export async function discoverSuburbanPhoenixCandidates(options: {
       rowsMaterialised: efficiency.rowsMaterialised,
       earlyFilteredGroups: efficiency.earlyFilteredGroups,
       statisticsPrunedGroups: efficiency.statisticsPrunedGroups,
-      budgetRemaining: snapshot.remaining,
+      budgetRemaining: Object.freeze({ ...snapshot.remaining }),
       destinationsContacted: Object.freeze([...contacted].sort()),
       elapsedMs: Date.now() - startedAt,
     };
   } finally {
     clearTimeout(deadline);
+    // Zero and drop every cached byte range before the pass ends.
+    session?.close();
     policy.cleanup();
   }
 }

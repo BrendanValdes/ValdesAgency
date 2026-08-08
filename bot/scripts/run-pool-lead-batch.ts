@@ -32,6 +32,7 @@ import { validateCrawlLimits } from "../src/lead-engine/crawl/policies.js";
 import { discoverSuburbanPhoenixCandidates } from "./overture-suburban-candidates.js";
 import type { EligibleCandidate } from "../src/lead-engine/assessment/candidate-gate.js";
 import type { CoverageCell, CoverageManifest } from "../src/lead-engine/geography/types.js";
+import type { SupportedQualificationNiche } from "../src/lead-engine/qualification/types.js";
 
 /**
  * Bounded multi-market pool-service lead batch.
@@ -512,8 +513,11 @@ export async function assessQualifyAndExport(input: {
   /** Absolute wall-clock deadline for the whole stage, in epoch milliseconds. */
   readonly deadlineAt: number;
   readonly now: () => Date;
+  /** Omitted callers retain the existing pool-service path. */
+  readonly nicheId?: SupportedQualificationNiche;
 }): Promise<AssessmentStageResult> {
   const { limits, paths, runId, now } = input;
+  const nicheId = input.nicheId ?? "pool_service";
   let store: AssessmentStore | null = null;
   const contacted = new Set<string>();
   const assessmentChunks: Array<Record<string, unknown>> = [];
@@ -532,10 +536,11 @@ export async function assessQualifyAndExport(input: {
       repositoryRoot: input.repositoryRoot,
       candidates: input.candidates,
       coverage: input.coverage,
+      nicheId,
       now,
     });
-    const niche = loadNicheConfigurations().get("pool_service");
-    if (!niche) throw new Error("Lead batch requires a configured pool_service niche");
+    const niche = loadNicheConfigurations().get(nicheId);
+    if (!niche?.enabled) throw new Error(`Lead batch requires an enabled ${nicheId} niche`);
 
     const chunkSize = Math.min(limits.assessmentChunkSize, 25);
     for (let start = 0; start < input.candidates.length; start += chunkSize) {
@@ -630,6 +635,7 @@ export async function assessQualifyAndExport(input: {
       maximumReview: 400,
       coverageKeys: input.coverageKeys,
       signal: new AbortController().signal,
+      nicheId,
     });
 
     // Stage 4 — durable private exports. Written 0600, never echoed to the terminal.

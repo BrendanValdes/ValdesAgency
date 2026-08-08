@@ -268,7 +268,7 @@ export async function runLiveWebsiteAssessment(input: {
   candidates: ReadonlyArray<EligibleCandidate>;
   limits: LiveWebsiteAssessmentLimits;
   niche: Pick<NicheConfiguration,
-    "service_synonyms" | "required_indicators" | "negative_keywords" |
+    "id" | "service_synonyms" | "required_indicators" | "negative_keywords" |
     "excluded_adjacent_industries" | "relevant_categories">;
   /** One crawler per business, so per-business limits are enforced by the crawler itself. */
   createCrawler: (candidate: EligibleCandidate) => LiveWebsiteCrawler;
@@ -479,7 +479,12 @@ export async function runLiveWebsiteAssessment(input: {
           observedServiceAreas.push(locality);
         }
       }
-      const serviceLanguage = evaluateServiceLanguage(pageText);
+      // The calibrated language catalogue is pool-specific. Foundation evidence
+      // comes only from that niche's configured multi-word services; pool terms
+      // must never be required or injected into a foundation assessment.
+      const serviceLanguage: ServiceLanguageEvaluation = input.niche.id === "pool_service"
+        ? evaluateServiceLanguage(pageText)
+        : { hits: [], facilityOrRetail: false, state: "missing" };
       for (const hit of serviceLanguage.hits) serviceLanguageRuleIds.add(hit.ruleId);
       const structuredData = jsonLd.organizationNames.map((value) => ({
         // Canonical persisted field name. The qualification reader selects

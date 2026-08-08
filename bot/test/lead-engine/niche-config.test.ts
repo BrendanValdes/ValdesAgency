@@ -12,20 +12,23 @@ describe("versioned niche configuration", () => {
     expect(resolveNicheConfiguration().enabled).toBe(true);
   });
 
-  it("validates all six stable niche IDs", () => {
+  it("validates all seven stable niche IDs", () => {
     const configurations = loadNicheConfigurations();
     expect([...configurations.keys()]).toEqual(PHASE_2_NICHE_IDS);
+    // The executable lead policy requires every niche configuration_version to
+    // equal the global schema_version, so all seven stay in lockstep at 1.0.0.
     expect([...configurations.values()].every((config) => config.configuration_version === "1.0.0")).toBe(true);
   });
 
-  it("keeps pool service as the only enabled niche", () => {
+  it("enables pool service and foundation waterproofing together", () => {
     const enabled = [...loadNicheConfigurations().values()]
       .filter((config) => config.enabled)
       .map((config) => config.id);
-    expect(enabled).toEqual(["pool_service"]);
+    expect(enabled).toEqual(["pool_service", "foundation_waterproofing"]);
+    expect(resolveNicheConfiguration("foundation_waterproofing").enabled).toBe(true);
   });
 
-  it.each(PHASE_2_NICHE_IDS.slice(1))("keeps supported niche %s valid but benchmark-gated", (nicheId) => {
+  it.each(PHASE_2_NICHE_IDS.slice(2))("keeps supported niche %s valid but benchmark-gated", (nicheId) => {
     const config = loadNicheConfigurations().get(nicheId);
     expect(config?.enabled).toBe(false);
     expect(() => resolveNicheConfiguration(nicheId)).toThrow("disabled pending its benchmark gate");
@@ -43,4 +46,3 @@ describe("versioned niche configuration", () => {
     expect(nicheConfigurationHash(first!)).toMatch(/^[a-f0-9]{64}$/);
   });
 });
-

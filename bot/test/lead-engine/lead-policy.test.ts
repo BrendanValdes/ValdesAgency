@@ -39,7 +39,7 @@ describe("executable lead policy", () => {
       byteBudget: 0,
       costBudgetMicroUsd: 0,
       defaultNiche: "pool_service",
-      enabledNiches: ["pool_service"],
+      enabledNiches: ["pool_service", "foundation_waterproofing"],
     });
     const enabledProviders = Object.values(policy.providers).filter((provider) => provider.enabled);
     expect(enabledProviders.map((provider) => provider.id)).toEqual([
@@ -194,12 +194,12 @@ describe("executable lead policy", () => {
     }
   });
 
-  it("rejects zero, multiple, unsupported, and non-default enabled niche sets", () => {
+  it("rejects zero, unsupported, incomplete, and non-default enabled niche sets", () => {
     const cases: Array<[unknown, unknown, string]> = [
       [[], "pool_service", "enabled_niche_missing"],
-      [["pool_service", "septic_pumping_repair"], "pool_service", "multiple_enabled_niches"],
+      [["pool_service", "septic_pumping_repair"], "pool_service", "unsupported_enabled_niche"],
       [["septic_pumping_repair"], "septic_pumping_repair", "unsupported_enabled_niche"],
-      [["pool_service"], "septic_pumping_repair", "default_niche_not_enabled"],
+      [["pool_service", "foundation_waterproofing"], "septic_pumping_repair", "default_niche_not_enabled"],
     ];
     for (const [enabled, defaultNiche, code] of cases) {
       const fixture = createTemporaryLeadPolicyRoot();

@@ -34,3 +34,4 @@ required_niche_fields:
 default_niche: pool_service
 enabled_niches:
   - pool_service
+  - foundation_waterproofing

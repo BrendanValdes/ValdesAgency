@@ -48,7 +48,12 @@ export type OverturePlacesErrorCode =
   // The official place collection could not be paired one-to-one with partition
   // extents, covers no partition for the coverage cell, or spans more partitions
   // than the bounded run may read. Never widened by guessing a partition.
-  | "partition_unresolved";
+  | "partition_unresolved"
+  // A per-pass asset session was reused after it was closed, or across a
+  // different budget or cancellation scope. Both would mis-account bytes and
+  // requests, so the session refuses instead.
+  | "asset_session_closed"
+  | "asset_session_scope_mismatch";
 
 export class OverturePlacesError extends Error {
   readonly code: OverturePlacesErrorCode;

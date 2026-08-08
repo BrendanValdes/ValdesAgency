@@ -1,6 +1,10 @@
 import { isCurrentExternalVerification } from "../domain/provenance.js";
 import { stableHash, stableId } from "../shared/stable.js";
-import { POOL_SERVICE_ICP_V1, POOL_SERVICE_ICP_MODEL_VERSION } from "./pool-service-model.js";
+import { POOL_SERVICE_ICP_MODEL_VERSION } from "./pool-service-model.js";
+import {
+  qualificationModelForVersion,
+  type QualificationModel,
+} from "./qualification-model.js";
 import {
   ICP_SCORE_COMPONENTS,
   type IcpPriorityTier,
@@ -75,21 +79,20 @@ function outcomeState(input: {
   return "missing";
 }
 
-const ruleById = new Map<string, (typeof POOL_SERVICE_ICP_V1.scoreRules)[number]>(
-  POOL_SERVICE_ICP_V1.scoreRules.map((rule) => [rule.id, rule]),
-);
-
-function ruleOutcome(input: {
-  ruleId: string;
-  state: QualificationFactState;
-  awarded: boolean;
-  references?: ReadonlyArray<QualificationEvidenceReference>;
-  explanation: string;
-  missingFlag?: string | null;
-  conflictFlag?: string | null;
-}): QualificationRuleOutcome {
+function ruleOutcome(
+  ruleById: ReadonlyMap<string, QualificationModel["scoreRules"][number]>,
+  input: {
+    ruleId: string;
+    state: QualificationFactState;
+    awarded: boolean;
+    references?: ReadonlyArray<QualificationEvidenceReference>;
+    explanation: string;
+    missingFlag?: string | null;
+    conflictFlag?: string | null;
+  },
+): QualificationRuleOutcome {
   const rule = ruleById.get(input.ruleId);
-  if (!rule) throw new Error(`Unknown pool-service ICP rule: ${input.ruleId}`);
+  if (!rule) throw new Error(`Unknown qualification rule: ${input.ruleId}`);
   return {
     component: rule.component,
     ruleId: rule.id,
@@ -138,10 +141,10 @@ function humanConfirmation(input: PoolServiceQualificationInput) {
   );
 }
 
-function priorityTier(score: number): IcpPriorityTier {
-  if (score >= POOL_SERVICE_ICP_V1.thresholds.highPriorityMinimum) return "high_priority";
-  if (score >= POOL_SERVICE_ICP_V1.thresholds.qualifiedMinimum) return "qualified";
-  if (score >= POOL_SERVICE_ICP_V1.thresholds.qualifiedWithReviewMinimum) return "moderate";
+function priorityTier(score: number, model: QualificationModel): IcpPriorityTier {
+  if (score >= model.thresholds.highPriorityMinimum) return "high_priority";
+  if (score >= model.thresholds.qualifiedMinimum) return "qualified";
+  if (score >= model.thresholds.qualifiedWithReviewMinimum) return "moderate";
   return "low";
 }
 
@@ -167,7 +170,10 @@ function geographyMatches(location: QualificationFact, market: QualificationFact
   return leftSubdivision === right.subdivision;
 }
 
-function hardDisqualifiers(input: PoolServiceQualificationInput): QualificationHardDisqualifier[] {
+function hardDisqualifiers(
+  input: PoolServiceQualificationInput,
+  model: QualificationModel,
+): QualificationHardDisqualifier[] {
   const result: QualificationHardDisqualifier[] = [];
   const closed = input.operations.filter((operation) =>
     operation.kind === "closed" && operation.status === "negative" &&
@@ -195,19 +201,19 @@ function hardDisqualifiers(input: PoolServiceQualificationInput): QualificationH
   }
 
   const excluded = input.services.filter((service) =>
-    service.state === "negative" && includesTerm(service.term, POOL_SERVICE_ICP_V1.excludedOperatorTerms) &&
+    service.state === "negative" && includesTerm(service.term, model.excludedOperatorTerms) &&
     hasFreshReference(service.fact)
   );
   const positiveServices = input.services.filter((service) =>
     service.state === "positive" &&
-    (includesTerm(service.term, POOL_SERVICE_ICP_V1.serviceTerms) ||
-      includesTerm(service.term, POOL_SERVICE_ICP_V1.relevantCategories)) &&
+    (includesTerm(service.term, model.serviceTerms) ||
+      includesTerm(service.term, model.relevantCategories)) &&
     hasFreshReference(service.fact)
   );
   if (excluded.length > 0 && positiveServices.length === 0) {
     result.push({
       ruleId: "hard.excluded_service_operator",
-      reason: "Current persisted evidence identifies an excluded supplier, wholesaler, or manufacturer and contains no pool-service operator evidence.",
+      reason: `Current persisted evidence identifies an excluded adjacent operator and contains no ${model.serviceLabel} evidence.`,
       evidenceReferences: referencesFor(excluded.map((entry) => entry.fact)),
     });
   }
@@ -222,9 +228,7 @@ function hardDisqualifiers(input: PoolServiceQualificationInput): QualificationH
     ...referencesFor(input.verifications.map((entry) => entry.fact)),
   ]).filter((reference) => reference.sourceClass !== null);
   if (materialReferences.length > 0 && materialReferences.every((reference) =>
-    POOL_SERVICE_ICP_V1.historicalOnlySourceClasses.includes(
-      reference.sourceClass as (typeof POOL_SERVICE_ICP_V1.historicalOnlySourceClasses)[number],
-    )
+    model.historicalOnlySourceClasses.includes(reference.sourceClass ?? "")
   )) {
     result.push({
       ruleId: "hard.historical_only_evidence",
@@ -235,62 +239,94 @@ function hardDisqualifiers(input: PoolServiceQualificationInput): QualificationH
   return result.sort((left, right) => left.ruleId.localeCompare(right.ruleId));
 }
 
-function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleOutcome[] {
+function buildOutcomes(
+  input: PoolServiceQualificationInput,
+  model: QualificationModel,
+): QualificationRuleOutcome[] {
   const outcomes: QualificationRuleOutcome[] = [];
+  const ruleById = new Map<string, QualificationModel["scoreRules"][number]>(
+    model.scoreRules.map((rule) => [rule.id, rule]),
+  );
   const positiveServices = input.services.filter((service) =>
     service.state === "positive" && usableFact(service.fact)
   );
   const relevantCategory = positiveServices.filter((service) =>
-    service.basis === "provider_category" && includesTerm(service.term, POOL_SERVICE_ICP_V1.relevantCategories)
+    service.basis === "provider_category" && includesTerm(service.term, model.relevantCategories)
   );
   const coreServices = positiveServices.filter((service) =>
-    includesTerm(service.term, POOL_SERVICE_ICP_V1.serviceTerms)
+    includesTerm(service.term, model.serviceTerms)
   );
+  const firstPartyCoreServices = coreServices.filter((service) =>
+    service.basis !== "provider_category" && service.fact.references.some((reference) =>
+      reference.sourceClass === "public_business_website"
+    )
+  );
+  const foundationCoreServiceEstablished = model.niche === "foundation_waterproofing" &&
+    firstPartyCoreServices.length > 0;
   const uniqueServiceTerms = new Set(coreServices.map((service) => normalized(service.term ?? "")).filter(Boolean));
   const recurringServices = coreServices.filter((service) =>
-    includesTerm(service.term, POOL_SERVICE_ICP_V1.recurringServiceTerms)
+    includesTerm(service.term, model.recurringServiceTerms)
   );
   const serviceFacts = input.services.map((service) => service.fact);
   const excludedService = input.services.some((service) => service.state === "negative");
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "niche.relevant_category",
-    state: outcomeState({ positive: relevantCategory.length > 0, facts: serviceFacts, negative: excludedService }),
-    awarded: relevantCategory.length > 0,
-    references: referencesFor(relevantCategory.map((entry) => entry.fact)),
+    state: outcomeState({
+      positive: relevantCategory.length > 0 || foundationCoreServiceEstablished,
+      facts: serviceFacts,
+      negative: excludedService,
+    }),
+    awarded: relevantCategory.length > 0 || foundationCoreServiceEstablished,
+    references: referencesFor(
+      (relevantCategory.length > 0 ? relevantCategory : firstPartyCoreServices).map((entry) => entry.fact),
+    ),
     explanation: relevantCategory.length > 0
-      ? "A persisted provider category identifies pool-service work."
-      : "No current persisted pool-service provider category was available.",
+      ? `A persisted provider category identifies ${model.serviceLabel} work.`
+      : foundationCoreServiceEstablished
+      ? `Strong first-party website evidence establishes core ${model.serviceLabel} work without requiring a provider category.`
+      : `No current persisted ${model.serviceLabel} provider category was available.`,
     missingFlag: serviceFacts.length === 0 ? "service_fit_unknown" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "niche.core_service_observed",
     state: outcomeState({ positive: coreServices.length > 0, facts: serviceFacts, negative: excludedService }),
     awarded: coreServices.length > 0,
     references: referencesFor(coreServices.map((entry) => entry.fact)),
     explanation: coreServices.length > 0
-      ? `Persisted evidence lists pool-service work: ${[...uniqueServiceTerms].sort().join(", ")}.`
-      : "No current persisted core pool-service description was observed.",
+      ? `Persisted evidence lists ${model.serviceLabel} work: ${[...uniqueServiceTerms].sort().join(", ")}.`
+      : `No current persisted core ${model.serviceLabel} description was observed.`,
     missingFlag: serviceFacts.length === 0 ? "service_fit_unknown" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "niche.multiple_services_observed",
-    state: outcomeState({ positive: uniqueServiceTerms.size >= 2, facts: coreServices.map((entry) => entry.fact) }),
-    awarded: uniqueServiceTerms.size >= 2,
+    state: outcomeState({
+      positive: uniqueServiceTerms.size >= 2 || foundationCoreServiceEstablished,
+      facts: coreServices.map((entry) => entry.fact),
+    }),
+    awarded: uniqueServiceTerms.size >= 2 || foundationCoreServiceEstablished,
     references: referencesFor(coreServices.map((entry) => entry.fact)),
     explanation: uniqueServiceTerms.size >= 2
-      ? "At least two distinct pool-service offerings were observed."
-      : "Fewer than two distinct pool-service offerings were observed.",
+      ? `At least two distinct ${model.serviceLabel} offerings were observed.`
+      : foundationCoreServiceEstablished
+      ? `One strong first-party core ${model.serviceLabel} offering is sufficient for this niche.`
+      : `Fewer than two distinct ${model.serviceLabel} offerings were observed.`,
     missingFlag: coreServices.length === 0 ? "service_breadth_unknown" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "niche.recurring_service_observed",
-    state: outcomeState({ positive: recurringServices.length > 0, facts: coreServices.map((entry) => entry.fact) }),
+    state: model.recurringServiceTerms.length === 0
+      ? "not_applicable"
+      : outcomeState({ positive: recurringServices.length > 0, facts: coreServices.map((entry) => entry.fact) }),
     awarded: recurringServices.length > 0,
     references: referencesFor(recurringServices.map((entry) => entry.fact)),
-    explanation: recurringServices.length > 0
+    explanation: model.recurringServiceTerms.length === 0
+      ? `Recurring service language is not required for the ${model.serviceLabel} niche.`
+      : recurringServices.length > 0
       ? "Recurring pool cleaning, maintenance, or service evidence was observed."
       : "Recurring pool-service work was not established by persisted evidence.",
-    missingFlag: coreServices.length === 0 ? "recurring_service_unknown" : null,
+    missingFlag: model.recurringServiceTerms.length > 0 && coreServices.length === 0
+      ? "recurring_service_unknown"
+      : null,
   }));
 
   const operation = (kind: string, status: string) =>
@@ -299,7 +335,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   const https = operation("https_works", "positive");
   const identity = operation("identity_agreement", "positive");
   const operationFacts = input.operations.map((entry) => entry.fact);
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "legitimacy.homepage_usable",
     state: outcomeState({ positive: homepage.some((entry) => usableFact(entry.fact)), facts: operationFacts }),
     awarded: homepage.some((entry) => usableFact(entry.fact)),
@@ -310,7 +346,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: input.assessment === null || ["blocked", "failed"].includes(input.assessment.status)
       ? "website_assessment_unavailable" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "legitimacy.https_observed",
     state: outcomeState({ positive: https.some((entry) => usableFact(entry.fact)), facts: operationFacts }),
     awarded: https.some((entry) => usableFact(entry.fact)),
@@ -318,7 +354,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     explanation: https.length > 0 ? "HTTPS worked in the persisted assessment." : "Working HTTPS was not observed.",
     missingFlag: input.assessment === null ? "https_status_unknown" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "legitimacy.identity_agrees",
     state: outcomeState({
       positive: identity.some((entry) => usableFact(entry.fact)) || input.assessment?.identityState === "agrees",
@@ -336,7 +372,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     conflictFlag: input.assessment?.identityState === "conflicts" ? "website_identity_conflict" : null,
   }));
   const locations = input.geography.locations.filter(usableFact);
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "legitimacy.location_observed",
     state: outcomeState({ positive: locations.length > 0, facts: input.geography.locations }),
     awarded: locations.length > 0,
@@ -345,7 +381,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: locations.length === 0 ? "business_location_missing" : null,
   }));
   const structured = input.structuredBusinessData.filter(usableFact);
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "legitimacy.structured_business_data",
     state: outcomeState({ positive: structured.length > 0, facts: input.structuredBusinessData }),
     awarded: structured.length > 0,
@@ -361,7 +397,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     const facts = conversion(feature);
     const absent = facts.filter((entry) => entry.status === "absent_after_successful_inspection" && usableFact(entry.fact));
     const present = facts.filter((entry) => entry.status === "present");
-    outcomes.push(ruleOutcome({
+    outcomes.push(ruleOutcome(ruleById, {
       ruleId,
       state: absent.length > 0 ? "positive" : present.length > 0 ? "negative" : outcomeState({ positive: false, facts: facts.map((entry) => entry.fact) }),
       awarded: absent.length > 0,
@@ -381,7 +417,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   const bookingAbsent = conversion("booking").some((entry) => entry.status === "absent_after_successful_inspection" && usableFact(entry.fact));
   const formAbsent = conversion("contact_form").some((entry) => entry.status === "absent_after_successful_inspection" && usableFact(entry.fact));
   const phoneOnly = phones.length > 0 && bookingAbsent && formAbsent;
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "opportunity.phone_only_dependency",
     state: phoneOnly ? "positive" : phones.length === 0 ? "missing" : "negative",
     awarded: phoneOnly,
@@ -397,7 +433,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   }));
 
   const assessmentDomain = input.assessment?.canonicalHomepageUrl || input.assessment?.sourceWebsiteUrl;
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.domain_observed",
     state: assessmentDomain && input.assessment?.reference.freshness !== "stale" ? "positive" : input.assessment ? "stale" : "missing",
     awarded: Boolean(assessmentDomain && input.assessment?.reference.freshness !== "stale"),
@@ -405,7 +441,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     explanation: assessmentDomain ? "A business website domain was persisted." : "No business website domain was persisted.",
     missingFlag: assessmentDomain ? null : "business_domain_missing",
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.public_phone_observed",
     state: outcomeState({ positive: phones.length > 0, facts: input.contacts.filter((entry) => entry.kind === "phone").map((entry) => entry.fact) }),
     awarded: phones.length > 0,
@@ -416,7 +452,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: phones.length === 0 ? "phone_missing" : null,
   }));
   const verifiedPhone = currentExternalVerification(input, "phone_reachability");
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.phone_reachability_verified",
     state: verifiedPhone.length > 0 ? "positive" : "missing",
     awarded: verifiedPhone.length > 0,
@@ -427,7 +463,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: verifiedPhone.length === 0 ? "phone_reachability_not_verified" : null,
   }));
   const emails = input.contacts.filter((contact) => contact.kind === "email" && usableFact(contact.fact));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.public_email_observed",
     state: outcomeState({ positive: emails.length > 0, facts: input.contacts.filter((entry) => entry.kind === "email").map((entry) => entry.fact) }),
     awarded: emails.length > 0,
@@ -438,7 +474,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: emails.length === 0 ? "email_missing" : null,
   }));
   const verifiedEmail = currentExternalVerification(input, "email_deliverability");
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.email_deliverability_verified",
     state: verifiedEmail.length > 0 ? "positive" : "missing",
     awarded: verifiedEmail.length > 0,
@@ -449,7 +485,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: verifiedEmail.length === 0 ? "email_deliverability_not_verified" : null,
   }));
   const forms = conversion("contact_form").filter((entry) => entry.status === "present" && usableFact(entry.fact));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.form_observed",
     state: outcomeState({ positive: forms.length > 0, facts: conversion("contact_form").map((entry) => entry.fact), negative: formAbsent }),
     awarded: forms.length > 0,
@@ -458,7 +494,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: conversion("contact_form").length === 0 ? "contact_form_assessment_unknown" : null,
   }));
   const channelCount = [phones.length > 0, emails.length > 0, forms.length > 0].filter(Boolean).length;
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "contact.multiple_channels",
     state: channelCount >= 2 ? "positive" : channelCount === 0 ? "missing" : "negative",
     awarded: channelCount >= 2,
@@ -473,7 +509,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
 
   const people = input.people.filter((person) => usableFact(person.fact));
   const titledPeople = people.filter((person) => Boolean(person.displayedTitle?.trim()));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "person.name_observed",
     state: outcomeState({ positive: people.length > 0, facts: input.people.map((entry) => entry.fact) }),
     awarded: people.length > 0,
@@ -483,7 +519,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
       : "No person name was observed; this does not imply that no decision-maker exists.",
     missingFlag: people.length === 0 ? "decision_maker_unknown" : null,
   }));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "person.title_observed",
     state: titledPeople.length > 0 ? "positive" : people.length > 0 ? "missing" : "missing",
     awarded: titledPeople.length > 0,
@@ -503,7 +539,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     passed: string,
     missing: string,
     flag: string,
-  ) => outcomes.push(ruleOutcome({
+  ) => outcomes.push(ruleOutcome(ruleById, {
     ruleId,
     state: matches.length > 0 ? "positive" : "missing",
     awarded: matches.length > 0,
@@ -520,7 +556,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   verificationOutcome("person.decision_authority_verified", authority,
     "Decision authority was externally verified for the compatible dimension.",
     "Observed title evidence has no current decision-authority verification.", "decision_authority_not_verified");
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "person.human_confirmation",
     state: human.length > 0 ? "positive" : "missing",
     awarded: human.length > 0,
@@ -532,7 +568,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   }));
 
   const identityResolved = input.identityReview.state === "clear" || input.identityReview.state === "resolved";
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "readiness.identity_resolved",
     state: identityResolved ? "positive" : input.identityReview.state === "required" ? "conflicting" : "missing",
     awarded: identityResolved,
@@ -542,7 +578,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     conflictFlag: input.identityReview.state === "required" ? "identity_review_required" : null,
   }));
   const assessmentComplete = input.assessment?.status === "complete" && input.assessment.reference.freshness !== "stale";
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "readiness.assessment_complete",
     state: assessmentComplete ? "positive" : input.assessment?.reference.freshness === "stale" ? "stale" : input.assessment ? "negative" : "missing",
     awarded: assessmentComplete,
@@ -551,7 +587,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: input.assessment ? null : "website_assessment_missing",
   }));
   const contactRoutes = conversion("contact_route").filter((entry) => entry.status === "present" && usableFact(entry.fact));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "readiness.contact_route",
     state: outcomeState({ positive: contactRoutes.length > 0 || phones.length > 0 || emails.length > 0, facts: input.contacts.map((entry) => entry.fact) }),
     awarded: contactRoutes.length > 0 || phones.length > 0 || emails.length > 0,
@@ -577,7 +613,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     ...referencesFor(input.verifications.map((entry) => entry.fact)),
   ]);
   const currentReferences = allInputReferences.filter((reference) => reference.freshness === "current");
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "readiness.current_evidence",
     state: currentReferences.length > 0 ? "positive" : allInputReferences.some((reference) => reference.freshness === "stale") ? "stale" : "missing",
     awarded: currentReferences.length > 0,
@@ -586,7 +622,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: allInputReferences.length === 0 ? "current_evidence_missing" : null,
   }));
   const businessUsable = !["rejected", "conflicting"].includes(input.business.state);
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "readiness.business_record_usable",
     state: businessUsable ? "positive" : "conflicting",
     awarded: businessUsable,
@@ -596,7 +632,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   }));
 
   const currentAssessment = input.assessment?.reference.freshness === "current";
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "quality.current_assessment",
     state: currentAssessment ? "positive" : input.assessment ? "stale" : "missing",
     awarded: currentAssessment,
@@ -607,7 +643,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   const auditable = allInputReferences.length > 0 && allInputReferences.every((reference) =>
     reference.sourceId.trim().length > 0 && reference.sourceTable.trim().length > 0
   );
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "quality.auditable_lineage",
     state: auditable ? "positive" : "missing",
     awarded: auditable,
@@ -618,7 +654,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   const explicitProvenance = allInputReferences.filter((reference) =>
     reference.sourceClass !== null && reference.sourceClass !== "legacy_unclassified"
   );
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "quality.explicit_provenance",
     state: explicitProvenance.length > 0 ? "positive" : "missing",
     awarded: explicitProvenance.length > 0,
@@ -627,7 +663,7 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
     missingFlag: explicitProvenance.length > 0 ? null : "explicit_provenance_missing",
   }));
   const sourceClasses = new Set(explicitProvenance.map((reference) => reference.sourceClass));
-  outcomes.push(ruleOutcome({
+  outcomes.push(ruleOutcome(ruleById, {
     ruleId: "quality.corroborated_sources",
     state: sourceClasses.size >= 2 ? "positive" : "missing",
     awarded: sourceClasses.size >= 2,
@@ -641,13 +677,16 @@ function buildOutcomes(input: PoolServiceQualificationInput): QualificationRuleO
   return outcomes;
 }
 
-function components(outcomes: ReadonlyArray<QualificationRuleOutcome>): QualificationComponentScore[] {
+function components(
+  outcomes: ReadonlyArray<QualificationRuleOutcome>,
+  model: QualificationModel,
+): QualificationComponentScore[] {
   return ICP_SCORE_COMPONENTS.map((component) => {
     const componentOutcomes = outcomes.filter((outcome) => outcome.component === component);
     const points = componentOutcomes.reduce((total, outcome) => total + outcome.points, 0);
     const maximumPoints = componentOutcomes.reduce((total, outcome) => total + outcome.maximumPoints, 0);
-    if (maximumPoints !== POOL_SERVICE_ICP_V1.componentWeights[component]) {
-      throw new Error(`Pool-service ICP component ${component} has an invalid maximum`);
+    if (maximumPoints !== model.componentWeights[component]) {
+      throw new Error(`${model.serviceLabel} ICP component ${component} has an invalid maximum`);
     }
     return { component, points, maximumPoints, outcomes: componentOutcomes };
   });
@@ -655,6 +694,7 @@ function components(outcomes: ReadonlyArray<QualificationRuleOutcome>): Qualific
 
 function resultState(input: {
   qualificationInput: PoolServiceQualificationInput;
+  model: QualificationModel;
   score: number;
   hardDisqualifiers: ReadonlyArray<QualificationHardDisqualifier>;
   hasFreshServiceFit: boolean;
@@ -670,8 +710,8 @@ function resultState(input: {
     return "stale_evidence";
   }
   if (!input.hasFreshServiceFit) return "insufficient_evidence";
-  if (input.score >= POOL_SERVICE_ICP_V1.thresholds.qualifiedMinimum) return "qualified";
-  if (input.score >= POOL_SERVICE_ICP_V1.thresholds.qualifiedWithReviewMinimum) return "qualified_with_review";
+  if (input.score >= input.model.thresholds.qualifiedMinimum) return "qualified";
+  if (input.score >= input.model.thresholds.qualifiedWithReviewMinimum) return "qualified_with_review";
   return "insufficient_evidence";
 }
 
@@ -698,16 +738,14 @@ function finalExplanation(input: {
   return parts.join(" ");
 }
 
-export function qualifyPoolServiceLead(
+export function qualifyLead(
   input: PoolServiceQualificationInput,
   options: { modelVersion: string; supersedesEvaluationId?: string | null },
 ): PoolServiceQualificationResult {
   canonicalIso("Qualification evaluation time", input.evaluatedAt);
-  if (options.modelVersion !== POOL_SERVICE_ICP_MODEL_VERSION) {
-    throw new Error(`Unsupported pool-service ICP model version: ${options.modelVersion}`);
-  }
-  if (input.business.nicheId !== "pool_service") {
-    throw new Error("Pool-service ICP v1 can evaluate only pool_service businesses");
+  const model = qualificationModelForVersion(options.modelVersion);
+  if (input.business.nicheId !== model.niche) {
+    throw new Error(`${model.version} can evaluate only ${model.niche} businesses`);
   }
 
   const inputFingerprint = stableHash({ modelVersion: options.modelVersion, input });
@@ -716,12 +754,12 @@ export function qualifyPoolServiceLead(
     modelVersion: options.modelVersion,
     inputFingerprint,
   });
-  const hard = hardDisqualifiers(input);
-  const outcomes = buildOutcomes(input);
-  const componentScores = components(outcomes);
+  const hard = hardDisqualifiers(input, model);
+  const outcomes = buildOutcomes(input, model);
+  const componentScores = components(outcomes, model);
   const overallScore = componentScores.reduce((total, component) => total + component.points, 0);
   if (!Number.isInteger(overallScore) || overallScore < 0 || overallScore > 100) {
-    throw new Error("Pool-service ICP score must be an integer between 0 and 100");
+    throw new Error(`${model.serviceLabel} ICP score must be an integer between 0 and 100`);
   }
   const citedReferences = uniqueReferences([
     ...outcomes.flatMap((outcome) => outcome.evidenceReferences),
@@ -729,17 +767,18 @@ export function qualifyPoolServiceLead(
   ]);
   const hasFreshServiceFit = input.services.some((service) =>
     service.state === "positive" && usableFact(service.fact) &&
-    (includesTerm(service.term, POOL_SERVICE_ICP_V1.serviceTerms) ||
-      includesTerm(service.term, POOL_SERVICE_ICP_V1.relevantCategories))
+    (includesTerm(service.term, model.serviceTerms) ||
+      includesTerm(service.term, model.relevantCategories))
   );
   const icpResult = resultState({
     qualificationInput: input,
+    model,
     score: overallScore,
     hardDisqualifiers: hard,
     hasFreshServiceFit,
     citedReferences,
   });
-  const tier = priorityTier(overallScore);
+  const tier = priorityTier(overallScore, model);
   const missingInformationFlags = [...new Set([
     ...outcomes.map((outcome) => outcome.missingFlag).filter((value): value is string => Boolean(value)),
     ...(input.geography.selectedMarkets.length === 0 ? ["selected_geography_missing"] : []),
@@ -828,7 +867,7 @@ export function qualifyPoolServiceLead(
     evaluationId,
     supersedesEvaluationId: options.supersedesEvaluationId ?? null,
     modelVersion: options.modelVersion,
-    niche: "pool_service",
+    niche: model.niche,
     businessId: input.business.id,
     runId: input.runId,
     evaluatedAt: input.evaluatedAt,
@@ -863,4 +902,18 @@ export function qualifyPoolServiceLead(
     },
     finalExplanation: explanation,
   };
+}
+
+/** Pool-only compatibility surface retained for offline orchestration and tests. */
+export function qualifyPoolServiceLead(
+  input: PoolServiceQualificationInput,
+  options: { modelVersion: string; supersedesEvaluationId?: string | null },
+): PoolServiceQualificationResult {
+  if (options.modelVersion !== POOL_SERVICE_ICP_MODEL_VERSION) {
+    throw new Error(`Unsupported pool-service ICP model version: ${options.modelVersion}`);
+  }
+  if (input.business.nicheId !== "pool_service") {
+    throw new Error("Pool-service ICP v1 can evaluate only pool_service businesses");
+  }
+  return qualifyLead(input, options);
 }

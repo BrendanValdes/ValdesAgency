@@ -89,11 +89,17 @@ export interface PoolBatchReport {
 export function parseBatchCanaryArguments(
   argv: ReadonlyArray<string>,
   repositoryRoot: string,
-): { databasePath: string; enableLiveBatch: boolean } {
+): {
+  databasePath: string;
+  enableLiveBatch: boolean;
+  retainDatabase: boolean;
+  resume: boolean;
+} {
   const values = new Map<string, string | true>();
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index] as string;
-    if (flag === "--confirm-live-batch" || flag === "--enable-live-batch") {
+    if (flag === "--confirm-live-batch" || flag === "--enable-live-batch" ||
+      flag === "--retain-database" || flag === "--resume") {
       values.set(flag, true);
       continue;
     }
@@ -122,8 +128,41 @@ export function parseBatchCanaryArguments(
     path.extname(databasePath) !== ".sqlite") {
     throw new Error("Batch canary database must be a .sqlite file under the OS temp directory and outside the repository");
   }
-  if (existsSync(databasePath)) throw new Error("Batch canary database path must not already exist");
-  return { databasePath, enableLiveBatch: values.get("--enable-live-batch") === true };
+  // Resume is the only way an existing artifact is accepted, and it accepts one
+  // only after every other path guard above has already passed: still absolute,
+  // still a .sqlite file, still under the OS temp directory, still outside the
+  // repository. Resuming also implies retention — deleting the artifact you just
+  // continued from would defeat the point.
+  const resume = values.get("--resume") === true;
+  if (existsSync(databasePath) && !resume) {
+    throw new Error("Batch canary database path must not already exist");
+  }
+  if (resume && !existsSync(databasePath)) {
+    throw new Error("Batch canary --resume requires an existing retained database");
+  }
+  return {
+    databasePath,
+    enableLiveBatch: values.get("--enable-live-batch") === true,
+    // Diagnosis-only retention. Default stays false, so the throwaway database is
+    // still removed unless retention is asked for explicitly.
+    retainDatabase: values.get("--retain-database") === true || resume,
+    resume,
+  };
+}
+
+/**
+ * Remove or retain the throwaway batch database and its SQLite companions.
+ *
+ * Default behaviour is unchanged: the database, -wal, and -shm files are all
+ * deleted. With retention the artifact is left in place for read-only
+ * inspection, which is the only way per-candidate qualification rows survive the
+ * run. Returns whether the artifact was retained.
+ */
+export function cleanupBatchDatabase(databasePath: string, retain: boolean): boolean {
+  if (retain) return true;
+  rmSync(databasePath, { force: true });
+  for (const suffix of ["-wal", "-shm"]) rmSync(`${databasePath}${suffix}`, { force: true });
+  return false;
 }
 
 export async function runPoolBatchCanary(input: {
@@ -163,6 +202,21 @@ export async function runPoolBatchCanary(input: {
   const discovery = passes[0];
   if (!discovery) throw new Error("Bounded calibration produced no discovery pass");
   const eligible = [...eligibleByKey.values()].slice(0, BATCH_CANARY_LIMITS.maxWebsitesAttempted);
+  // Every pass plans from the same targets, configuration, and query version, so
+  // they share one manifest identity and differ only in which slice of cells they
+  // took. Unioning the slices gives the whole market this batch planned.
+  const coverage = {
+    ...discovery.coverage,
+    cells: Object.freeze([...new Map(
+      passes.flatMap((pass) => pass.coverage.cells).map((cell) => [cell.coverageKey, cell]),
+    ).values()]),
+  };
+  // The cells actually queried, across every pass. Using only the first pass left
+  // a candidate found in a later pass outside the queue scope and outside the
+  // selected market, which is a lineage falsehood rather than a real rejection.
+  const queriedCoverageKeys = [...new Set(
+    passes.flatMap((pass) => pass.summary.perCell.map((cell) => cell.coverageCellSafeId)),
+  )].sort();
   const discoveryTotals = passes.reduce((totals, pass) => ({
     cellsPlanned: totals.cellsPlanned + pass.summary.cellsPlanned,
     cellsQueried: totals.cellsQueried + pass.summary.cellsQueried,
@@ -205,15 +259,19 @@ export async function runPoolBatchCanary(input: {
     maxDurationMs: limits.maxDurationMs,
   });
   let databaseCreated = false;
+  // Hoisted so the finally block can close the handle on the failure path too,
+  // rather than leaving a live -wal behind next to a retained database.
+  let store: ReturnType<typeof createAssessmentStore> | null = null;
   const contacted = new Set<string>();
   try {
     const runId = "pool-batch-canary";
     const scopeId = "pool-batch-canary-scope";
-    const store = createAssessmentStore({
+    store = createAssessmentStore({
       databasePath: args.databasePath,
       repositoryRoot: input.repositoryRoot,
       candidates: eligible,
       now,
+      coverage,
     });
     databaseCreated = true;
     const niche = loadNicheConfigurations().get("pool_service");
@@ -266,7 +324,7 @@ export async function runPoolBatchCanary(input: {
       evaluatedAt,
       maximumCallable: BATCH_CANARY_LIMITS.targetCallableLeads,
       maximumReview: BATCH_CANARY_LIMITS.maxWebsitesAttempted,
-      coverageKeys: discovery.summary.perCell.map((cell) => cell.coverageCellSafeId),
+      coverageKeys: queriedCoverageKeys,
       signal: new AbortController().signal,
     });
 
@@ -274,7 +332,6 @@ export async function runPoolBatchCanary(input: {
       observationsBySite: websites.serviceLanguageBySite,
     });
     const evidence = store.evidenceCounts();
-    store.close();
     return {
       ran: true,
       releaseId: discovery.releaseId,
@@ -293,6 +350,8 @@ export async function runPoolBatchCanary(input: {
         eligibleCandidates: eligible.length,
         duplicatesAcrossCells: discoveryTotals.duplicates,
         gateBlockedCounts: gateBlockedTotals,
+        cellsPersisted: coverage.cells.length,
+        cellsSelectedAsMarket: queriedCoverageKeys.length,
         stopReason: passes[passes.length - 1]?.summary.stopReason ?? "not_started",
       },
       calibration: {
@@ -317,7 +376,7 @@ export async function runPoolBatchCanary(input: {
         publicPersonCandidates: websites.publicPersonCandidates,
         stopReason: websites.stopReason,
       },
-      evidence,
+      evidence: { ...evidence },
       qualification: {
         evaluated: queue.evaluated,
         skippedAlreadyEvaluated: queue.skippedAlreadyEvaluated,
@@ -354,9 +413,15 @@ export async function runPoolBatchCanary(input: {
     };
   } finally {
     policy.cleanup();
+    // Every connection is closed normally before the artifact is reported or
+    // inspected, on both the success and the failure path.
+    if (store !== null && store.database.open) store.close();
     if (databaseCreated && existsSync(args.databasePath)) {
-      rmSync(args.databasePath, { force: true });
-      for (const suffix of ["-wal", "-shm"]) rmSync(`${args.databasePath}${suffix}`, { force: true });
+      const retained = cleanupBatchDatabase(args.databasePath, args.retainDatabase);
+      if (retained) {
+        // Aggregate-safe: a temp-directory path, never a lead value or secret.
+        process.stderr.write(`retained batch canary database: ${args.databasePath}\n`);
+      }
     }
   }
 }

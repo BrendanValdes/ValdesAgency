@@ -30,7 +30,7 @@ export type EvidenceId = string;
 export type ProviderCallId = string;
 export type ArtifactReferenceId = string;
 
-export type NicheId = "pool_service" | "landscaping" | "hvac";
+export type NicheId = "pool_service" | "foundation_waterproofing" | "landscaping" | "hvac";
 export type EvidenceEntityType = "business" | "person";
 
 export interface LeadRun {

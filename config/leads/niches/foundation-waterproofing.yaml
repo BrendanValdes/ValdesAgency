@@ -1,0 +1,17 @@
+id: foundation_waterproofing
+display_name: Foundation Repair & Waterproofing
+enabled: true
+search_terms: [foundation repair, basement waterproofing, crawl space repair, foundation contractor, structural foundation repair, foundation waterproofing]
+service_synonyms: [foundation repair, foundation stabilization, basement waterproofing, crawl space repair, crawl space encapsulation, structural foundation repair, foundation crack repair, foundation wall repair, bowed foundation wall repair, cracked foundation wall repair, piering, underpinning, waterproofing drainage system]
+required_indicators: [foundation repair, basement waterproofing, crawl space encapsulation, structural foundation repair]
+negative_keywords: [general contractor, plumbing company, plumber, roofing company, roofer, landscaping company, landscaper, drainage contractor, mold remediation, concrete flatwork, concrete contractor, home builder, roof waterproofing, deck waterproofing]
+excluded_adjacent_industries: [general contractors, plumbers, roofers, landscapers, drainage-only contractors, mold remediation companies, concrete flatwork companies, home builders, roof waterproofing, deck waterproofing]
+relevant_categories: [foundation_contractor, foundation_repair, waterproofing_service, basement_waterproofing, structural_engineer]
+chain_franchise_exclusions: [national foundation repair chain, national basement waterproofing franchise]
+geography_strategy: {mode: nationwide, density: adaptive, result_cap: 1000, max_depth: 5}
+icp_placeholders: [company_size_future, service_area_future]
+pain_signal_placeholders: [manual_followup_future, missed_calls_future]
+required_evidence_policy: {candidate_identity: provider_observation, qualification: future_phase}
+owner_titles_to_seek: [Owner, Founder, President, General Manager]
+export_tags: [niche:foundation_waterproofing, engine:v2]
+configuration_version: "1.0.0"

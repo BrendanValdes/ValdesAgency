@@ -7,6 +7,7 @@ import { stableHash } from "../shared/stable.js";
 
 export const PHASE_2_NICHE_IDS = [
   "pool_service",
+  "foundation_waterproofing",
   "septic_pumping_repair",
   "well_pump_water_treatment",
   "commercial_refrigeration_ice_machines",
@@ -56,6 +57,7 @@ export type NicheConfiguration = z.infer<typeof nicheConfigurationSchema>;
 
 const NICHE_FILES: Readonly<Record<Phase2NicheId, string>> = {
   pool_service: "pool-service.yaml",
+  foundation_waterproofing: "foundation-waterproofing.yaml",
   septic_pumping_repair: "septic-pumping-repair.yaml",
   well_pump_water_treatment: "well-pump-water-treatment.yaml",
   commercial_refrigeration_ice_machines: "commercial-refrigeration-ice-machines.yaml",
@@ -86,8 +88,8 @@ export function loadNicheConfigurations(
     result.set(nicheId, parsed);
   }
   const enabled = [...result.values()].filter((config) => config.enabled);
-  if (enabled.length !== 1 || enabled[0]?.id !== "pool_service") {
-    throw new Error("Pool service must be the only enabled Phase 2 niche");
+  if (enabled.map((config) => config.id).join(",") !== "pool_service,foundation_waterproofing") {
+    throw new Error("Pool service and foundation waterproofing must be the enabled niches");
   }
   return result;
 }

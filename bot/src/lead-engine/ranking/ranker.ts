@@ -1,3 +1,4 @@
+import { qualificationModelForVersion } from "../qualification/qualification-model.js";
 import { stableId } from "../shared/stable.js";
 import { POOL_SERVICE_RANKING_V1 } from "./pool-service-ranking-model.js";
 import type {
@@ -161,18 +162,101 @@ function contactReadiness(candidate: QueueCandidate, generatedMs: number): {
   };
 }
 
+/**
+ * Stable reason codes for a qualified lead that is not yet human-callable.
+ *
+ * Each names exactly one missing piece of callable evidence, so a reviewer can
+ * see what to go and confirm rather than a single opaque rejection.
+ */
+export const CALLABLE_EVIDENCE_REASONS = Object.freeze({
+  incomplete: "callable_evidence_incomplete",
+  qualification: "callable_evidence_qualification_insufficient",
+  identity: "callable_evidence_identity_not_attached",
+  serviceFit: "callable_evidence_service_fit_missing",
+  homepage: "callable_evidence_homepage_not_usable",
+  https: "callable_evidence_https_not_observed",
+  phoneRoute: "callable_evidence_observed_phone_route_missing",
+} as const);
+
+function awarded(candidate: QueueCandidate, ruleId: string): boolean {
+  const rule = outcome(candidate, ruleId);
+  return Boolean(rule && rule.points > 0);
+}
+
+/**
+ * A phone route directly observed on the assessed business website.
+ *
+ * The rule must be awarded *and* its lineage must point at this assessment's own
+ * public-website contact observations. That is what rules out a directory
+ * listing, an aggregator, a third party, or anything inferred rather than seen:
+ * those never produce a `website_contact_observations` row for this assessment.
+ *
+ * No verification credit is granted or required here — the claim stays the same
+ * public, unverified candidate the extractor recorded.
+ */
+function observedWebsitePhoneRoute(candidate: QueueCandidate): boolean {
+  const rule = outcome(candidate, "contact.public_phone_observed");
+  if (!rule || rule.points <= 0) return false;
+  return rule.evidenceReferences.some((reference) =>
+    reference.sourceTable === "website_contact_observations" &&
+    reference.sourceClass === "public_business_website" &&
+    reference.claimState !== "conflicting" &&
+    reference.claimState !== "rejected" &&
+    reference.evidenceState !== "conflicting" &&
+    reference.freshness !== "stale"
+  );
+}
+
+/**
+ * Minimum evidence for "a person can pick up the phone and call this business".
+ *
+ * Deliberately does NOT require a decision maker, external verification, human
+ * confirmation, a second source class, or any row the live path cannot produce.
+ * It requires only that the business is real, reachable by phone, and that the
+ * phone belongs to the site we actually assessed.
+ *
+ * Returns the missing reason codes in a stable order; empty means callable.
+ */
+function missingCallableEvidence(candidate: QueueCandidate): string[] {
+  const missing: string[] = [];
+  const qualification = candidate.qualification;
+  const qualificationModel = qualificationModelForVersion(qualification.modelVersion);
+
+  if (qualification.icpResult !== "qualified" ||
+      qualification.overallScore < qualificationModel.thresholds.qualifiedMinimum) {
+    missing.push(CALLABLE_EVIDENCE_REASONS.qualification);
+  }
+  // Positive attachment, not merely the absence of a raised conflict. The
+  // earlier identityReview branch already diverts conflicts and pending review;
+  // this additionally rejects "unavailable" and requires the assessed site to
+  // actually agree with the business record.
+  if (!awarded(candidate, "legitimacy.identity_agrees") ||
+      candidate.assessment?.identityState !== "agrees" ||
+      !["clear", "resolved"].includes(qualification.identityReviewState)) {
+    missing.push(CALLABLE_EVIDENCE_REASONS.identity);
+  }
+  if (!awarded(candidate, "niche.core_service_observed") &&
+      !awarded(candidate, "niche.relevant_category")) {
+    missing.push(CALLABLE_EVIDENCE_REASONS.serviceFit);
+  }
+  if (!awarded(candidate, "legitimacy.homepage_usable")) missing.push(CALLABLE_EVIDENCE_REASONS.homepage);
+  if (!awarded(candidate, "legitimacy.https_observed")) missing.push(CALLABLE_EVIDENCE_REASONS.https);
+  if (!observedWebsitePhoneRoute(candidate)) missing.push(CALLABLE_EVIDENCE_REASONS.phoneRoute);
+  return missing;
+}
+
 function band(score: number): QueuePriorityBand {
   return score >= 800 ? "top" : score >= 650 ? "high" : score >= 500 ? "standard" : "low";
 }
 
 export function validateCallingQueueConstraints(constraints: CallingQueueConstraints): void {
   canonicalTimestamp(constraints.generatedAt, "Queue generatedAt");
-  if (constraints.niche !== "pool_service") throw new Error("Calling queue supports only the pool_service niche");
+  const qualificationModel = qualificationModelForVersion(constraints.qualificationModelVersion);
+  if (qualificationModel.niche !== constraints.niche) {
+    throw new Error("Calling queue niche does not match its qualification model");
+  }
   if (constraints.queueVersion !== "calling_queue_v1" || constraints.rankingModelVersion !== POOL_SERVICE_RANKING_V1.version) {
     throw new Error("Unsupported calling queue or ranking model version");
-  }
-  if (constraints.qualificationModelVersion !== "pool_service_icp_v1") {
-    throw new Error("Only completed pool_service_icp_v1 evaluations are supported");
   }
   if (constraints.freshnessPolicyVersion !== POOL_SERVICE_RANKING_V1.freshnessPolicy.version) {
     throw new Error("Unsupported queue freshness policy version");
@@ -307,6 +391,31 @@ export function rankQueueCandidate(
     if (constraints.contactPolicy === "require_route" && allowedRoutes.length === 0) {
       disposition = "not_eligible";
       reasons.push({ code: "contact_route_unavailable", detail: "No included public contact route is supported by persisted evidence." });
+    }
+  }
+  // Minimum callable-evidence gate.
+  //
+  // Runs last, so every earlier classification — duplicate, disqualified,
+  // identity review, stale, insufficient, rejected, out-of-scope, unaccepted
+  // result, below-threshold, no contact route — keeps its existing disposition
+  // and reason codes untouched. In particular an out-of-scope lead is still
+  // not_eligible/outside_queue_scope and never reaches this gate.
+  //
+  // A qualified lead that fails here is held in review_required rather than
+  // dropped to not_eligible: the evidence is missing, not disqualifying, and a
+  // human can resolve it. Priority score and band are already computed above and
+  // are not touched, so ordering within the review queue is preserved.
+  if (disposition === "callable") {
+    const missing = missingCallableEvidence(candidate);
+    if (missing.length > 0) {
+      disposition = "review_required";
+      reasons.push({
+        code: CALLABLE_EVIDENCE_REASONS.incomplete,
+        detail: "The lead is qualified but lacks the minimum evidence to hand to a human caller.",
+      });
+      for (const code of missing) {
+        reasons.push({ code, detail: `Callable evidence is missing: ${code}.` });
+      }
     }
   }
   if (disposition === "callable") reasons.push({ code: "callable", detail: "All explicit eligibility, identity, freshness, market, and contact gates passed." });

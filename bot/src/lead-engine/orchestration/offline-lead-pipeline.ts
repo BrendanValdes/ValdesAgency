@@ -483,12 +483,11 @@ function validateInput(
   }
   if (
     dependencies.policy.defaultNiche !== "pool_service" ||
-    dependencies.policy.enabledNiches.length !== 1 ||
-    dependencies.policy.enabledNiches[0] !== "pool_service"
+    !dependencies.policy.enabledNiches.includes("pool_service")
   ) {
     deterministicInputFailure(
       "invalid_niche_policy",
-      "Offline orchestration requires pool_service as the sole enabled/default niche",
+      "Offline orchestration requires pool_service as an enabled/default niche",
       "policy",
     );
   }

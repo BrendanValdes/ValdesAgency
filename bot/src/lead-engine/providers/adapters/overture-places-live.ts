@@ -38,6 +38,8 @@ import {
   OVERTURE_POOL_TAXONOMY_MAPPING_VERSION,
   type OverturePlacesQueryPlan,
   type OvertureReleasePin,
+  type OvertureCandidateFunnel,
+  type OvertureQueryCacheMetrics,
   type OvertureTraversalStopReason,
 } from "../overture/types.js";
 
@@ -66,6 +68,17 @@ export interface OverturePlacesAdapterAudit {
   readonly rowsMaterialised: number;
   readonly earlyFilteredGroups: number;
   readonly statisticsPrunedGroups: number;
+  /** Row-level candidate funnel from the bounded traversal. */
+  readonly funnel: OvertureCandidateFunnel | null;
+  /** Byte-range cache behaviour for this cell's query. */
+  readonly cache: OvertureQueryCacheMetrics | null;
+  /**
+   * Histogram of the provider category identifiers this cell actually saw, by
+   * classifier disposition. Category identifiers are dataset vocabulary, not
+   * business values, so this is safe to report and is the audit trail for
+   * calibrating the configured category list against real data.
+   */
+  readonly observedCategories: Readonly<Record<string, number>>;
 }
 
 function primaryName(record: OverturePlaceRecord): string | null {
@@ -266,11 +279,19 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
 
       const envelopes = [];
       let reviewCount = 0;
+      const observedCategories: Record<string, number> = {};
       for (const record of [...records.values()].sort((left, right) => left.id.localeCompare(right.id))) {
         const category = classifyOverturePoolCategory({
           basicCategory: record.basic_category,
           taxonomy: record.taxonomy,
         });
+        // Exactly what the classifier keyed on, tallied per disposition. This is
+        // the observability part A needs: which identifiers the live path really
+        // encounters, without persisting or printing any record.
+        for (const matched of category.matchedCategories) {
+          const key = `${category.disposition}:${matched}`;
+          observedCategories[key] = (observedCategories[key] ?? 0) + 1;
+        }
         if (category.disposition === "excluded" || category.disposition === "missing") {
           rejectedCount += 1;
           continue;
@@ -357,6 +378,9 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         rowsMaterialised: result.rowsMaterialised,
         earlyFilteredGroups: result.earlyFilteredGroups,
         statisticsPrunedGroups: result.statisticsPrunedGroups,
+        funnel: result.funnel,
+        cache: result.cache,
+        observedCategories: Object.freeze({ ...observedCategories }),
       });
       return { status, envelopes };
     } catch (error) {
@@ -381,6 +405,9 @@ export class OverturePlacesLiveDiscoveryProvider implements DiscoveryProviderGat
         rowsMaterialised: 0,
         earlyFilteredGroups: 0,
         statisticsPrunedGroups: 0,
+        funnel: null,
+        cache: null,
+        observedCategories: Object.freeze({}),
       });
       return { status: "failed", envelopes: [envelope] };
     }

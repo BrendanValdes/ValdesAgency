@@ -1,6 +1,25 @@
 import { stableId } from "../shared/stable.js";
 import type { BoundingArea, GeographyTarget } from "./types.js";
 
+/**
+ * `business_identifiers.scheme` used to record the coverage cell a business was
+ * discovered in.
+ *
+ * Written by the assessment store and read by the calling-queue repository, so
+ * it lives here rather than in either, keeping the ranking layer independent of
+ * the assessment layer.
+ *
+ * The stored value is `"<coverageKey>|<businessId>"` because the table enforces
+ * a global `UNIQUE (scheme, value)`; only the coverage key is scope-relevant.
+ */
+export const DISCOVERY_COVERAGE_SCHEME = "discovery_coverage_cell";
+
+/** Recover the coverage key from a stored discovery-coverage identifier value. */
+export function discoveryCoverageKeyOf(identifierValue: string): string | null {
+  const key = identifierValue.split("|")[0] ?? "";
+  return key.length > 0 ? key : null;
+}
+
 export function normalizedBounds(bounds: BoundingArea): BoundingArea {
   const rounded = (value: number) => Number(value.toFixed(6));
   if (![bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite)) {

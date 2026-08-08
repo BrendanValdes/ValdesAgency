@@ -89,7 +89,7 @@ describe("forward-only migrations", () => {
       const before = getMigrationHistory(fixture.database);
       const after = migrateDatabase(fixture.database);
       expect(after).toEqual(before);
-      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(after.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
       expect(after.map(({ name }) => name)).toEqual([
         "001_core_runs_businesses.sql",
         "002_evidence_tasks_provider_calls.sql",
@@ -101,6 +101,7 @@ describe("forward-only migrations", () => {
         "008_icp_qualification_scoring.sql",
         "009_internal_calling_queue.sql",
         "010_live_overture_discovery.sql",
+        "011_foundation_waterproofing_niche.sql",
       ]);
       expect(after.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum))).toBe(true);
     } finally {

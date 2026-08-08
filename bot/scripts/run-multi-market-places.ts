@@ -11,6 +11,7 @@ import {
 } from "../src/lead-engine/providers/google/text-search.js";
 import {
   GOOGLE_PLACES_ADAPTER_VERSION,
+  GOOGLE_FOUNDATION_WATERPROOFING_QUERIES,
   GOOGLE_POOL_SERVICE_QUERIES,
   GOOGLE_PLACES_MAX_PAGE_SIZE,
   type GoogleTextSearchPage,
@@ -26,6 +27,7 @@ import {
 } from "./run-pool-lead-batch.js";
 import type { EligibleCandidate } from "../src/lead-engine/assessment/candidate-gate.js";
 import type { BoundingArea, CoverageCell, CoverageManifest } from "../src/lead-engine/geography/types.js";
+import type { SupportedQualificationNiche } from "../src/lead-engine/qualification/types.js";
 
 /**
  * Multi-market Google Places lead runner.
@@ -75,6 +77,27 @@ import type { BoundingArea, CoverageCell, CoverageManifest } from "../src/lead-e
  */
 
 export const MULTI_MARKET_QUERY_VERSION = "multi-market-places-1.0.0" as const;
+export const FOUNDATION_WATERPROOFING_QUERY_VERSION =
+  "foundation-waterproofing-places-1.0.0" as const;
+
+export const MULTI_MARKET_NICHE_IDS = Object.freeze({
+  "pool-service": "pool_service",
+  "foundation-waterproofing": "foundation_waterproofing",
+} as const);
+
+export function googleQueriesForNiche(
+  nicheId: SupportedQualificationNiche,
+): ReadonlyArray<string> {
+  return nicheId === "foundation_waterproofing"
+    ? GOOGLE_FOUNDATION_WATERPROOFING_QUERIES
+    : GOOGLE_POOL_SERVICE_QUERIES;
+}
+
+function queryVersionForNiche(nicheId: SupportedQualificationNiche): string {
+  return nicheId === "foundation_waterproofing"
+    ? FOUNDATION_WATERPROOFING_QUERY_VERSION
+    : MULTI_MARKET_QUERY_VERSION;
+}
 
 /** Every number is a ceiling, never a target. */
 export const MULTI_MARKET_BUDGETS = Object.freeze({
@@ -119,6 +142,7 @@ export interface MultiMarketArguments {
   readonly maxAssessedCandidates: number;
   readonly queriesPerCity: number;
   readonly enableLiveRun: boolean;
+  readonly nicheId: SupportedQualificationNiche;
 }
 
 const CITY_SLUG = /[^a-z0-9]+/g;
@@ -218,7 +242,8 @@ export function parseMultiMarketArguments(
   let targetCallablePerState = 50;
   let maxGoogleRequests: number | null = null;
   let maxAssessedCandidates = 400;
-  let queriesPerCity = GOOGLE_POOL_SERVICE_QUERIES.length;
+  let queriesPerCity: number | null = null;
+  let nicheId: SupportedQualificationNiche = "pool_service";
   const markets: MultiMarket[] = [];
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -229,6 +254,12 @@ export function parseMultiMarketArguments(
     if (!value || value.startsWith("--")) throw new Error(`Runner argument ${flag} requires a value`);
     index += 1;
     if (flag === "--data-root") { dataRoot = value; continue; }
+    if (flag === "--niche") {
+      const resolved = MULTI_MARKET_NICHE_IDS[value as keyof typeof MULTI_MARKET_NICHE_IDS];
+      if (!resolved) throw new Error(`Unsupported niche: ${value}`);
+      nicheId = resolved;
+      continue;
+    }
     if (flag === "--market") { markets.push(parseMarketSpec(value)); continue; }
     if (flag === "--markets-file") {
       if (!path.isAbsolute(value)) throw new Error("Markets file must be an absolute path");
@@ -261,9 +292,11 @@ export function parseMultiMarketArguments(
   if (!Number.isSafeInteger(maxAssessedCandidates) || maxAssessedCandidates < 1 || maxAssessedCandidates > 2_000) {
     throw new Error("Candidate cap must be an integer between 1 and 2000");
   }
-  if (!Number.isSafeInteger(queriesPerCity) || queriesPerCity < 1 ||
-    queriesPerCity > GOOGLE_POOL_SERVICE_QUERIES.length) {
-    throw new Error(`Queries per city must be an integer between 1 and ${GOOGLE_POOL_SERVICE_QUERIES.length}`);
+  const maximumQueries = googleQueriesForNiche(nicheId).length;
+  const selectedQueries = queriesPerCity ?? maximumQueries;
+  if (!Number.isSafeInteger(selectedQueries) || selectedQueries < 1 ||
+    selectedQueries > maximumQueries) {
+    throw new Error(`Queries per city must be an integer between 1 and ${maximumQueries}`);
   }
   return Object.freeze({
     dataRoot,
@@ -271,8 +304,9 @@ export function parseMultiMarketArguments(
     targetCallablePerState,
     maxGoogleRequests,
     maxAssessedCandidates,
-    queriesPerCity,
+    queriesPerCity: selectedQueries,
     enableLiveRun,
+    nicheId,
   });
 }
 
@@ -286,11 +320,14 @@ export function parseMultiMarketArguments(
  * Google-sourced lead has into the calling queue's scope, since no provider
  * address means no persisted location row.
  */
-export function planMarketCell(market: MultiMarket): { manifest: CoverageManifest; cell: CoverageCell } {
+export function planMarketCell(
+  market: MultiMarket,
+  nicheId: SupportedQualificationNiche = "pool_service",
+): { manifest: CoverageManifest; cell: CoverageCell } {
   const manifest = planCoverage({
-    nicheId: "pool_service",
+    nicheId,
     configurationVersion: "1.0.0",
-    queryVersion: MULTI_MARKET_QUERY_VERSION,
+    queryVersion: queryVersionForNiche(nicheId),
     strategy: "dense",
     targets: [{
       level: "city",
@@ -421,6 +458,7 @@ export function combinedCsv(
 
 export interface MultiMarketReport {
   readonly ran: boolean;
+  readonly niche: keyof typeof MULTI_MARKET_NICHE_IDS;
   readonly adapterVersion: string;
   readonly queryVersion: string;
   readonly queries: ReadonlyArray<string>;
@@ -449,6 +487,7 @@ export type AssessMarket = (input: {
   readonly cell: CoverageCell;
   readonly dataRoot: string;
   readonly deadlineAt: number;
+  readonly nicheId: SupportedQualificationNiche;
 }) => Promise<AssessmentStageResult>;
 
 function assessmentLimits() {
@@ -520,15 +559,17 @@ export async function runMultiMarketPlaces(input: {
   const parent = resolveBatchPaths(args.dataRoot, input.repositoryRoot);
   const startedAt = Date.now();
   const deadlineAt = startedAt + MULTI_MARKET_BUDGETS.maxRuntimeMs;
-  const queries = GOOGLE_POOL_SERVICE_QUERIES.slice(0, args.queriesPerCity);
+  const queries = googleQueriesForNiche(args.nicheId).slice(0, args.queriesPerCity);
   const combinedCsvPath = path.join(parent.dataRoot, "multi-market-leads.csv");
   const summaryPath = path.join(parent.dataRoot, "multi-market-summary.json");
   const stateByMarket = new Map(args.markets.map((market) => [market.id, market.stateCode]));
 
   const empty = {
     ran: false,
+    niche: (Object.entries(MULTI_MARKET_NICHE_IDS)
+      .find(([, id]) => id === args.nicheId)?.[0] ?? "pool-service") as keyof typeof MULTI_MARKET_NICHE_IDS,
     adapterVersion: GOOGLE_PLACES_ADAPTER_VERSION,
-    queryVersion: MULTI_MARKET_QUERY_VERSION,
+    queryVersion: queryVersionForNiche(args.nicheId),
     queries,
     markets: args.markets.map((market) => market.id),
     perCity: [], perState: [],
@@ -566,6 +607,7 @@ export async function runMultiMarketPlaces(input: {
     limits: assessmentLimits(),
     deadlineAt: stage.deadlineAt,
     now: () => new Date(),
+    nicheId: stage.nicheId,
   }));
 
   const seen = newDedupeState();
@@ -606,7 +648,7 @@ export async function runMultiMarketPlaces(input: {
       const exhausted = runExhausted();
       if (exhausted !== null) { stateStop = exhausted; runStop = exhausted; break states; }
 
-      const { manifest, cell } = planMarketCell(market);
+      const { manifest, cell } = planMarketCell(market, args.nicheId);
       const cityCandidates: EligibleCandidate[] = [];
       let cityRequests = 0;
       let cityPlaces = 0;
@@ -697,6 +739,7 @@ export async function runMultiMarketPlaces(input: {
             market, manifest, cell,
             dataRoot: path.join(parent.dataRoot, market.id),
             deadlineAt,
+            nicheId: args.nicheId,
           });
         } catch (error) {
           // A city whose assessment stage refuses is recorded and skipped; the
@@ -777,8 +820,9 @@ export async function runMultiMarketPlaces(input: {
 
   const report: MultiMarketReport = {
     ran: true,
+    niche: empty.niche,
     adapterVersion: GOOGLE_PLACES_ADAPTER_VERSION,
-    queryVersion: MULTI_MARKET_QUERY_VERSION,
+    queryVersion: queryVersionForNiche(args.nicheId),
     queries,
     markets: args.markets.map((market) => market.id),
     perCity: Object.freeze(perCity.map((entry) => Object.freeze(entry))),

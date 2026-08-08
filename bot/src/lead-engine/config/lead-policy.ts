@@ -309,16 +309,18 @@ function assertNicheConsistency(
   global: GlobalPolicyFile,
   niches: ReadonlyMap<Phase2NicheId, NicheConfiguration>,
 ): void {
+  const supportedEnabledNiches: ReadonlyArray<Phase2NicheId> = [
+    "pool_service",
+    "foundation_waterproofing",
+  ];
   if (new Set(global.enabled_niches).size !== global.enabled_niches.length) {
     throw policyError("duplicate_enabled_niche", "schema.enabled_niches");
   }
   if (global.enabled_niches.length === 0) {
     throw policyError("enabled_niche_missing", "schema.enabled_niches");
   }
-  if (global.enabled_niches.length !== 1) {
-    throw policyError("multiple_enabled_niches", "schema.enabled_niches");
-  }
-  if (global.enabled_niches[0] !== "pool_service") {
+  if (global.enabled_niches.length !== supportedEnabledNiches.length ||
+    global.enabled_niches.some((id, index) => id !== supportedEnabledNiches[index])) {
     throw policyError("unsupported_enabled_niche", "schema.enabled_niches");
   }
   if (!global.enabled_niches.includes(global.default_niche)) {
@@ -327,10 +329,11 @@ function assertNicheConsistency(
   const enabledFiles = [...niches.values()]
     .filter((niche) => niche.enabled)
     .map((niche) => niche.id);
-  if (enabledFiles.length !== 1 || enabledFiles[0] !== "pool_service") {
-    throw policyError("niche_files_not_pool_only", "niches");
+  if (enabledFiles.length !== supportedEnabledNiches.length ||
+    enabledFiles.some((id, index) => id !== supportedEnabledNiches[index])) {
+    throw policyError("niche_files_mismatch", "niches");
   }
-  if (enabledFiles[0] !== global.enabled_niches[0]) {
+  if (enabledFiles.some((id, index) => id !== global.enabled_niches[index])) {
     throw policyError("niche_policy_mismatch", "schema.enabled_niches");
   }
   if (new Set(global.required_niche_fields).size !== global.required_niche_fields.length) {

@@ -50,11 +50,63 @@ export interface SeedLeadOptions {
   readonly publicEmail?: boolean;
   readonly verifiedEmail?: "current" | "expired" | false;
   readonly form?: boolean;
+  /**
+   * Emit the niche/legitimacy rule outcomes the callable-evidence gate requires.
+   * Defaults to true so existing "this lead should be callable" fixtures keep
+   * meaning that; set false to exercise the gate's rejection paths.
+   */
+  readonly callableEvidence?: boolean;
+  /** Persisted qualification identity state; defaults to the result's own. */
+  readonly identityReviewState?: "required" | "clear" | "resolved" | "unavailable";
+  /** Assessed website-to-business identity agreement; defaults to "agrees". */
+  readonly assessmentIdentityState?: "agrees" | "conflicts" | "ambiguous" | "unavailable";
   readonly coverageKey?: string;
   readonly countryCode?: string;
   readonly subdivisionCode?: string;
   readonly supersedesEvaluationId?: string | null;
   readonly modelVersion?: string;
+}
+
+/**
+ * A public contact value seen on the assessed website itself.
+ *
+ * The callable-evidence gate requires this lineage for a phone route, so the
+ * fixture has to reproduce it rather than pointing every contact rule at the
+ * generic assessment reference.
+ */
+const websiteObservationReference = {
+  ...baseReference,
+  sourceTable: "website_contact_observations" as const,
+  sourceId: "website-contact-observation",
+  sourceClass: "public_business_website" as const,
+  claimState: "public_unverified_candidate" as const,
+};
+
+/** Rule outcomes a genuinely human-callable synthetic lead must carry. */
+function callableEvidenceOutcomes(enabled: boolean): QualificationRuleOutcome[] {
+  if (!enabled) return [];
+  const build = (
+    component: QualificationRuleOutcome["component"],
+    ruleId: string,
+    maximumPoints: number,
+  ): QualificationRuleOutcome => ({
+    component,
+    ruleId,
+    state: "positive",
+    points: maximumPoints,
+    maximumPoints,
+    evidenceReferences: [baseReference],
+    explanation: `${ruleId} supported by synthetic persisted evidence.`,
+    missingFlag: null,
+    conflictFlag: null,
+  });
+  return [
+    build("niche_service_fit", "niche.relevant_category", 5),
+    build("niche_service_fit", "niche.core_service_observed", 10),
+    build("business_legitimacy", "legitimacy.homepage_usable", 5),
+    build("business_legitimacy", "legitimacy.https_observed", 2),
+    build("business_legitimacy", "legitimacy.identity_agrees", 4),
+  ];
 }
 
 function contactOutcome(
@@ -75,7 +127,9 @@ function contactOutcome(
     verificationMethod: ruleId.includes("phone") ? "phone_reachability_check" as const : "email_deliverability_check" as const,
     verificationResult: "passed" as const,
     freshUntil: verification === "current" ? FRESH_UNTIL : "2026-01-19T12:00:00.000Z",
-  } : baseReference;
+  } : ruleId === "contact.public_phone_observed" || ruleId === "contact.public_email_observed"
+    ? websiteObservationReference
+    : baseReference;
   return {
     component: ruleId.startsWith("readiness") ? "outreach_readiness" : "contactability",
     ruleId,
@@ -125,9 +179,12 @@ export function seedRankedLead(database: SqliteDatabase, options: SeedLeadOption
   const personPoints = Math.max(0, Math.min(10, remainingPoints));
   remainingPoints -= personPoints;
   const outreachPoints = Math.max(0, Math.min(10, remainingPoints));
+  const callableOutcomes = callableEvidenceOutcomes(options.callableEvidence ?? true);
+  const outcomesFor = (component: QualificationRuleOutcome["component"]) =>
+    callableOutcomes.filter((item) => item.component === component);
   const componentScores: PoolServiceQualificationResult["componentScores"] = [
-    { component: "niche_service_fit", points: nichePoints, maximumPoints: 25, outcomes: [] },
-    { component: "business_legitimacy", points: legitimacyPoints, maximumPoints: 15, outcomes: [] },
+    { component: "niche_service_fit", points: nichePoints, maximumPoints: 25, outcomes: outcomesFor("niche_service_fit") },
+    { component: "business_legitimacy", points: legitimacyPoints, maximumPoints: 15, outcomes: outcomesFor("business_legitimacy") },
     { component: "opportunity_signals", points: opportunityPoints, maximumPoints: 20, outcomes: [{ component: "opportunity_signals", ruleId: "opportunity.booking_absent", state: opportunityPoints ? "positive" : "negative", points: opportunityPoints, maximumPoints: 20, evidenceReferences: [baseReference], explanation: "Synthetic observed opportunity signal.", missingFlag: null, conflictFlag: null }] },
     { component: "contactability", points: 15, maximumPoints: 15, outcomes: contactOutcomes },
     { component: "decision_maker_evidence", points: personPoints, maximumPoints: 10, outcomes: [] },
@@ -155,7 +212,7 @@ export function seedRankedLead(database: SqliteDatabase, options: SeedLeadOption
     evidenceReferences: [baseReference],
     freshnessWarnings: [],
     verificationLimitations: ["Synthetic fixture; candidate contacts are not verified unless explicitly marked."],
-    identityReviewState: identityRequired ? "required" : "clear",
+    identityReviewState: options.identityReviewState ?? (identityRequired ? "required" : "clear"),
     reviewRequirements: { required: reviewRequired, reasons: reviewRequired ? ["synthetic_review_required"] : [] },
     confidence: { observedMinimumBasisPoints: 8000, observedMaximumBasisPoints: 8000, usedAsVerification: false },
     evidenceQuality: { currentReferences: 1, staleReferences: 0, unknownFreshnessReferences: 0, conflictingReferences: 0, sourceClasses: ["synthetic_fixture"] },
@@ -178,8 +235,8 @@ export function seedRankedLead(database: SqliteDatabase, options: SeedLeadOption
       started_at, assessed_at, fresh_until, crawl_policy_version, extraction_policy_version,
       browser_status, identity_state, review_required, source_class
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'fixture-crawl-v1', 'fixture-extract-v1',
-              'not_checked', 'agrees', ?, 'synthetic_fixture')
-  `).run(assessmentId, businessId, `https://${options.id}.example.test/`, `https://${options.id}.example.test/`, options.assessmentStatus ?? "complete", assessmentAt, assessmentAt, assessmentFreshUntil, reviewRequired ? 1 : 0);
+              'not_checked', ?, ?, 'synthetic_fixture')
+  `).run(assessmentId, businessId, `https://${options.id}.example.test/`, `https://${options.id}.example.test/`, options.assessmentStatus ?? "complete", assessmentAt, assessmentAt, assessmentFreshUntil, options.assessmentIdentityState ?? "agrees", reviewRequired ? 1 : 0);
   database.prepare(`
     INSERT INTO icp_qualification_evaluations (
       id, run_id, business_id, assessment_id, model_version, niche_id, input_fingerprint,

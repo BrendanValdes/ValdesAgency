@@ -1,7 +1,8 @@
 import { createQualificationRepository } from "../qualification/repository.js";
-import { qualifyPoolServiceLead } from "../qualification/qualifier.js";
+import { qualifyLead } from "../qualification/qualifier.js";
 import { POOL_SERVICE_ICP_MODEL_VERSION } from "../qualification/pool-service-model.js";
-import type { IcpQualificationResult } from "../qualification/types.js";
+import { qualificationModelForNiche } from "../qualification/qualification-model.js";
+import type { IcpQualificationResult, SupportedQualificationNiche } from "../qualification/types.js";
 import { generateInternalCallingQueue } from "../ranking/internal-calling-queue.js";
 import {
   CALLING_QUEUE_VERSION,
@@ -25,6 +26,13 @@ import type { SqliteDatabase } from "../db/database.js";
  * handled by the qualifier and ranker exactly as they are offline — this stage
  * adds no new admissibility rules and relaxes none.
  */
+
+/**
+ * Re-exported so bounded scripts can name the qualification model version they
+ * rank against without importing the qualification module directly, which the
+ * Phase 3 containment boundary forbids for anything under scripts/ or website/.
+ */
+export { POOL_SERVICE_ICP_MODEL_VERSION } from "../qualification/pool-service-model.js";
 
 export interface QualificationOutcomeCounts {
   readonly qualified: number;
@@ -66,7 +74,11 @@ export function qualifyAndRankBatch(input: {
   maximumReview: number;
   coverageKeys: ReadonlyArray<string>;
   signal: AbortSignal;
+  /** Omitted callers keep the existing pool-service behavior. */
+  nicheId?: SupportedQualificationNiche;
 }): BatchQueueSummary {
+  const nicheId = input.nicheId ?? "pool_service";
+  const qualificationModel = qualificationModelForNiche(nicheId);
   const qualification = createQualificationRepository(input.database);
   const counts: Record<string, number> = {};
   let evaluated = 0;
@@ -81,14 +93,18 @@ export function qualifyAndRankBatch(input: {
       runId: null,
       assessmentId: entry.assessmentId,
       evaluatedAt: input.evaluatedAt,
+      // The same cells that scope the queue below are this batch's selected
+      // market, so the geography hard rule compares a business location against
+      // the market that was actually searched rather than against nothing.
+      coverageKeys: input.coverageKeys,
     });
-    const result = qualifyPoolServiceLead(qualificationInput, {
-      modelVersion: POOL_SERVICE_ICP_MODEL_VERSION,
+    const result = qualifyLead(qualificationInput, {
+      modelVersion: qualificationModel.version,
     });
     // Idempotency: an identical input fingerprint is never re-persisted, so a
     // resumed batch reuses the prior evaluation instead of duplicating it.
     const existing = qualification.getByFingerprint(
-      entry.businessId, POOL_SERVICE_ICP_MODEL_VERSION, result.inputFingerprint,
+      entry.businessId, qualificationModel.version, result.inputFingerprint,
     );
     if (existing) {
       skippedAlreadyEvaluated += 1;
@@ -103,7 +119,7 @@ export function qualifyAndRankBatch(input: {
   const constraints: CallingQueueConstraints = {
     queueVersion: CALLING_QUEUE_VERSION,
     rankingModelVersion: POOL_SERVICE_RANKING_MODEL_VERSION,
-    niche: "pool_service",
+    niche: nicheId,
     // Scoped to the coverage cells this batch actually discovered.
     scope: { kind: "coverage_keys", coverageKeys: input.coverageKeys },
     maximumCallable: input.maximumCallable,
@@ -111,7 +127,7 @@ export function qualifyAndRankBatch(input: {
     minimumQualificationScore: 0,
     minimumPriorityScore: 0,
     acceptedQualificationResults: ["qualified"],
-    qualificationModelVersion: POOL_SERVICE_ICP_MODEL_VERSION,
+    qualificationModelVersion: qualificationModel.version,
     freshnessPolicyVersion: POOL_SERVICE_QUEUE_FRESHNESS_POLICY_VERSION,
     includedContactRoutes: ["phone", "email", "form"],
     contactPolicy: "require_route",

@@ -42,8 +42,25 @@ export const POOL_SERVICE_ICP_V1 = Object.freeze({
     "pool service",
     "recurring pool maintenance",
   ]),
+  /**
+   * Provider-category vocabulary, calibrated 2026-08-03 against the identifiers
+   * official Overture data actually publishes.
+   *
+   * VOCABULARY ONLY. No weight, threshold, score floor, rule id, component, or
+   * maximum changed with this list. The v1 list named `pool_service`, which
+   * Overture never emits, so `niche.relevant_category` read `missing` on every
+   * real lead while the pipeline was structurally unable to award its 5 points.
+   *
+   * Membership is governed by OVERTURE_POOL_SERVICE_CATEGORY_CALIBRATION, which
+   * holds the per-identifier rationale. Retail, facility, recreation,
+   * spa-adjacent, and builder-ambiguous identifiers are excluded on purpose.
+   * `pool_service` is retained as the canonical term from v1.
+   */
   relevantCategories: Object.freeze([
     "pool_service",
+    "pool_cleaning",
+    "pool_cleaning_service",
+    "pool_maintenance_service",
     "swimming_pool_repair_service",
   ]),
   excludedOperatorTerms: Object.freeze([

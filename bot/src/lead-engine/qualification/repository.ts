@@ -184,6 +184,25 @@ function fact(
   return { value, state: effectiveState, references: ordered };
 }
 
+/**
+ * Canonical geography value for a selected market.
+ *
+ * A persisted business location is always rendered as
+ * `subdivision:<country>-<region>`, while a coverage cell may carry either a bare
+ * subdivision code ("AZ") or an already-qualified one ("US-AZ"). Qualifying the
+ * bare form here — rather than in the comparison — keeps both sides of
+ * `hard.outside_selected_geography` in one shape, so an in-market business is not
+ * disqualified purely because its market was recorded in the short form. A blank
+ * subdivision still means "anywhere in this country".
+ */
+function marketGeographyValue(countryCode: string, subdivisionCode: string | null): string {
+  const country = countryCode.trim().toUpperCase();
+  const subdivision = subdivisionCode?.trim().toUpperCase() ?? "";
+  const qualified = !subdivision ? ""
+    : subdivision.includes("-") ? subdivision : `${country}-${subdivision}`;
+  return `country:${country}|subdivision:${qualified}`;
+}
+
 function assessmentRow(
   database: SqliteDatabase,
   businessId: string,
@@ -261,6 +280,12 @@ export interface QualificationRepository {
     runId?: string | null;
     assessmentId?: string | null;
     evaluatedAt: string;
+    /**
+     * Coverage cells this evaluation's batch actually searched, for callers that
+     * traverse cells without an orchestrated run. Each key must already exist as
+     * a persisted coverage cell; unknown keys are ignored rather than invented.
+     */
+    coverageKeys?: ReadonlyArray<string>;
   }): PoolServiceQualificationInput;
   save(result: PoolServiceQualificationResult, assessmentId?: string | null): PoolServiceQualificationResult;
   getById(id: string): PoolServiceQualificationResult | null;
@@ -276,7 +301,7 @@ export interface QualificationRepository {
 
 export function createQualificationRepository(database: SqliteDatabase): QualificationRepository {
   const repository: QualificationRepository = {
-    loadPoolServiceInput({ businessId, runId = null, assessmentId = null, evaluatedAt }) {
+    loadPoolServiceInput({ businessId, runId = null, assessmentId = null, evaluatedAt, coverageKeys = [] }) {
       const evaluatedMs = Date.parse(evaluatedAt);
       if (!Number.isFinite(evaluatedMs) || new Date(evaluatedMs).toISOString() !== evaluatedAt) {
         throw new Error("Qualification evaluation time must be a canonical ISO timestamp");
@@ -322,24 +347,50 @@ export function createQualificationRepository(database: SqliteDatabase): Qualifi
           evidenceState: row.evidence_state, observedAt: row.updated_at,
         })],
       ));
-      const selectedMarkets = runId ? (database.prepare(`
-        SELECT DISTINCT cc.coverage_key, cc.country_code, cc.subdivision_code, cc.updated_at
-        FROM provider_calls pc
-        JOIN discovery_observations observation ON observation.provider_call_id = pc.id
-        JOIN discovery_queries query ON query.id = observation.query_id
-        JOIN coverage_cells cc ON cc.coverage_key = query.coverage_key
-        WHERE pc.run_id = ?
-        ORDER BY cc.coverage_key
-      `).all(runId) as Array<{
+      // Selected markets have two persisted sources and both are honoured.
+      //
+      // An orchestrated run reaches its cells through the discovery lineage. A
+      // bounded batch that traverses cells directly has no provider_calls row to
+      // join through, so it names the coverage keys it actually searched; those
+      // rows must already exist as coverage cells, which is what makes them
+      // citable. Neither source defaults anything in: a caller with no run and no
+      // coverage keys yields no market, and the geography hard rule then does not
+      // fire at all rather than rejecting or admitting on a guess.
+      const marketRows = new Map<string, {
         coverage_key: string; country_code: string; subdivision_code: string | null; updated_at: string;
-      }>).map((row) => fact(
-        `country:${row.country_code.toUpperCase()}|subdivision:${row.subdivision_code?.toUpperCase() ?? ""}`,
-        "positive",
-        [reference({
-          sourceTable: "coverage_cells", sourceId: row.coverage_key,
-          evaluatedAt, observedAt: row.updated_at,
-        })],
-      )) : [];
+      }>();
+      if (runId) {
+        for (const row of database.prepare(`
+          SELECT DISTINCT cc.coverage_key, cc.country_code, cc.subdivision_code, cc.updated_at
+          FROM provider_calls pc
+          JOIN discovery_observations observation ON observation.provider_call_id = pc.id
+          JOIN discovery_queries query ON query.id = observation.query_id
+          JOIN coverage_cells cc ON cc.coverage_key = query.coverage_key
+          WHERE pc.run_id = ?
+          ORDER BY cc.coverage_key
+        `).all(runId) as Array<{
+          coverage_key: string; country_code: string; subdivision_code: string | null; updated_at: string;
+        }>) marketRows.set(row.coverage_key, row);
+      }
+      for (const coverageKey of new Set(coverageKeys)) {
+        const row = database.prepare(`
+          SELECT coverage_key, country_code, subdivision_code, updated_at
+          FROM coverage_cells WHERE coverage_key = ?
+        `).get(coverageKey) as {
+          coverage_key: string; country_code: string; subdivision_code: string | null; updated_at: string;
+        } | undefined;
+        if (row) marketRows.set(row.coverage_key, row);
+      }
+      const selectedMarkets = [...marketRows.values()]
+        .sort((left, right) => left.coverage_key.localeCompare(right.coverage_key))
+        .map((row) => fact(
+          marketGeographyValue(row.country_code, row.subdivision_code),
+          "positive",
+          [reference({
+            sourceTable: "coverage_cells", sourceId: row.coverage_key,
+            evaluatedAt, observedAt: row.updated_at,
+          })],
+        ));
 
       const serviceRows = assessment ? database.prepare(`
         SELECT * FROM service_evidence WHERE assessment_id = ? ORDER BY id

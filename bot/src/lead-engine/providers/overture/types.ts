@@ -111,6 +111,35 @@ export interface OvertureAssetQueryResult {
   readonly earlyFilteredGroups: number;
   /** Row groups skipped using column statistics, before any row was read. */
   readonly statisticsPrunedGroups: number;
+  /**
+   * Candidate funnel, aggregate counts only. Every stage is a count of decoded
+   * rows, never a business value, so this can be reported verbatim.
+   */
+  readonly funnel: OvertureCandidateFunnel;
+  /** Byte-range cache behaviour for this query. */
+  readonly cache: OvertureQueryCacheMetrics;
+}
+
+export interface OvertureCandidateFunnel {
+  /** Rows decoded through the full projection, before any row-level filter. */
+  readonly decodedRows: number;
+  /** Decoded rows whose point geometry fell outside the coverage cell. */
+  readonly rejectedOutsideCell: number;
+  /** In-cell rows already seen in this query, by provider place id. */
+  readonly rejectedDuplicateId: number;
+  /** In-cell, first-seen rows the injected category predicate refused. */
+  readonly rejectedByCategory: number;
+  /** In-cell, first-seen rows the category predicate accepted. */
+  readonly acceptedCandidates: number;
+}
+
+export interface OvertureQueryCacheMetrics {
+  /** Ranged reads served from the bounded byte cache without a network request. */
+  readonly rangeHits: number;
+  /** Ranged reads that required a network request. */
+  readonly rangeMisses: number;
+  /** True when this query reused an asset handle a previous cell had opened. */
+  readonly assetHandleReused: boolean;
 }
 
 export interface OvertureAssetQueryInput {
