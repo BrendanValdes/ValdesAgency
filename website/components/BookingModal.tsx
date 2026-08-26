@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+} from "react";
+import { ArrowRight, Check, Clock3, X } from "lucide-react";
+import styles from "./BookingModal.module.css";
 
 interface BookingModalProps {
   open: boolean;
@@ -12,17 +21,54 @@ type Status = "idle" | "submitting" | "success" | "error";
 export default function BookingModal({ open, onClose }: BookingModalProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!open) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const focusFrame = window.requestAnimationFrame(() => firstFieldRef.current?.focus());
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
+
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.removeEventListener("keydown", handler);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
     };
   }, [open, onClose]);
 
@@ -38,6 +84,10 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
   }, [open]);
 
   if (!open) return null;
+
+  function handleBackdropMouseDown(e: MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) onClose();
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -72,103 +122,136 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-      onClick={onClose}
+      className={styles.backdrop}
+      onMouseDown={handleBackdropMouseDown}
       role="dialog"
       aria-modal="true"
-      aria-label="Book a strategy call"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
     >
       <div
-        className="glass rounded-3xl p-8 sm:p-10 max-w-xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        className={styles.modal}
       >
+        <button
+          type="button"
+          onClick={onClose}
+          className={styles.closeButton}
+          aria-label="Close booking form"
+        >
+          <X size={18} strokeWidth={1.7} aria-hidden="true" />
+        </button>
+
         {status === "success" ? (
-          <div className="text-center space-y-5 py-6">
-            <span className="power-dot inline-block" aria-hidden="true" />
-            <h2 className="font-display text-3xl sm:text-4xl uppercase">Got it.</h2>
-            <p className="text-paper">Brendan will call you within 24 hours.</p>
-            <p className="text-paper-dim text-sm">
+          <div className={styles.successPanel}>
+            <div className={styles.successMark} aria-hidden="true">
+              <Check size={26} strokeWidth={1.7} />
+            </div>
+            <p className={styles.kicker}>Request received</p>
+            <h2 id={titleId}>You’re all set.</h2>
+            <p id={descriptionId} className={styles.successLead}>Brendan will call you within 24 hours.</p>
+            <p className={styles.contactLine}>
               hello@valdesagency.com &middot; 702.523.8826
             </p>
             <button
+              type="button"
               onClick={onClose}
-              className="mt-4 font-mono-accent uppercase text-xs tracking-[0.14em] text-paper-dim hover:text-paper transition-colors cursor-pointer"
+              className={styles.doneButton}
             >
-              Close
+              Done <ArrowRight size={15} aria-hidden="true" />
             </button>
           </div>
         ) : (
-          <>
-            <div className="mb-8 flex items-start justify-between gap-4">
+          <div className={styles.bookingLayout}>
+            <div className={styles.modalIntro}>
               <div>
-                <h2 className="font-display text-2xl sm:text-3xl uppercase leading-none">
-                  Book a strategy call
-                </h2>
-                <p className="text-paper-dim mt-2 text-sm">
-                  30 minutes. Free. No pitch deck.
+                <p className={styles.kicker}><span aria-hidden="true" /> Strategy session</p>
+                <h2 id={titleId}>Let’s find your next growth opportunity.</h2>
+                <p id={descriptionId} className={styles.introCopy}>
+                  A focused conversation about where you are now, where you want to grow, and what would make the biggest difference.
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="text-paper-dim hover:text-paper transition-colors text-2xl leading-none cursor-pointer"
-                aria-label="Close"
-              >
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input
-                  name="firstName"
-                  required
-                  placeholder="First name"
-                  autoComplete="given-name"
-                  className="bg-ink-soft border border-white/10 rounded-xl px-4 py-3 text-paper placeholder:text-paper-dim focus:outline-none focus:border-signal transition-colors"
-                />
-                <input
-                  name="lastName"
-                  required
-                  placeholder="Last name"
-                  autoComplete="family-name"
-                  className="bg-ink-soft border border-white/10 rounded-xl px-4 py-3 text-paper placeholder:text-paper-dim focus:outline-none focus:border-signal transition-colors"
-                />
+
+              <div className={styles.sessionDetails}>
+                <div className={styles.detailIcon}><Clock3 size={18} strokeWidth={1.6} aria-hidden="true" /></div>
+                <div>
+                  <strong>30 minutes</strong>
+                  <span>Free. Direct. No pitch deck.</span>
+                </div>
               </div>
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="Email"
-                autoComplete="email"
-                className="w-full bg-ink-soft border border-white/10 rounded-xl px-4 py-3 text-paper placeholder:text-paper-dim focus:outline-none focus:border-signal transition-colors"
-              />
-              <input
-                name="phone"
-                type="tel"
-                required
-                placeholder="Phone"
-                autoComplete="tel"
-                className="w-full bg-ink-soft border border-white/10 rounded-xl px-4 py-3 text-paper placeholder:text-paper-dim focus:outline-none focus:border-signal transition-colors"
-              />
-              <textarea
-                name="business"
-                rows={3}
-                placeholder="What's your business? (optional)"
-                className="w-full bg-ink-soft border border-white/10 rounded-xl px-4 py-3 text-paper placeholder:text-paper-dim focus:outline-none focus:border-signal transition-colors resize-none"
-              />
+            </div>
+
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles.nameRow}>
+                <label className={styles.field}>
+                  <span>First name <small>Required</small></span>
+                  <input
+                    ref={firstFieldRef}
+                    name="firstName"
+                    required
+                    placeholder="First name"
+                    autoComplete="given-name"
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Last name <small>Required</small></span>
+                  <input
+                    name="lastName"
+                    required
+                    placeholder="Last name"
+                    autoComplete="family-name"
+                  />
+                </label>
+              </div>
+
+              <label className={styles.field}>
+                <span>Email <small>Required</small></span>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                />
+              </label>
+
+              <label className={styles.field}>
+                <span>Phone <small>Required</small></span>
+                <input
+                  name="phone"
+                  type="tel"
+                  required
+                  placeholder="(555) 555-5555"
+                  autoComplete="tel"
+                />
+              </label>
+
+              <label className={styles.field}>
+                <span>Tell us about your business <small>Optional</small></span>
+                <textarea
+                  name="business"
+                  rows={3}
+                  placeholder="Service area, current goals, or the biggest bottleneck"
+                />
+              </label>
+
               {status === "error" && (
-                <p className="text-signal text-sm">
+                <p className={styles.errorMessage} role="alert">
                   {errorMsg || "Something went wrong. Try again."}
                 </p>
               )}
+
               <button
                 type="submit"
                 disabled={status === "submitting"}
-                className="glass glass-hover w-full font-display uppercase tracking-[0.08em] text-sm py-4 rounded-full text-paper transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className={styles.submitButton}
               >
-                {status === "submitting" ? "Sending..." : "Send"}
+                <span>{status === "submitting" ? "Sending request…" : "Book my growth call"}</span>
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
+              <p className={styles.formNote}>Your details stay private and are only used to arrange this call.</p>
             </form>
-          </>
+          </div>
         )}
       </div>
     </div>

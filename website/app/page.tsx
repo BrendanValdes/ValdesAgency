@@ -47,12 +47,12 @@ const demandServices = [
 const pipeline = ["New lead", "Contacted", "Inspection", "Estimate", "Follow-up", "Won"] as const;
 
 const system = [
-  { label: "Ads", icon: Search },
-  { label: "Website / calls", icon: Smartphone },
-  { label: "Ava", icon: Bot },
-  { label: "CRM", icon: Database },
-  { label: "Follow-up", icon: MessageSquareText },
-  { label: "Booked / won", icon: CalendarCheck },
+  { label: "Demand", detail: "Local intent", icon: Search },
+  { label: "Website / calls", detail: "Clear response", icon: Smartphone },
+  { label: "Ava", detail: "Answers now", icon: Bot },
+  { label: "CRM", detail: "One record", icon: Database },
+  { label: "Follow-up", detail: "Next action", icon: MessageSquareText },
+  { label: "Won work", detail: "Revenue protected", icon: CalendarCheck },
 ] as const;
 
 const launch = [
@@ -93,11 +93,10 @@ export default function Home() {
               <span /> Growth systems for waterproofing companies
             </p>
             <h1 className={styles.heroTitle}>
-              Turn urgent water problems into booked inspections
-              <em> — and booked inspections into profitable jobs.</em>
+              Turn urgent water problems into booked, profitable work.
             </h1>
             <p className={styles.heroBody}>
-              Valdes Agency builds the acquisition, response, follow-up, and conversion system behind growing waterproofing companies.
+              Create more qualified opportunities, book more inspections, and keep every estimate moving toward won work.
             </p>
             <div className={styles.heroButtons}>
               <button className={styles.primaryButton} type="button" onClick={openBooking}>
@@ -107,53 +106,69 @@ export default function Home() {
                 See how it works <ArrowDown size={16} aria-hidden="true" />
               </a>
             </div>
-            <div className={styles.heroServiceLine} aria-label="Services included">
-              <span>Demand</span>
-              <i />
-              <span>Response</span>
-              <i />
-              <span>Conversion</span>
-              <i />
-              <span>Follow-up</span>
-            </div>
           </div>
 
-          <div className={styles.heroDrawing} aria-label="A connected waterproofing growth system illustration">
-            <div className={styles.drawingHeader}>
-              <span>Growth architecture</span>
-              <span>VA / WP-01</span>
-            </div>
-            <div className={styles.foundationDiagram}>
-              <div className={styles.diagramLabel}>Homeowner demand</div>
-              <div className={styles.rain} aria-hidden="true">
-                <i /><i /><i /><i /><i /><i />
+          <div className={styles.heroDrawing} aria-label="Homeowner demand becoming a booked inspection, an active estimate, and won waterproofing work">
+            <div className={styles.heroAtmosphere} aria-hidden="true" />
+            <svg className={styles.heroContours} viewBox="0 0 640 660" aria-hidden="true">
+              <path d="M40 410C82 292 172 220 292 214c126-7 225 48 308 164" />
+              <path d="M18 455c48-145 153-234 287-238 142-5 250 64 326 198" />
+              <path d="M-6 501c54-174 178-278 325-277 157 2 270 84 338 234" />
+              <path d="M86 378c37-84 108-136 203-143 102-7 186 32 261 126" />
+              <path d="M137 349c30-58 84-94 154-99 78-5 145 25 201 91" />
+            </svg>
+            <div className={styles.heroSignalStage}>
+              <svg className={styles.heroBeamMap} viewBox="0 0 600 520" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="heroBeamBlue" x1="0" x2="1">
+                    <stop offset="0" stopColor="#7eb7ec" stopOpacity="0" />
+                    <stop offset="0.5" stopColor="#7eb7ec" />
+                    <stop offset="1" stopColor="#2879df" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="heroBeamCopper" x1="0" x2="1">
+                    <stop offset="0" stopColor="#c46f43" stopOpacity="0" />
+                    <stop offset="0.55" stopColor="#e19a71" />
+                    <stop offset="1" stopColor="#c46f43" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="heroBeamSuccess" x1="0" x2="1">
+                    <stop offset="0" stopColor="#7ba58a" stopOpacity="0" />
+                    <stop offset="0.58" stopColor="#91b59d" />
+                    <stop offset="1" stopColor="#7ba58a" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path className={styles.heroBeamBase} d="M104 116C175 116 188 222 292 244S365 113 465 113" />
+                <path className={styles.heroBeamBase} d="M465 113C480 214 382 280 267 354S371 437 490 432" />
+                <path className={`${styles.heroBeamPulse} ${styles.heroBeamBlue}`} pathLength="1" d="M104 116C175 116 188 222 292 244S365 113 465 113" />
+                <path className={`${styles.heroBeamPulse} ${styles.heroBeamCopper}`} pathLength="1" d="M465 113C480 214 382 280 267 354" />
+                <path className={`${styles.heroBeamPulse} ${styles.heroBeamSuccess}`} pathLength="1" d="M267 354C283 430 371 437 490 432" />
+              </svg>
+
+              <div className={`${styles.heroSignalCard} ${styles.heroDemandCard}`}>
+                <span><Search size={15} aria-hidden="true" /> Homeowner intent</span>
+                <strong>“Basement water near me”</strong>
               </div>
-              <div className={styles.house} aria-hidden="true">
-                <span className={styles.roof} />
-                <span className={styles.wall} />
-                <span className={styles.basement} />
-                <span className={styles.drainLine} />
-                <span className={styles.sump} />
+
+              <div className={`${styles.heroSignalCard} ${styles.heroInspectionCard}`}>
+                <span><CalendarCheck size={15} aria-hidden="true" /> Inspection booked</span>
+                <strong>Tuesday · 10:30 AM</strong>
               </div>
-              <div className={`${styles.flowCard} ${styles.flowCardOne}`}>
-                <span>01</span>
-                <strong>Problem identified</strong>
-                <small>System responds</small>
+
+              <div className={styles.heroOutcomeMessage}>
+                <small>Pipeline momentum</small>
+                <strong>More opportunities<br />moving forward.</strong>
               </div>
-              <div className={`${styles.flowCard} ${styles.flowCardTwo}`}>
-                <span>02</span>
-                <strong>Inspection booked</strong>
-                <small>Pipeline advances</small>
+
+              <div className={`${styles.heroSignalCard} ${styles.heroEstimateCard}`}>
+                <span><MessageSquareText size={15} aria-hidden="true" /> Estimate follow-up</span>
+                <strong>Opportunity active</strong>
+                <small><i /> Next touch scheduled</small>
               </div>
-              <div className={`${styles.flowCard} ${styles.flowCardThree}`}>
-                <span>03</span>
-                <strong>Estimate followed up</strong>
-                <small>Opportunity protected</small>
+
+              <div className={`${styles.heroSignalCard} ${styles.heroWonCard}`}>
+                <span><Check size={16} aria-hidden="true" /> Job won</span>
+                <strong>Work scheduled</strong>
+                <small>New revenue secured</small>
               </div>
-            </div>
-            <div className={styles.drawingFooter}>
-              <span><CircleDot size={12} /> Connected system</span>
-              <span>Built for the next urgent call</span>
             </div>
           </div>
         </div>
@@ -164,8 +179,11 @@ export default function Home() {
         <div className={`${styles.shell} ${styles.videoGrid}`}>
           <div className={styles.sectionIntro}>
             <p className={styles.eyebrow}><span /> 02 / The walkthrough</p>
-            <h2 className={styles.displayTitle}>Two minutes.<br /><em>The whole growth engine.</em></h2>
-            <p>
+            <h2 className={`${styles.displayTitle} ${styles.walkthroughTitle}`}>
+              <span>Two minutes.</span>
+              <span>The whole growth engine.</span>
+            </h2>
+            <p className={styles.walkthroughCopy}>
               See how search, calls, booking, estimates, and follow-up work as one revenue system rather than separate marketing tasks.
             </p>
             <div className={styles.videoIndex}>
@@ -211,7 +229,7 @@ export default function Home() {
           <div className={styles.splitHeading}>
             <div>
               <p className={styles.darkEyebrow}>Waterproofing customer journey</p>
-              <h2 className={styles.darkTitle}>Revenue leaks happen <em>between the steps.</em></h2>
+              <h2 className={styles.darkTitle}>Revenue leaks happen between the steps.</h2>
             </div>
             <p>
               A homeowner rarely gives you unlimited time. Every handoff has to keep urgency, trust, and momentum intact.
@@ -264,7 +282,7 @@ export default function Home() {
         <div className={`${styles.shell} ${styles.demandGrid}`}>
           <div className={styles.demandCopy}>
             <p className={styles.darkEyebrow}>04 / Demand generation</p>
-            <h2 className={styles.darkTitle}>Be visible when the homeowner’s problem becomes <em>urgent.</em></h2>
+            <h2 className={styles.darkTitle}>Be visible when the homeowner’s problem becomes urgent.</h2>
             <p>
               Google captures active intent. Meta builds local familiarity before and after the search. Both point toward a clear inspection request.
             </p>
@@ -306,6 +324,18 @@ export default function Home() {
         </div>
 
         <div className={`${styles.shell} ${styles.avaConsole}`}>
+          <svg className={styles.avaBeamMap} viewBox="0 0 1200 430" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="avaBeamGradient" x1="0" x2="1">
+                <stop offset="0" stopColor="#7eb7ec" stopOpacity="0" />
+                <stop offset="0.48" stopColor="#7eb7ec" />
+                <stop offset="0.72" stopColor="#e19a71" />
+                <stop offset="1" stopColor="#e19a71" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path className={styles.avaBeamBase} d="M180 210C340 210 370 120 600 120S860 210 1020 210" />
+            <path className={styles.avaBeamPulse} pathLength="1" d="M180 210C340 210 370 120 600 120S860 210 1020 210" />
+          </svg>
           <div className={styles.incomingCall}>
             <div className={styles.callStatus}><span /> Incoming call</div>
             <div className={styles.callerAvatar}><PhoneCall size={28} aria-hidden="true" /></div>
@@ -372,7 +402,7 @@ export default function Home() {
 
           <div className={styles.websiteCopy}>
             <p className={styles.darkEyebrow}>06 / Conversion website</p>
-            <h2 className={styles.darkTitle}>Turn expensive clicks into <em>inspection requests.</em></h2>
+            <h2 className={styles.darkTitle}>Turn expensive clicks into inspection requests.</h2>
             <p>
               The site makes the next step obvious, builds confidence quickly, and works just as hard on a wet basement at 9 p.m. as it does on desktop.
             </p>
@@ -391,7 +421,7 @@ export default function Home() {
           <div className={styles.splitHeading}>
             <div>
               <p className={styles.darkEyebrow}>07 / Follow-up + CRM</p>
-              <h2 className={styles.darkTitle}>The money isn’t only in generating the lead. <em>It’s in what happens next.</em></h2>
+              <h2 className={styles.darkTitle}>The money isn’t only in generating the lead. It’s in what happens next.</h2>
             </div>
             <p>
               Every conversation has a place, every opportunity has a next action, and every estimate can be followed until the homeowner decides.
@@ -425,23 +455,41 @@ export default function Home() {
         <div className={styles.shell}>
           <div className={styles.systemHeading}>
             <p className={styles.eyebrow}><span /> 08 / Connected growth system</p>
-            <h2 className={styles.displayTitle}>One system.<br /><em>No dropped handoffs.</em></h2>
+            <h2 className={styles.displayTitle}>One system. No dropped handoffs.</h2>
             <p>Each part makes the next part stronger — from the first search to the work you win.</p>
           </div>
 
-          <ol className={styles.systemFlow}>
-            {system.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <li key={item.label}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div><Icon size={24} strokeWidth={1.5} aria-hidden="true" /></div>
-                  <strong>{item.label}</strong>
-                  {index < system.length - 1 && <ArrowRight className={styles.systemArrow} size={17} aria-hidden="true" />}
-                </li>
-              );
-            })}
-          </ol>
+          <div className={styles.systemCanvas}>
+            <div className={styles.systemGlow} aria-hidden="true" />
+            <svg className={styles.systemBeamMap} viewBox="0 0 1200 380" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="systemBeamGradient" x1="0" x2="1">
+                  <stop offset="0" stopColor="#7eb7ec" stopOpacity="0" />
+                  <stop offset="0.08" stopColor="#7eb7ec" />
+                  <stop offset="0.19" stopColor="#2879df" />
+                  <stop offset="0.27" stopColor="#e19a71" />
+                  <stop offset="0.78" stopColor="#c46f43" />
+                  <stop offset="0.88" stopColor="#91b59d" />
+                  <stop offset="1" stopColor="#7ba58a" stopOpacity="0.32" />
+                </linearGradient>
+              </defs>
+              <path className={styles.systemBeamBase} d="M95 236C170 236 186 106 292 106S390 237 500 237s111-131 206-131 111 131 207 131 111-131 194-131" />
+              <path className={styles.systemBeamPulse} pathLength="1" d="M95 236C170 236 186 106 292 106S390 237 500 237s111-131 206-131 111 131 207 131 111-131 194-131" />
+            </svg>
+            <ol className={styles.systemFlow}>
+              {system.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.label}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <div><Icon size={24} strokeWidth={1.5} aria-hidden="true" /></div>
+                    <strong>{item.label}</strong>
+                    <small>{item.detail}</small>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       </section>
 
@@ -450,7 +498,7 @@ export default function Home() {
           <div className={styles.processHeading}>
             <div>
               <p className={styles.darkEyebrow}>09 / Launch process</p>
-              <h2 className={styles.darkTitle}>Built in sequence.<br /><em>Improved with evidence.</em></h2>
+              <h2 className={styles.darkTitle}>Built in sequence. Improved with evidence.</h2>
             </div>
             <p>A focused progression from the current state to a working, connected acquisition and conversion system.</p>
           </div>
@@ -470,13 +518,23 @@ export default function Home() {
 
       <section className={`${styles.section} ${styles.finalSection}`} id="book">
         <div className={styles.finalContour} aria-hidden="true" />
-        <div className={`${styles.shell} ${styles.finalInner}`}>
-          <p className={styles.eyebrow}><span /> Ready when you are</p>
-          <h2 className={styles.finalTitle}>You handle the waterproofing. <em>We’ll build the system behind the growth.</em></h2>
-          <p>Let’s look at where demand, response, and follow-up are breaking down — and what a connected system could change.</p>
-          <button className={styles.primaryButton} type="button" onClick={openBooking}>
-            Book a growth call <ArrowRight size={17} aria-hidden="true" />
-          </button>
+        <div className={`${styles.shell} ${styles.finalStage}`}>
+          <div className={styles.finalOrb} aria-hidden="true" />
+          <div className={styles.finalInner}>
+            <p className={styles.eyebrow}><span /> Ready when you are</p>
+            <h2 className={styles.finalTitle}>You handle the waterproofing. <em>We’ll build the system behind the growth.</em></h2>
+            <p>Let’s look at where demand, response, and follow-up are breaking down — and what a connected system could change.</p>
+            <button className={styles.primaryButton} type="button" onClick={openBooking}>
+              Book a growth call <ArrowRight size={17} aria-hidden="true" />
+            </button>
+            <div className={styles.finalRoute} aria-label="The connected growth system">
+              <span>Demand</span><i /><span>Response</span><i /><span>Follow-up</span><i /><span>Won work</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${styles.shell} ${styles.footerSignature}`} aria-hidden="true">
+          <span>VALDES</span><small>AGENCY</small>
         </div>
 
         <footer className={`${styles.shell} ${styles.footer}`}>

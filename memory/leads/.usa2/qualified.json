@@ -1,0 +1,562 @@
+[
+{
+"name": "Mountain Ridge Pool Service LLC",
+"city": "Surprise AZ",
+"metro": "Phoenix AZ",
+"nn": "mountain ridge",
+"kname": "Mountain Ridge Pool Service LLC",
+"rating": 5,
+"reviews": 8,
+"phone": "+1 480-382-6282",
+"site": "http://mountainridgepools.com/",
+"address": "Desert Oasis, Surprise, AZ 85387, United States",
+"ph10": "4803826282",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Weekly Dallas Pool Service",
+"city": "Dallas TX",
+"metro": "Dallas-Fort Worth TX",
+"nn": "weekly dallas",
+"kname": "Weekly Dallas Pool Service",
+"rating": 4.8,
+"reviews": 9,
+"phone": "+1 214-377-1319",
+"site": "http://dallas-poolservice.net/",
+"address": "901 Main St 25 STE 25, Dallas, TX 75202, United States",
+"ph10": "2143771319",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Scheduled Dallas Pool Cleaning",
+"city": "Dallas TX",
+"metro": "Dallas-Fort Worth TX",
+"nn": "scheduled dallas cleaning",
+"kname": "Scheduled Dallas Pool Cleaning",
+"rating": 4.9,
+"reviews": 18,
+"phone": "+1 214-431-5170",
+"site": null,
+"address": null,
+"ph10": "2144315170",
+"gaps": [
+"web"
+]
+},
+{
+"name": "MQ Pool Cleaning Service",
+"city": "Mesquite TX",
+"metro": "Dallas-Fort Worth TX",
+"nn": "mq cleaning",
+"kname": "MQ Pool Cleaning Service",
+"rating": 5,
+"reviews": 5,
+"phone": "+1 972-848-6294",
+"site": "https://mesquitepoolservicepros.com/",
+"address": null,
+"ph10": "9728486294",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Scheduled Garland Pool Maintenance",
+"city": "Garland TX",
+"metro": "Dallas-Fort Worth TX",
+"nn": "scheduled garland maintenance",
+"kname": "Scheduled Garland Pool Maintenance",
+"rating": 4.9,
+"reviews": 15,
+"phone": "(214) 919-8020",
+"site": null,
+"address": null,
+"ph10": "2149198020",
+"gaps": [
+"web"
+]
+},
+{
+"name": "Texas Elite Pool Care",
+"city": "Pflugerville TX",
+"metro": "Austin TX",
+"nn": "texas elite care",
+"kname": "Texas Elite Pool Care",
+"rating": 5,
+"reviews": 6,
+"phone": "+1 737-243-3360",
+"site": "https://www.google.com/search?sca_esv=1524ef01b153bc09&hl=en&si=APenkKm7iecQ4G6P-TsbSMFKIQtv3EFIqRAFw-i8uEbk55Z-_63CEWkvHcBrQNpSbfCpZHYd23RuatdmBwS9yyhefPf49ud6y_YH5lAiiRsRPNEIvV9yZaLCY-Y2CtMi9sNfkW6n3n-8JUgHXPwWw3cmLWzcJVKmfQ%3D%3D&q=Texas+Elite+Pool+Care+Reviews&sa=X&ved=2ahUKEwjiuOacjbWVAxU9gK8BHeDQKcIQ0bkNegQILRAD",
+"address": null,
+"ph10": "7372433360",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Longhorn Pool Pros",
+"city": "Leander TX",
+"metro": "Austin TX",
+"nn": "longhorn pros",
+"kname": "Longhorn Pool Pros",
+"rating": 5,
+"reviews": 13,
+"phone": "(512) 734-5050",
+"site": "https://www.longhornpoolpros.com/",
+"address": null,
+"ph10": "5127345050",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "ASP - America's Swimming Pool Company of San Marcos",
+"city": "San Marcos TX",
+"metro": "Austin TX",
+"nn": "asp americas swimming san marcos",
+"kname": "ASP - America's Swimming Pool Company of San Marcos",
+"rating": 4.9,
+"reviews": 12,
+"phone": "+1 512-522-0994",
+"site": "https://www.asppoolco.com/sanmarcos/",
+"address": null,
+"ph10": "5125220994",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "The Bearded Pool Guy",
+"city": "New Braunfels TX",
+"metro": "San Antonio TX",
+"nn": "bearded guy",
+"kname": "The Bearded Pool Guy",
+"rating": 5,
+"reviews": 11,
+"phone": "+1 830-532-8541",
+"site": "https://www.thebeardedpoolguy.net/",
+"address": null,
+"ph10": "8305328541",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Townsend Pool Service",
+"city": "Schertz TX",
+"metro": "San Antonio TX",
+"nn": "townsend",
+"kname": "Townsend Pool Service",
+"rating": 5,
+"reviews": 7,
+"phone": "(956) 489-9110",
+"site": "https://www.townsendpoolservice.com/",
+"address": null,
+"ph10": "9564899110",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Lux Pool and Spa Services",
+"city": "Schertz TX",
+"metro": "San Antonio TX",
+"nn": "lux spa",
+"kname": "Lux Pool and Spa Services",
+"rating": 5,
+"reviews": 2,
+"phone": "+1 361-460-7069",
+"site": "https://luxpoolandspa.net/",
+"address": null,
+"ph10": "3614607069",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Blue Pool Expert of Brandon",
+"city": "Brandon FL",
+"metro": "Tampa FL",
+"nn": "blue expert brandon",
+"kname": "Blue Pool Expert of Brandon",
+"rating": 4.9,
+"reviews": 9,
+"phone": "+1 813-694-3331",
+"site": "http://bluepoolexperts.com/",
+"address": "904 W Robertson St, Brandon, FL 33511, United States",
+"ph10": "8136943331",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "All About Pool Care Services, LLC",
+"city": "Sanford FL",
+"metro": "Orlando FL",
+"nn": "all about care",
+"kname": "All About Pool Care Services, LLC",
+"rating": 4.5,
+"reviews": 15,
+"phone": "(407) 430-7543",
+"site": null,
+"address": null,
+"ph10": "4074307543",
+"gaps": [
+"web"
+]
+},
+{
+"name": "Just Keep Skimming Pool Service",
+"city": "St Augustine FL",
+"metro": "Jacksonville FL",
+"nn": "just keep skimming",
+"kname": "Just Keep Skimming Pool Service",
+"rating": 5,
+"reviews": 4,
+"phone": "+1 904-293-9051",
+"site": "http://justkeepskimmingpools.com/",
+"address": null,
+"ph10": "9042939051",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Soaky Pool Services",
+"city": "Miami FL",
+"metro": "Miami / South FL",
+"nn": "soaky",
+"kname": "Soaky Pool Services",
+"rating": 5,
+"reviews": 13,
+"phone": "(305) 481-3435",
+"site": "http://www.soakypool.com/",
+"address": "66 W Flagler St Suit 900, Miami, FL 33130",
+"ph10": "3054813435",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "JC Florida Pool Service , LLC",
+"city": "Hialeah FL",
+"metro": "Miami / South FL",
+"nn": "jc florida",
+"kname": "JC Florida Pool Service , LLC",
+"rating": 5,
+"reviews": 10,
+"phone": "(786) 970-9855",
+"site": "https://www.google.com/search?sca_esv=1524ef01b153bc09&hl=en&si=APenkKm7iecQ4G6P-TsbSMFKIQtv3EFIqRAFw-i8uEbk55Z-_4aSqH4OphYCPzIP6NJyaUEBjRrK9evv5L44pI4KoAAxDsaUz3cNiBV-CRLJ8NPDIWuUMd65cHmAZdTKmSMKIuHOzarutvfWmLgPWIw2QiYahjaOvQ%3D%3D&q=JC+Florida+Pool+Service+,+LLC+Reviews&sa=X&ved=2ahUKEwjYm961jbWVAxUEC3kGHW-GOkoQ0bkNegQINBAF",
+"address": "2520 W 74th St, Hialeah, FL 33016",
+"ph10": "7869709855",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Expert Pool Cleaning Services",
+"city": "Pembroke Pines FL",
+"metro": "Miami / South FL",
+"nn": "expert cleaning",
+"kname": "Expert Pool Cleaning Services",
+"rating": 4.9,
+"reviews": 7,
+"phone": "(954) 388-0074",
+"site": "http://pinespoolcare.com/",
+"address": "618 N University Dr, Pembroke Pines, FL 33024",
+"ph10": "9543880074",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Expert Pompano Pool Cleaners",
+"city": "Pompano Beach FL",
+"metro": "Miami / South FL",
+"nn": "expert pompano cleaners",
+"kname": "Expert Pompano Pool Cleaners",
+"rating": 4.8,
+"reviews": 9,
+"phone": "(954) 953-5522",
+"site": "http://pompanobeachpoolguys.com/",
+"address": "449 S Federal Hwy #405, Pompano Beach, FL 33062",
+"ph10": "9549535522",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "On Time Pool Service & Care",
+"city": "Pompano Beach FL",
+"metro": "Miami / South FL",
+"nn": "on time care",
+"kname": "On Time Pool Service & Care",
+"rating": 4.6,
+"reviews": 8,
+"phone": "+1 954-320-0099",
+"site": "http://pontevedrabeachpools.com/",
+"address": "2900 W Sample Rd, Pompano Beach, FL 33073, United States",
+"ph10": "9543200099",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Deep End Pool Service",
+"city": "Naples FL",
+"metro": "Fort Myers / Naples FL",
+"nn": "deep end",
+"kname": "Deep End Pool Service",
+"rating": 4.9,
+"reviews": 34,
+"phone": "+1 239-699-6279",
+"site": null,
+"address": null,
+"ph10": "2396996279",
+"gaps": [
+"web"
+]
+},
+{
+"name": "On-Time Pool Service, Inc.",
+"city": "Sarasota FL",
+"metro": "Sarasota FL",
+"nn": "ontime",
+"kname": "On-Time Pool Service, Inc.",
+"rating": 4.9,
+"reviews": 521,
+"phone": "+1 941-344-2783",
+"site": null,
+"address": null,
+"ph10": "9413442783",
+"gaps": [
+"web"
+]
+},
+{
+"name": "The Friendly Guys Pool Services",
+"city": "Coral Springs FL",
+"metro": "Miami / South FL",
+"nn": "friendly guys",
+"kname": "The Friendly Guys Pool Services",
+"rating": 4.9,
+"reviews": 10,
+"phone": "(954) 960-3335",
+"site": "http://coralspringspoolservices.net/",
+"address": "9600 Westview Dr #109, Coral Springs, FL 33076",
+"ph10": "9549603335",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "J & S Pool & Spa",
+"city": "Clovis CA",
+"metro": "Fresno CA",
+"nn": "j s spa",
+"kname": "J & S Pool & Spa",
+"rating": 3.8,
+"reviews": 101,
+"phone": "(559) 297-7995",
+"site": "https://jspool.com/",
+"address": "338 N Minnewawa Ave, Clovis, CA 93612",
+"ph10": "5592977995",
+"gaps": [
+"rating"
+]
+},
+{
+"name": "TLC Pool Service",
+"city": "Visalia CA",
+"metro": "Fresno CA",
+"nn": "tlc",
+"kname": "TLC Pool Service",
+"rating": 4.9,
+"reviews": 49,
+"phone": "+1 559-679-3613",
+"site": "https://cyberanalytica.wixsite.com/tlcpool",
+"address": null,
+"ph10": "5596793613",
+"gaps": [
+"web"
+]
+},
+{
+"name": "Glen's Pool Service",
+"city": "Ontario CA",
+"metro": "Riverside / IE",
+"nn": "glens",
+"kname": "Glen's Pool Service",
+"rating": 4.5,
+"reviews": 8,
+"phone": "+1 909-994-1842",
+"site": "https://glens-pool-service.com/",
+"address": null,
+"ph10": "9099941842",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Corona Pool Service - ORCA Pools",
+"city": "Corona CA",
+"metro": "Riverside / IE",
+"nn": "corona orca",
+"kname": "Corona Pool Service - ORCA Pools",
+"rating": 5,
+"reviews": 11,
+"phone": "(951) 221-3206",
+"site": "https://orcapoolsandspas.com/pool-service-corona/",
+"address": "501 Queensland Cir #301, Corona, CA 92879",
+"ph10": "9512213206",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Platinum pools and spa",
+"city": "Ontario CA",
+"metro": "Riverside / IE",
+"nn": "platinum spa",
+"kname": "Platinum pools and spa",
+"rating": 4.1,
+"reviews": 7,
+"phone": "+1 909-964-8645",
+"site": "https://www.google.com/search?sca_esv=1524ef01b153bc09&hl=en&rlz=1C1ONGR_enUS1170US1170&si=APenkKnzv9m99ToiohAuzpadUwbOz34nZJ3j2Ukmo5XOUYWAphwSUDKEAHuFs_u4Prv_6u8D3-OiXEFcRL4vxd6_DjY1RNa6QP-T40fkZdna-9NtaNo9kyYt23tKF6wAvu8OKo0k-P1JYsd4gwrW-fjrSmj7goJCkw%3D%3D&q=Platinum+pools+and+spa+Reviews&sa=X&ved=2ahUKEwjGs_HQjbWVAxX7TGwGHeIaGbIQ0bkNegQIJxAF",
+"address": "1645 N Madera Ave, Ontario, CA 91764, United States",
+"ph10": "9099648645",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "marios pool service",
+"city": "Escondido CA",
+"metro": "San Diego CA",
+"nn": "marios",
+"kname": "marios pool service",
+"rating": 4.8,
+"reviews": 4,
+"phone": "+1 760-443-0112",
+"site": "http://www.mariospoolservice.com/",
+"address": "350 S Midway Dr, Escondido, CA 92027, United States",
+"ph10": "7604430112",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Top of the line Pool and Spa",
+"city": "Escondido CA",
+"metro": "San Diego CA",
+"nn": "top line spa",
+"kname": "Top of the line Pool and Spa",
+"rating": 5,
+"reviews": 6,
+"phone": "(760) 270-2425",
+"site": "https://topofthelinepools.com/",
+"address": null,
+"ph10": "7602702425",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Proper Pool Care",
+"city": "Charlotte NC",
+"metro": "Charlotte NC",
+"nn": "proper care",
+"kname": "Proper Pool Care",
+"rating": 5,
+"reviews": 10,
+"phone": "+1 704-985-2234",
+"site": "http://properpoolcarecharlotte.com/",
+"address": "4614 Wilgrove Mint Hill Rd #01, Mint Hill, NC 28227, United States",
+"ph10": "7049852234",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Georgia Pool Solutions",
+"city": "Marietta GA",
+"metro": "Atlanta GA",
+"nn": "georgia solutions",
+"kname": "Georgia Pool Solutions",
+"rating": 5,
+"reviews": 14,
+"phone": "+1 770-524-3468",
+"site": "https://georgiapoolsolutions.com/",
+"address": null,
+"ph10": "7705243468",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Aloha Pool Service",
+"city": "Savannah GA",
+"metro": "Savannah GA",
+"nn": "aloha",
+"kname": "Aloha Pool Service",
+"rating": 5,
+"reviews": 11,
+"phone": "+1 912-667-0693",
+"site": "http://alohapoolsav.com/",
+"address": "223 Hammocks View, Savannah, GA 31410, United States",
+"ph10": "9126670693",
+"gaps": [
+"reviews"
+]
+},
+{
+"name": "Aqua Preaux Pool Services LLC",
+"city": "Baton Rouge LA",
+"metro": "New Orleans / Baton Rouge LA",
+"nn": "aqua preaux",
+"kname": "Aqua Preaux Pool Services LLC",
+"rating": 5,
+"reviews": 19,
+"phone": "(225) 610-2441",
+"site": "https://aquapreauxpoolservices.godaddysites.com/",
+"address": "Jones Creek Rd, Baton Rouge, LA 70817",
+"ph10": "2256102441",
+"gaps": [
+"web"
+]
+},
+{
+"name": "FAMILY POOL SERVICE",
+"city": "Memphis TN",
+"metro": "Memphis TN",
+"nn": "family",
+"kname": "FAMILY POOL SERVICE",
+"rating": 3.9,
+"reviews": 76,
+"phone": "+1 901-297-7812",
+"site": "https://thefamilypool.com/",
+"address": "7420 Doncaster Ln, Memphis, TN 38125, United States",
+"ph10": "9012977812",
+"gaps": [
+"rating"
+]
+},
+{
+"name": "Metairie Pool Cleaning and Service",
+"city": "Metairie LA",
+"metro": "New Orleans / Baton Rouge LA",
+"nn": "metairie cleaning",
+"kname": "Metairie Pool Cleaning and Service",
+"rating": 4.1,
+"reviews": 9,
+"phone": "+1 504-565-2962",
+"site": "https://www.metairiepoolcleaner.com/",
+"address": null,
+"ph10": "5045652962",
+"gaps": [
+"reviews"
+]
+}
+]

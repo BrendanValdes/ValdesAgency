@@ -1,0 +1,11 @@
+pool: 3530 name-deduped | 401 already-enriched skipped | 3129 fresh to enrich (cap 1400)
+[144/1400] hits=56 with_phone=56 qualified=12
+[288/1400] hits=176 with_phone=176 qualified=68
+[432/1400] hits=296 with_phone=293 qualified=105
+[576/1400] hits=417 with_phone=412 qualified=136
+[720/1400] hits=536 with_phone=529 qualified=176
+reached TARGET_BUF=155 qualified at 720 SERP calls — stopping
+ENRICHED5 (knowledge block, name-deduped): 536
+  with phone: 529
+  qualified (authoritative): 176
+  SERP calls spent: 720

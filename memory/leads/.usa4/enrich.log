@@ -1,0 +1,14 @@
+candidates available (name-deduped): 3639  |  enriching first 600 (cap 600)
+[72/600] knowledge_hits=58 with_phone=58
+[144/600] knowledge_hits=115 with_phone=115
+[216/600] knowledge_hits=172 with_phone=172
+[288/600] knowledge_hits=229 with_phone=229
+[360/600] knowledge_hits=295 with_phone=295
+[432/600] knowledge_hits=363 with_phone=362
+[504/600] knowledge_hits=428 with_phone=427
+reached PHONE_SURPLUS_STOP=400 at 504 calls, stopping
+ENRICHED (knowledge block, name-deduped): 426
+  with phone: 425
+  with rating: 426
+  with reviews: 426
+  SERP calls spent: 504

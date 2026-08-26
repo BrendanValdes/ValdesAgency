@@ -93,10 +93,10 @@ export const SECTION_LEAD_CAPTURE: SectionCopy = {
 };
 
 export const SECTION_CONTENT: SectionCopy = {
-  label: "Agentic System",
-  headline: "Stay visible without touching it.",
-  body: "The system turns your job photos into social posts, writes the captions, and publishes across your platforms automatically.",
-  tags: ["Auto-Posting", "Caption Writing", "Before and After Content"],
+  label: "CONTENT THAT KEEPS YOU TOP OF MIND",
+  headline: "Stay visible.\nWin the next call.",
+  body: "Your content system turns real pool-service work into polished posts, captions, and updates that keep your business active and recognizable—without adding another task to your day.",
+  tags: ["More Local Visibility", "Consistent Posting", "Less Owner Work"],
 };
 
 export const SECTION_COMMAND_CENTER: SectionCopy = {
