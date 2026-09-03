@@ -165,10 +165,10 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
           <div className={styles.bookingLayout}>
             <div className={styles.modalIntro}>
               <div>
-                <p className={styles.kicker}><span aria-hidden="true" /> Strategy session</p>
-                <h2 id={titleId}>Let’s find your next growth opportunity.</h2>
+                <p className={styles.kicker}><span aria-hidden="true" /> Focused working session</p>
+                <h2 id={titleId}>Let’s find the best place to start.</h2>
                 <p id={descriptionId} className={styles.introCopy}>
-                  A focused conversation about where you are now, where you want to grow, and what would make the biggest difference.
+                  Tell us a little about the business. We’ll look at how opportunities come in, how they move, and what, if anything, would make the biggest difference.
                 </p>
               </div>
 
@@ -231,7 +231,7 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
                 <textarea
                   name="business"
                   rows={3}
-                  placeholder="Service area, current goals, or the biggest bottleneck"
+                  placeholder="Service area, growth goals, or where you would like more capacity"
                 />
               </label>
 
@@ -246,7 +246,7 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
                 disabled={status === "submitting"}
                 className={styles.submitButton}
               >
-                <span>{status === "submitting" ? "Sending request…" : "Book my growth call"}</span>
+                <span>{status === "submitting" ? "Sending request…" : "Find the best place to start"}</span>
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
               <p className={styles.formNote}>Your details stay private and are only used to arrange this call.</p>
