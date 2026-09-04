@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import BookingProvider from "@/components/BookingProvider";
+import AvaProvider from "@/components/AvaProvider";
 
 // Snap scroll is CSS-native (see globals.css). LenisProvider and
 // SnapScrollProvider were removed because Lenis intercepts wheel
@@ -69,7 +70,9 @@ export default function RootLayout({
       className={`${manrope.variable} ${manropeDisplay.variable} ${mondwestFallback.variable}`}
     >
       <body>
-        <BookingProvider>{children}</BookingProvider>
+        <AvaProvider>
+          <BookingProvider>{children}</BookingProvider>
+        </AvaProvider>
       </body>
     </html>
   );

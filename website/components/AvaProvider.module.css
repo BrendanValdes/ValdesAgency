@@ -1,0 +1,64 @@
+.launcher { position:fixed; z-index:80; right:clamp(14px,2vw,28px); bottom:clamp(14px,2vw,28px); display:flex; align-items:center; gap:11px; min-width:132px; padding:11px 16px 11px 12px; border:1px solid rgba(255,255,255,.16); border-radius:999px; color:#fff; background:rgba(10,10,10,.88); box-shadow:0 18px 55px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter:blur(18px) saturate(140%); cursor:pointer; font:inherit; transition:transform .25s ease,border-color .25s ease; }
+.launcher:hover { transform:translateY(-2px); border-color:rgba(232,93,4,.75); }
+.launcherPulse { position:relative; width:28px; height:28px; border-radius:50%; background:linear-gradient(145deg,#e85d04,#b91c1c); box-shadow:0 0 20px rgba(232,93,4,.35); }
+.launcherPulse::after { content:""; position:absolute; inset:8px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.13); }
+.launcher span:last-child { display:grid; text-align:left; line-height:1.05; }
+.launcher small { font:500 9px/1 var(--font-mono); letter-spacing:.18em; color:#e85d04; }
+.launcher strong { margin-top:5px; font-size:12px; font-weight:700; }
+.scrim { position:fixed; z-index:90; inset:0; display:grid; place-items:center; padding:24px; background:rgba(3,3,3,.68); backdrop-filter:blur(10px) saturate(105%); animation:fadeIn .2s ease both; }
+.panel { position:relative; width:min(510px,100%); overflow:hidden; border:1px solid rgba(255,255,255,.12); border-radius:28px; color:#fff; background:radial-gradient(circle at 50% 48%,rgba(196,111,67,.09),transparent 34%),linear-gradient(155deg,#151515,#0c0c0c 72%); box-shadow:0 35px 110px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.05); animation:rise .32s cubic-bezier(.2,.8,.2,1) both; }
+.panel::before { content:""; position:absolute; inset:0 auto 0 0; width:2px; background:linear-gradient(180deg,transparent 12%,#c46f43 48%,transparent 88%); opacity:.8; }
+.panel header { padding:42px 54px 0; text-align:center; }
+.close { position:absolute; z-index:2; right:18px; top:18px; width:38px; height:38px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.1); border-radius:50%; color:#a5a5a5; background:rgba(255,255,255,.035); cursor:pointer; transition:color .2s ease,background .2s ease; }
+.close:hover { color:#fff; background:rgba(255,255,255,.08); }
+.brand { color:#c9825f; font:500 10px/1 var(--font-mono); letter-spacing:.25em; text-transform:uppercase; }
+.panel h2 { margin-top:15px; font:800 clamp(40px,7vw,56px)/.92 var(--font-display); letter-spacing:-.055em; }
+.role { margin-top:13px; color:rgba(255,255,255,.63); font:500 12px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.introduction { max-width:390px; margin:24px auto 0; color:rgba(255,255,255,.64); font-size:14px; line-height:1.7; }
+.context { width:max-content; max-width:100%; margin:19px auto 0; padding:8px 12px; border:1px solid rgba(196,111,67,.22); border-radius:999px; color:#dda17f; background:rgba(196,111,67,.07); font-size:11px; line-height:1.3; }
+.voiceStage { position:relative; min-height:248px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 36px 22px; text-align:center; }
+.orbit { position:absolute; top:47%; left:50%; width:168px; height:168px; transform:translate(-50%,-58%); }
+.orbit i { position:absolute; inset:0; border:1px solid rgba(255,255,255,.055); border-radius:50%; }
+.orbit i:nth-child(2) { inset:20px; border-color:rgba(196,111,67,.09); }
+.orbit i:nth-child(3) { inset:40px; border-color:rgba(196,111,67,.13); }
+.live .orbit i { animation:breathe 2.4s ease-in-out infinite; }
+.live .orbit i:nth-child(2) { animation-delay:-.7s; }
+.live .orbit i:nth-child(3) { animation-delay:-1.4s; }
+.voiceMark { z-index:1; display:flex; align-items:center; justify-content:center; gap:5px; width:76px; height:76px; margin-bottom:32px; border:1px solid rgba(238,170,131,.28); border-radius:50%; background:radial-gradient(circle at 35% 30%,#d98a61,#a23b22 56%,#681b12); box-shadow:0 16px 46px rgba(140,47,25,.3),inset 0 1px rgba(255,255,255,.2); }
+.voiceMark span { width:3px; height:14px; border-radius:4px; background:#fff; opacity:.9; }
+.voiceMark span:nth-child(2),.voiceMark span:nth-child(4) { height:23px; }
+.voiceMark span:nth-child(3) { height:32px; }
+.live .voiceMark span { animation:wave .9s ease-in-out infinite alternate; }
+.live .voiceMark span:nth-child(2) { animation-delay:-.4s; }
+.live .voiceMark span:nth-child(3) { animation-delay:-.7s; }
+.live .voiceMark span:nth-child(4) { animation-delay:-.2s; }
+.live .voiceMark span:nth-child(5) { animation-delay:-.55s; }
+.speaking .voiceMark { box-shadow:0 16px 56px rgba(196,83,45,.44),inset 0 1px rgba(255,255,255,.2); }
+.voiceStage strong { z-index:1; font:700 17px/1.2 var(--font-display); letter-spacing:-.02em; }
+.voiceStage p { z-index:1; max-width:310px; min-height:40px; margin-top:9px; color:#888; font-size:12px; line-height:1.6; }
+.panel footer { padding:0 54px 42px; }
+.panel footer button { width:100%; min-height:52px; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:13px; color:#fff; font:700 13px/1 var(--font-body); cursor:pointer; }
+.startButton { border:1px solid #cf6840; background:linear-gradient(135deg,#ad321d,#d76733); box-shadow:0 12px 34px rgba(153,49,27,.25); }
+.endButton { border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.055); }
+@keyframes fadeIn { from { opacity:0; } }
+@keyframes rise { from { opacity:0; transform:translateY(16px) scale(.985); } }
+@keyframes breathe { 50% { transform:scale(1.08); border-color:rgba(196,111,67,.22); } }
+@keyframes wave { to { height:8px; opacity:.55; } }
+@media (max-width:560px) {
+  .launcher { min-width:0; padding-right:12px; }
+  .launcher span:last-child { display:none; }
+  .scrim { place-items:end center; padding:16px 10px max(10px,env(safe-area-inset-bottom)); }
+  .panel { width:100%; border-radius:25px; }
+  .panel header { padding:36px 28px 0; }
+  .panel h2 { font-size:42px; }
+  .introduction { margin-top:19px; }
+  .voiceStage { min-height:224px; padding:28px 24px 16px; }
+  .panel footer { padding:0 24px 28px; }
+}
+@media (max-height:700px) {
+  .panel header { padding-top:30px; }
+  .introduction { margin-top:16px; }
+  .voiceStage { min-height:210px; padding-top:22px; }
+  .panel footer { padding-bottom:26px; }
+}
+@media (prefers-reduced-motion:reduce) { .launcher,.panel,.scrim,.orbit i,.voiceMark span { animation:none!important; transition:none!important; } }

@@ -199,7 +199,8 @@
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.timezoneField select {
   width: 100%;
   border: 1px solid rgba(143, 178, 204, 0.16);
   border-radius: 12px;
@@ -235,10 +236,75 @@
 }
 
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.timezoneField select:focus {
   border-color: rgba(226, 160, 122, 0.72);
   background: rgba(244, 241, 233, 0.07);
   box-shadow: 0 0 0 3px rgba(197, 111, 67, 0.11);
+}
+
+.field .fieldError {
+  display: block;
+  margin-top: -2px;
+  color: #efb292;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: rgba(239, 178, 146, 0.72);
+}
+
+.timezoneField {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 10px 12px 10px 15px;
+  border: 1px solid rgba(143, 178, 204, 0.16);
+  border-radius: 12px;
+  background: rgba(244, 241, 233, 0.035);
+}
+
+.timezoneField span,
+.timezoneField small,
+.timezoneField strong {
+  display: block;
+}
+
+.timezoneField small {
+  margin-bottom: 4px;
+  color: rgba(244, 241, 233, 0.34);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.timezoneField strong {
+  color: rgba(244, 241, 233, 0.82);
+  font-family: Iowan Old Style, Baskerville, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.timezoneField select {
+  min-width: 116px;
+  min-height: 40px;
+  padding: 0 34px 0 12px;
+  color: var(--modal-paper);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.timezoneField option {
+  background: #0d2636;
+  color: var(--modal-paper);
 }
 
 .submitButton,
@@ -288,6 +354,292 @@
   font-size: 10px;
   line-height: 1.45;
   text-align: center;
+}
+
+.scheduleStep {
+  display: grid;
+  gap: 17px;
+  min-width: 0;
+}
+
+.scheduleControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.changeTimezone {
+  border: 0;
+  border-bottom: 1px solid rgba(226, 160, 122, 0.28);
+  padding: 0 0 3px;
+  background: transparent;
+  color: #e2a07a;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.backButton,
+.retryButton {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: rgba(244, 241, 233, 0.5);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.backButton:hover,
+.retryButton:hover {
+  color: #e2a07a;
+}
+
+.loadingPanel {
+  min-height: 250px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  color: rgba(244, 241, 233, 0.52);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.spinner {
+  color: var(--modal-copper);
+  animation: spin 800ms linear infinite;
+}
+
+.dateRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(70px, 1fr);
+  gap: 8px;
+  padding-bottom: 5px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 178, 204, 0.22) transparent;
+}
+
+.dateRail button {
+  min-height: 78px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid rgba(143, 178, 204, 0.15);
+  border-radius: 13px;
+  background: rgba(244, 241, 233, 0.035);
+  color: rgba(244, 241, 233, 0.58);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.dateRail button:hover {
+  border-color: rgba(143, 178, 204, 0.38);
+  color: var(--modal-paper);
+  transform: translateY(-1px);
+}
+
+.dateRail button small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dateRail button strong {
+  font-family: Iowan Old Style, Baskerville, "Times New Roman", serif;
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.dateRail button span {
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.dateRail .selectedDate {
+  border-color: rgba(226, 160, 122, 0.68);
+  background: rgba(197, 111, 67, 0.14);
+  color: #f4f1e9;
+  box-shadow: inset 0 0 0 1px rgba(197, 111, 67, 0.08);
+}
+
+.slotHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 2px;
+}
+
+.slotHeader span {
+  color: rgba(244, 241, 233, 0.72);
+  font-family: Iowan Old Style, Baskerville, "Times New Roman", serif;
+  font-size: 17px;
+}
+
+.slotHeader small {
+  color: rgba(244, 241, 233, 0.3);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.timeGrid button {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(143, 178, 204, 0.15);
+  border-radius: 11px;
+  background: rgba(244, 241, 233, 0.04);
+  color: rgba(244, 241, 233, 0.72);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.timeGrid button:hover {
+  border-color: rgba(143, 178, 204, 0.4);
+  background: rgba(143, 178, 204, 0.08);
+  color: var(--modal-paper);
+}
+
+.timeGrid .selectedTime {
+  border-color: rgba(226, 160, 122, 0.7);
+  background: var(--modal-copper);
+  color: white;
+}
+
+.timesToggle {
+  width: fit-content;
+  margin: -3px auto 0;
+  border: 0;
+  border-bottom: 1px solid rgba(226, 160, 122, 0.28);
+  padding: 3px 1px 5px;
+  background: transparent;
+  color: rgba(244, 241, 233, 0.52);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+
+.timesToggle:hover {
+  border-color: var(--modal-copper);
+  color: #e2a07a;
+}
+
+.timesActions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.avaOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 16px;
+  border: 1px solid rgba(143, 178, 204, 0.12);
+  border-radius: 12px;
+  background: rgba(143, 178, 204, 0.035);
+}
+
+.avaOption strong {
+  display: block;
+  color: rgba(244, 241, 233, 0.7);
+  font-family: Iowan Old Style, Baskerville, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.avaOption p {
+  margin: 4px 0 0;
+  color: rgba(244, 241, 233, 0.38);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.avaOption button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(143, 178, 204, 0.22);
+  border-radius: 10px;
+  padding: 0 13px;
+  background: transparent;
+  color: rgba(244, 241, 233, 0.68);
+  font: inherit;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.avaOption button:hover {
+  border-color: rgba(226, 160, 122, 0.42);
+  background: rgba(197, 111, 67, 0.06);
+  color: #e2a07a;
+}
+
+.backButton:focus-visible,
+.retryButton:focus-visible,
+.dateRail button:focus-visible,
+.timeGrid button:focus-visible {
+  outline: 2px solid var(--modal-blue);
+  outline-offset: 2px;
+}
+
+.timesToggle:focus-visible {
+  outline: 2px solid var(--modal-blue);
+  outline-offset: 3px;
+}
+
+.avaOption button:focus-visible {
+  outline: 2px solid var(--modal-blue);
+  outline-offset: 2px;
+}
+
+.changeTimezone:focus-visible,
+.timezoneField select:focus-visible {
+  outline: 2px solid var(--modal-blue);
+  outline-offset: 3px;
 }
 
 .errorMessage {
@@ -357,6 +709,10 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 760px) {
   .backdrop {
     align-items: start;
@@ -364,7 +720,8 @@
   }
 
   .modal {
-    max-height: calc(100svh - 24px);
+    max-height: none;
+    overflow: visible;
     border-radius: 22px;
   }
 
@@ -374,8 +731,8 @@
 
   .modalIntro {
     min-height: 0;
-    gap: 28px;
-    padding: 58px 24px 28px;
+    gap: 20px;
+    padding: 50px 24px 22px;
     border-right: 0;
     border-bottom: 1px solid rgba(143, 178, 204, 0.11);
   }
@@ -397,7 +754,36 @@
 
   .form {
     min-height: 0;
-    padding: 30px 24px 28px;
+    padding: 24px 24px 26px;
+  }
+
+  .dateRail {
+    grid-auto-columns: 72px;
+  }
+
+  .timeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeGrid button {
+    min-height: 54px;
+    font-size: 13px;
+  }
+
+  .timezoneField select {
+    min-width: 132px;
+    min-height: 44px;
+  }
+
+  .avaOption {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .avaOption button {
+    width: 100%;
+    min-height: 48px;
   }
 
   .successPanel {
@@ -424,5 +810,9 @@
   .field input,
   .field textarea {
     transition: none;
+  }
+
+  .spinner {
+    animation: none;
   }
 }
